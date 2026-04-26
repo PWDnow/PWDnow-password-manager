@@ -1,0 +1,21 @@
+[Unit]
+Description=Vault Daemon — hourly encrypted backup
+After=vault-daemon.service
+
+[Service]
+Type=oneshot
+User=vault
+Group=vault
+
+# Copy the vault DB to /var/backups/vault-daemon/ and prune backups older than 30 days.
+# The vault DB is encrypted (SQLCipher / XChaCha20-Poly1305), so backups are safe at rest.
+ExecStart=/bin/bash -c '\
+  DEST=/var/backups/vault-daemon; \
+  mkdir -p "$DEST"; \
+  cp /var/lib/vault-daemon/vault.db "$DEST/vault-$(date +%%s).db"; \
+  find "$DEST" -name "vault-*.db" -mtime +30 -delete'
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/vault-daemon /var/backups/vault-daemon

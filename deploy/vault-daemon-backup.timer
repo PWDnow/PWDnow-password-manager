@@ -1,0 +1,10 @@
+[Unit]
+Description=Vault Daemon — hourly backup timer
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
