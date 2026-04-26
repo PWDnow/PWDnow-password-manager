@@ -30,13 +30,22 @@ export interface MfaConfig {
   };
   webauthn: {
     enabled: boolean;
-    credentials: WebAuthnCredentialMeta[];
+    credentials: WebAuthnCredentialMeta[];  // cross-platform hardware keys (YubiKey etc.)
+  };
+  passkey: {
+    enabled: boolean;
+    credentials: WebAuthnCredentialMeta[];  // platform passkeys (iCloud/Google sync, residentKey)
+  };
+  platform: {
+    enabled: boolean;
+    credentials: WebAuthnCredentialMeta[];  // device-bound biometrics (Touch ID, Windows Hello)
   };
   email: {
     enabled: boolean;
     address?: string;
     enabledAt?: number;
   };
+  passwordlessEnabled?: boolean;  // when true, password field is hidden at login
 }
 
 // ─── LocalStorage helpers (CRIT-06: AES-GCM encrypted) ───────────────────────
@@ -53,7 +62,10 @@ const MFA_KEY = 'mfa_config';
 const DEFAULT_MFA = (): MfaConfig => ({
   totp:     { enabled: false },
   webauthn: { enabled: false, credentials: [] },
+  passkey:  { enabled: false, credentials: [] },
+  platform: { enabled: false, credentials: [] },
   email:    { enabled: false },
+  passwordlessEnabled: false,
 });
 
 let _mfaCache: MfaConfig | null = null;
@@ -374,4 +386,200 @@ export async function authenticateWebAuthn(credentialId: string): Promise<boolea
   saveMfaConfig(cfg);
 
   return true;
+}
+
+// ─── Passkey / Platform Auth ──────────────────────────────────────────────────
+
+/**
+ * Non-sensitive hint stored in plaintext so the login page can show the
+ * "Use Passkey" button and target the right credentials without decrypting
+ * the full MFA config (which requires the password-derived local key).
+ */
+const PASSKEY_HINT_KEY = '_pwdn_pk_hint';
+
+function savePasskeyHint(credentials: WebAuthnCredentialMeta[]): void {
+  const ids = credentials.map(c => ({ id: c.rawId, name: c.name }));
+  localStorage.setItem(PASSKEY_HINT_KEY, JSON.stringify(ids));
+}
+
+export function getPasskeyHint(): Array<{ id: string; name: string }> {
+  try {
+    const s = localStorage.getItem(PASSKEY_HINT_KEY);
+    return s ? (JSON.parse(s) as Array<{ id: string; name: string }>) : [];
+  } catch { return []; }
+}
+
+function refreshPasskeyHint(): void {
+  const cfg = getMfaConfig();
+  const all = [...(cfg.passkey?.credentials ?? []), ...(cfg.platform?.credentials ?? [])];
+  savePasskeyHint(all);
+}
+
+/**
+ * Register a SYNCED passkey (iCloud Keychain / Google Password Manager).
+ * Uses authenticatorAttachment 'platform' + residentKey 'required'.
+ * On Mac this triggers Touch ID; on Windows it triggers Windows Hello.
+ */
+export async function registerPasskey(
+  userId: string,
+  email: string,
+  displayName: string,
+  credentialName: string,
+): Promise<WebAuthnCredentialMeta> {
+  if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported in this browser.');
+  if (!isSecureContext()) throw new Error('WebAuthn requires a secure context (HTTPS or localhost).');
+
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const userIdBytes = new TextEncoder().encode(userId);
+
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: 'PWDnow', id: window.location.hostname },
+      user: { id: userIdBytes, name: email, displayName },
+      pubKeyCredParams: [
+        { alg: -7,   type: 'public-key' },  // ES256
+        { alg: -257, type: 'public-key' },  // RS256
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        userVerification: 'required',
+        residentKey: 'required',  // discoverable / syncable credential
+      },
+      timeout: 60_000,
+      attestation: 'none',
+    },
+  }) as PublicKeyCredential;
+
+  if (!credential) throw new Error('Registration cancelled.');
+
+  const meta: WebAuthnCredentialMeta = {
+    id:        bufToB64url(credential.rawId),
+    rawId:     bufToB64url(credential.rawId),
+    name:      credentialName,
+    createdAt: Date.now(),
+    counter:   0,
+  };
+
+  const cfg = getMfaConfig();
+  if (!cfg.passkey) cfg.passkey = { enabled: false, credentials: [] };
+  cfg.passkey.credentials.push(meta);
+  cfg.passkey.enabled = true;
+  saveMfaConfig(cfg);
+  refreshPasskeyHint();
+
+  return meta;
+}
+
+/**
+ * Register a DEVICE-BOUND platform authenticator (Touch ID, Windows Hello, Face ID).
+ * Same underlying API as passkey but residentKey is 'discouraged' so it is NOT synced.
+ */
+export async function registerPlatformAuth(
+  userId: string,
+  email: string,
+  displayName: string,
+  credentialName: string,
+): Promise<WebAuthnCredentialMeta> {
+  if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported in this browser.');
+  if (!isSecureContext()) throw new Error('WebAuthn requires a secure context (HTTPS or localhost).');
+
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const userIdBytes = new TextEncoder().encode(userId);
+
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: 'PWDnow', id: window.location.hostname },
+      user: { id: userIdBytes, name: email, displayName },
+      pubKeyCredParams: [
+        { alg: -7,   type: 'public-key' },
+        { alg: -257, type: 'public-key' },
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        userVerification: 'required',
+        residentKey: 'discouraged',  // device-bound, not synced
+      },
+      timeout: 60_000,
+      attestation: 'none',
+    },
+  }) as PublicKeyCredential;
+
+  if (!credential) throw new Error('Registration cancelled.');
+
+  const meta: WebAuthnCredentialMeta = {
+    id:        bufToB64url(credential.rawId),
+    rawId:     bufToB64url(credential.rawId),
+    name:      credentialName,
+    createdAt: Date.now(),
+    counter:   0,
+  };
+
+  const cfg = getMfaConfig();
+  if (!cfg.platform) cfg.platform = { enabled: false, credentials: [] };
+  cfg.platform.credentials.push(meta);
+  cfg.platform.enabled = true;
+  saveMfaConfig(cfg);
+  refreshPasskeyHint();
+
+  return meta;
+}
+
+/**
+ * Authenticate with a registered passkey or platform authenticator at login time.
+ * Uses the stored hint (non-sensitive credential IDs) to target the right credential.
+ * Falls back to discoverable credential lookup if no hint is stored.
+ *
+ * NOTE: Challenge-response signature is NOT verified server-side in demo mode.
+ * Possession of the device + successful biometric is the auth factor.
+ */
+export async function authenticateWithPasskeyForLogin(): Promise<boolean> {
+  if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported.');
+  if (!isSecureContext()) throw new Error('WebAuthn requires HTTPS or localhost.');
+
+  const hints = getPasskeyHint();
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+  const requestOptions: PublicKeyCredentialRequestOptions = {
+    challenge,
+    rpId: window.location.hostname,
+    userVerification: 'required',
+    timeout: 60_000,
+  };
+
+  if (hints.length > 0) {
+    requestOptions.allowCredentials = hints.map(h => ({
+      id: b64urlToBuf(h.id),
+      type: 'public-key' as const,
+      transports: ['internal' as AuthenticatorTransport],
+    }));
+  }
+  // If no hints, omit allowCredentials → discoverable credential (resident key) lookup.
+
+  const assertion = await navigator.credentials.get({ publicKey: requestOptions }) as PublicKeyCredential;
+  if (!assertion) return false;
+
+  const returnedId = bufToB64url(assertion.rawId);
+
+  // Verify the returned credential is in our hint set or cached MFA config.
+  if (hints.some(h => h.id === returnedId)) return true;
+
+  const cfg = getMfaConfig();
+  return (
+    (cfg.passkey?.credentials ?? []).some(c => c.id === returnedId) ||
+    (cfg.platform?.credentials ?? []).some(c => c.id === returnedId)
+  );
+}
+
+/** Count how many distinct MFA methods are currently enabled. */
+export function countActiveMfaMethods(cfg?: MfaConfig): number {
+  const c = cfg ?? getMfaConfig();
+  return [
+    c.totp.enabled,
+    c.webauthn.enabled,
+    c.passkey?.enabled ?? false,
+    c.platform?.enabled ?? false,
+    c.email.enabled,
+  ].filter(Boolean).length;
 }

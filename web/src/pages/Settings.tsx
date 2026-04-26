@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { User, History, ShieldAlert, Smartphone, Key, Mail, Monitor, CheckCircle, LogOut, Edit3, RefreshCw, X, ShieldCheck, Check, Eye, EyeOff, Camera, ChevronDown, Copy, AlertTriangle, Trash2, Timer, Server, Loader2, Download, Upload, Plane, Skull, Flame, FileJson, FileText, FileUp } from 'lucide-react';
+import { User, History, ShieldAlert, Smartphone, Key, Mail, Monitor, CheckCircle, LogOut, Edit3, RefreshCw, X, ShieldCheck, Check, Eye, EyeOff, Camera, ChevronDown, Copy, AlertTriangle, Trash2, Timer, Server, Loader2, Download, Upload, Plane, Skull, Flame, FileJson, FileText, FileUp, Fingerprint, KeyRound, ToggleLeft, ToggleRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
@@ -30,6 +30,8 @@ import {
   generateEmailCode, verifyEmailCode, clearPendingOtp,
   isWebAuthnSupported, isSecureContext,
   registerWebAuthn, authenticateWebAuthn,
+  registerPasskey, registerPlatformAuth,
+  countActiveMfaMethods,
   type MfaConfig, type WebAuthnCredentialMeta,
 } from '../utils/mfa';
 import COUNTRY_LIST from '../data/country-list.json';
@@ -86,7 +88,7 @@ export default function Settings() {
   const refreshMfa = () => setMfaConfig(getMfaConfig());
 
   // ── MFA modal state ────────────────────────────────────────────────────────
-  type MfaType = 'totp' | 'webauthn' | 'email';
+  type MfaType = 'totp' | 'webauthn' | 'email' | 'passkey' | 'platform';
   const [mfaModal, setMfaModal] = useState<{ type: MfaType; step: number } | null>(null);
 
   // TOTP
@@ -113,10 +115,20 @@ export default function Settings() {
     });
   }, [totpSecret]);
 
-  // WebAuthn
+  // WebAuthn (hardware security keys)
   const [webAuthnError, setWebAuthnError]   = useState('');
   const [webAuthnBusy, setWebAuthnBusy]     = useState(false);
   const [webAuthnKeyName, setWebAuthnKeyName] = useState('My Security Key');
+
+  // Passkey (synced, iCloud / Google)
+  const [passkeyError, setPasskeyError]   = useState('');
+  const [passkeyBusy, setPasskeyBusy]     = useState(false);
+  const [passkeyName, setPasskeyName]     = useState('My Device');
+
+  // Platform auth (device-bound: Touch ID, Windows Hello, Face ID)
+  const [platformError, setPlatformError]   = useState('');
+  const [platformBusy, setPlatformBusy]     = useState(false);
+  const [platformName, setPlatformName]     = useState('This Device');
 
   // Email
   const [emailInput, setEmailInput]     = useState('');
@@ -137,6 +149,12 @@ export default function Settings() {
     setWebAuthnError('');
     setWebAuthnBusy(false);
     setWebAuthnKeyName('My Security Key');
+    setPasskeyError('');
+    setPasskeyBusy(false);
+    setPasskeyName('My Device');
+    setPlatformError('');
+    setPlatformBusy(false);
+    setPlatformName('This Device');
     setEmailError('');
     setEmailCode(['', '', '', '', '', '']);
     setEmailSimCode('');
@@ -232,6 +250,64 @@ export default function Settings() {
     const cfg = getMfaConfig();
     cfg.webauthn.credentials = cfg.webauthn.credentials.filter(c => c.id !== credId);
     cfg.webauthn.enabled = cfg.webauthn.credentials.length > 0;
+    saveMfaConfig(cfg);
+    refreshMfa();
+  };
+
+  // ── Passkey: register ─────────────────────────────────────────────────────
+  const handlePasskeyRegister = async () => {
+    setPasskeyError('');
+    setPasskeyBusy(true);
+    try {
+      const userEmail = profile.email || 'user@pwdnow';
+      await registerPasskey(userEmail, userEmail, profile.firstName || 'User', passkeyName.trim() || 'My Device');
+      refreshMfa();
+      setMfaModal({ type: 'passkey', step: 3 });
+    } catch (err) {
+      setPasskeyError(err instanceof Error ? err.message : 'Registration failed.');
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  const handlePasskeyRemove = (credId: string) => {
+    const cfg = getMfaConfig();
+    if (!cfg.passkey) return;
+    cfg.passkey.credentials = cfg.passkey.credentials.filter(c => c.id !== credId);
+    cfg.passkey.enabled = cfg.passkey.credentials.length > 0;
+    saveMfaConfig(cfg);
+    refreshMfa();
+  };
+
+  // ── Platform Auth (Touch ID / Windows Hello): register ────────────────────
+  const handlePlatformRegister = async () => {
+    setPlatformError('');
+    setPlatformBusy(true);
+    try {
+      const userEmail = profile.email || 'user@pwdnow';
+      await registerPlatformAuth(userEmail, userEmail, profile.firstName || 'User', platformName.trim() || 'This Device');
+      refreshMfa();
+      setMfaModal({ type: 'platform', step: 3 });
+    } catch (err) {
+      setPlatformError(err instanceof Error ? err.message : 'Registration failed.');
+    } finally {
+      setPlatformBusy(false);
+    }
+  };
+
+  const handlePlatformRemove = (credId: string) => {
+    const cfg = getMfaConfig();
+    if (!cfg.platform) return;
+    cfg.platform.credentials = cfg.platform.credentials.filter(c => c.id !== credId);
+    cfg.platform.enabled = cfg.platform.credentials.length > 0;
+    saveMfaConfig(cfg);
+    refreshMfa();
+  };
+
+  // ── Passwordless toggle ───────────────────────────────────────────────────
+  const handlePasswordlessToggle = () => {
+    const cfg = getMfaConfig();
+    cfg.passwordlessEnabled = !cfg.passwordlessEnabled;
     saveMfaConfig(cfg);
     refreshMfa();
   };
@@ -1166,11 +1242,11 @@ export default function Settings() {
                 <h3 className="font-bold text-xl mb-2">{t('settings.mfa', 'Multi-Factor Authentication (MFA)')}</h3>
                 <p className="text-sm text-on-surface-variant">{t('settings.twoFactorDesc', 'Recommended for all users to prevent unauthorized access.')}</p>
               </div>
-              {(mfaConfig.totp.enabled || mfaConfig.webauthn.enabled || mfaConfig.email.enabled) && (
+              {countActiveMfaMethods(mfaConfig) > 0 && (
                 <div className="bg-black text-white px-4 py-1.5 rounded text-[10px] font-black uppercase tracking-widest">{t('settings.statusActive', 'Status: Active')}</div>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* TOTP */}
               {(() => {
                 const active = mfaConfig.totp.enabled;
@@ -1263,7 +1339,101 @@ export default function Settings() {
                   </div>
                 );
               })()}
+
+              {/* Passkey (synced) */}
+              {(() => {
+                const active = mfaConfig.passkey?.enabled ?? false;
+                const count = mfaConfig.passkey?.credentials?.length ?? 0;
+                return (
+                  <div
+                    onClick={() => openMfaModal('passkey')}
+                    className={`p-8 rounded-xl border-2 transition-all cursor-pointer flex flex-col ${active ? 'border-black dark:border-on-primary-container bg-white dark:bg-surface-container-high shadow-lg' : 'border-outline-variant/40 bg-surface-container-high hover:border-outline-variant hover:bg-surface-container-highest'}`}
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <KeyRound size={32} className={active ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? 'border-black bg-black dark:border-on-primary-container dark:bg-on-primary-container' : 'border-outline-variant'}`}>
+                        {active && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-lg mb-2">Passkey</h4>
+                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">Synced passkey via iCloud Keychain or Google Password Manager. Works across your devices.</p>
+                    <div className="mt-auto">
+                      {active ? (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 px-2.5 py-1 rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />{count} passkey{count !== 1 ? 's' : ''} registered
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-outline-variant" />Not set up
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Platform Auth – Touch ID / Windows Hello / Face ID */}
+              {(() => {
+                const active = mfaConfig.platform?.enabled ?? false;
+                const count = mfaConfig.platform?.credentials?.length ?? 0;
+                return (
+                  <div
+                    onClick={() => openMfaModal('platform')}
+                    className={`p-8 rounded-xl border-2 transition-all cursor-pointer flex flex-col ${active ? 'border-black dark:border-on-primary-container bg-white dark:bg-surface-container-high shadow-lg' : 'border-outline-variant/40 bg-surface-container-high hover:border-outline-variant hover:bg-surface-container-highest'}`}
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <Fingerprint size={32} className={active ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? 'border-black bg-black dark:border-on-primary-container dark:bg-on-primary-container' : 'border-outline-variant'}`}>
+                        {active && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-lg mb-2">Touch ID / Windows Hello</h4>
+                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">Device-bound biometric. Your fingerprint or face stays on this device — never synced.</p>
+                    <div className="mt-auto">
+                      {active ? (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 px-2.5 py-1 rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />{count} device{count !== 1 ? 's' : ''} registered
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-outline-variant" />Not set up
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
+
+            {/* Passwordless toggle — shown when ≥2 MFA methods are active */}
+            {countActiveMfaMethods(mfaConfig) >= 2 && (
+              <div className={`mt-8 p-6 rounded-xl border-2 flex items-center justify-between gap-6 transition-all ${mfaConfig.passwordlessEnabled ? 'border-black dark:border-on-primary-container bg-black/5 dark:bg-white/5' : 'border-outline-variant/30 bg-surface-container-high'}`}>
+                <div className="flex items-start gap-4">
+                  <div className={`mt-0.5 p-2 rounded-xl ${mfaConfig.passwordlessEnabled ? 'bg-black text-white' : 'bg-surface-container-highest text-on-surface-variant'}`}>
+                    <Fingerprint size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-base mb-1">Go Passwordless</h4>
+                    <p className="text-xs text-on-surface-variant leading-relaxed max-w-lg">
+                      {mfaConfig.passwordlessEnabled
+                        ? 'Password field is hidden at login. Sign in using your configured MFA method.'
+                        : 'You have 2+ authentication methods. Disable the password field at login and sign in with your biometric or security key instead.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handlePasswordlessToggle}
+                  className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all"
+                  style={mfaConfig.passwordlessEnabled
+                    ? { background: 'black', color: 'white' }
+                    : { background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface)' }}
+                >
+                  {mfaConfig.passwordlessEnabled
+                    ? <><ToggleRight size={16} />Enabled</>
+                    : <><ToggleLeft size={16} />Disabled</>}
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1905,9 +2075,11 @@ export default function Settings() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                   <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center">
-                    {mfaModal.type === 'totp'     && <Smartphone className="text-white" size={22} />}
-                    {mfaModal.type === 'webauthn' && <Key        className="text-white" size={22} />}
-                    {mfaModal.type === 'email'    && <Mail       className="text-white" size={22} />}
+                    {mfaModal.type === 'totp'     && <Smartphone  className="text-white" size={22} />}
+                    {mfaModal.type === 'webauthn' && <Key         className="text-white" size={22} />}
+                    {mfaModal.type === 'email'    && <Mail        className="text-white" size={22} />}
+                    {mfaModal.type === 'passkey'  && <KeyRound    className="text-white" size={22} />}
+                    {mfaModal.type === 'platform' && <Fingerprint className="text-white" size={22} />}
                   </div>
                   <button onClick={closeMfaModal} className="p-2 hover:bg-surface-container-low rounded-full transition-colors">
                     <X size={20} />
@@ -2344,6 +2516,228 @@ export default function Settings() {
                         <div>
                           <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Email verification active</h3>
                           <p className="text-on-surface-variant text-sm">OTP codes will be sent to <strong className="text-black dark:text-white">{emailInput}</strong> at every login.</p>
+                        </div>
+                        <button onClick={closeMfaModal} className="w-full py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-neutral-800 transition-all">Done</button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ════════════════════════════════════════════════════════════
+                    PASSKEY – Synced Passkey (iCloud / Google)
+                    Step 1 = name input + register (or manage if already set)
+                    Step 3 = success
+                ═══════════════════════════════════════════════════════════ */}
+                {mfaModal.type === 'passkey' && (
+                  <>
+                    {/* Manage existing passkeys */}
+                    {(mfaConfig.passkey?.enabled) && mfaModal.step === 1 && (
+                      <div className="space-y-8">
+                        <div>
+                          <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Passkeys</h3>
+                          <p className="text-on-surface-variant text-sm leading-relaxed">Synced passkeys registered to this account.</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          {(mfaConfig.passkey?.credentials ?? []).map(cred => (
+                            <div key={cred.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                              <div className="flex items-center gap-3">
+                                <KeyRound size={18} className="text-on-surface-variant" />
+                                <div>
+                                  <p className="font-bold text-sm">{cred.name}</p>
+                                  <p className="text-[10px] text-on-surface-variant">Added {new Date(cred.createdAt).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+                              <button onClick={() => handlePasskeyRemove(cred.id)} className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors" title="Remove passkey">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Add another passkey</label>
+                          <div className="flex gap-3">
+                            <input type="text" value={passkeyName} onChange={e => setPasskeyName(e.target.value)}
+                              placeholder="e.g. MacBook Pro"
+                              className="flex-1 px-4 py-3 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold text-sm focus:ring-2 focus:ring-black/20 outline-none" />
+                            <button onClick={handlePasskeyRegister} disabled={passkeyBusy}
+                              className="px-6 py-3 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center gap-2">
+                              {passkeyBusy ? <RefreshCw size={14} className="animate-spin" /> : <KeyRound size={14} />}Add
+                            </button>
+                          </div>
+                          {passkeyError && <p className="text-xs font-bold text-error flex items-center gap-2"><AlertTriangle size={14} />{passkeyError}</p>}
+                        </div>
+
+                        <button onClick={closeMfaModal} className="w-full py-4 bg-surface-container-low text-black dark:text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-surface-container-high transition-all">Close</button>
+                      </div>
+                    )}
+
+                    {/* First-time setup */}
+                    {!(mfaConfig.passkey?.enabled) && mfaModal.step === 1 && (
+                      <div className="space-y-8">
+                        <div>
+                          <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Register a Passkey</h3>
+                          <p className="text-on-surface-variant text-sm leading-relaxed">
+                            A passkey is stored in your iCloud Keychain (Mac/iPhone) or Google Password Manager (Android/Chrome) and syncs across your devices. On Mac, you'll be prompted for Touch ID.
+                          </p>
+                        </div>
+
+                        {!isWebAuthnSupported() ? (
+                          <div className="p-5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 rounded-xl flex items-start gap-3">
+                            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-sm text-amber-800 dark:text-amber-300">Passkeys are not supported in this browser.</p>
+                          </div>
+                        ) : (
+                          <>
+                            {!isSecureContext() && (
+                              <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-3">
+                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed"><strong>Note:</strong> Passkey registration requires HTTPS or <code>localhost</code>.</p>
+                              </div>
+                            )}
+                            <div className="space-y-4">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Passkey name</label>
+                              <input type="text" autoFocus value={passkeyName} onChange={e => setPasskeyName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && !passkeyBusy) handlePasskeyRegister(); }}
+                                placeholder="e.g. MacBook Pro"
+                                className="w-full px-5 py-3.5 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/20 outline-none transition-all" />
+                            </div>
+                          </>
+                        )}
+
+                        {passkeyError && <p className="text-xs font-bold text-error flex items-center gap-2"><AlertTriangle size={14} />{passkeyError}</p>}
+
+                        <div className="flex gap-3">
+                          <button onClick={closeMfaModal} className="flex-1 py-4 bg-surface-container-low text-black dark:text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-surface-container-high transition-all">Cancel</button>
+                          <button onClick={handlePasskeyRegister} disabled={passkeyBusy || !isWebAuthnSupported()}
+                            className="flex-1 py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                            {passkeyBusy ? <RefreshCw size={16} className="animate-spin" /> : <KeyRound size={16} />}
+                            {passkeyBusy ? 'Waiting for Touch ID…' : 'Create Passkey'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {mfaModal.step === 3 && (
+                      <div className="text-center py-6 space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-green-50 dark:bg-green-950/40 flex items-center justify-center mx-auto">
+                          <CheckCircle size={40} className="text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Passkey created</h3>
+                          <p className="text-on-surface-variant text-sm">"{passkeyName}" is saved. You can now use Touch ID or your passkey provider to sign in.</p>
+                        </div>
+                        <button onClick={closeMfaModal} className="w-full py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-neutral-800 transition-all">Done</button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ════════════════════════════════════════════════════════════
+                    PLATFORM AUTH – Touch ID / Windows Hello / Face ID
+                    Step 1 = name input + register (or manage if already set)
+                    Step 3 = success
+                ═══════════════════════════════════════════════════════════ */}
+                {mfaModal.type === 'platform' && (
+                  <>
+                    {/* Manage existing */}
+                    {(mfaConfig.platform?.enabled) && mfaModal.step === 1 && (
+                      <div className="space-y-8">
+                        <div>
+                          <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Touch ID / Windows Hello</h3>
+                          <p className="text-on-surface-variant text-sm leading-relaxed">Device-bound biometric authenticators registered to this account.</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          {(mfaConfig.platform?.credentials ?? []).map(cred => (
+                            <div key={cred.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-outline-variant/10">
+                              <div className="flex items-center gap-3">
+                                <Fingerprint size={18} className="text-on-surface-variant" />
+                                <div>
+                                  <p className="font-bold text-sm">{cred.name}</p>
+                                  <p className="text-[10px] text-on-surface-variant">Added {new Date(cred.createdAt).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+                              <button onClick={() => handlePlatformRemove(cred.id)} className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors" title="Remove">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Add another device</label>
+                          <div className="flex gap-3">
+                            <input type="text" value={platformName} onChange={e => setPlatformName(e.target.value)}
+                              placeholder="e.g. MacBook Pro"
+                              className="flex-1 px-4 py-3 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold text-sm focus:ring-2 focus:ring-black/20 outline-none" />
+                            <button onClick={handlePlatformRegister} disabled={platformBusy}
+                              className="px-6 py-3 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center gap-2">
+                              {platformBusy ? <RefreshCw size={14} className="animate-spin" /> : <Fingerprint size={14} />}Add
+                            </button>
+                          </div>
+                          {platformError && <p className="text-xs font-bold text-error flex items-center gap-2"><AlertTriangle size={14} />{platformError}</p>}
+                        </div>
+
+                        <button onClick={closeMfaModal} className="w-full py-4 bg-surface-container-low text-black dark:text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-surface-container-high transition-all">Close</button>
+                      </div>
+                    )}
+
+                    {/* First-time setup */}
+                    {!(mfaConfig.platform?.enabled) && mfaModal.step === 1 && (
+                      <div className="space-y-8">
+                        <div>
+                          <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Register Touch ID / Windows Hello</h3>
+                          <p className="text-on-surface-variant text-sm leading-relaxed">
+                            This registers a device-bound biometric credential. Your fingerprint or face data stays on this device and is never synced or shared.
+                          </p>
+                        </div>
+
+                        {!isWebAuthnSupported() ? (
+                          <div className="p-5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 rounded-xl flex items-start gap-3">
+                            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-sm text-amber-800 dark:text-amber-300">Platform biometrics are not supported in this browser.</p>
+                          </div>
+                        ) : (
+                          <>
+                            {!isSecureContext() && (
+                              <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-3">
+                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed"><strong>Note:</strong> Biometric registration requires HTTPS or <code>localhost</code>.</p>
+                              </div>
+                            )}
+                            <div className="space-y-4">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Device name</label>
+                              <input type="text" autoFocus value={platformName} onChange={e => setPlatformName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && !platformBusy) handlePlatformRegister(); }}
+                                placeholder="e.g. MacBook Pro"
+                                className="w-full px-5 py-3.5 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/20 outline-none transition-all" />
+                            </div>
+                          </>
+                        )}
+
+                        {platformError && <p className="text-xs font-bold text-error flex items-center gap-2"><AlertTriangle size={14} />{platformError}</p>}
+
+                        <div className="flex gap-3">
+                          <button onClick={closeMfaModal} className="flex-1 py-4 bg-surface-container-low text-black dark:text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-surface-container-high transition-all">Cancel</button>
+                          <button onClick={handlePlatformRegister} disabled={platformBusy || !isWebAuthnSupported()}
+                            className="flex-1 py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                            {platformBusy ? <RefreshCw size={16} className="animate-spin" /> : <Fingerprint size={16} />}
+                            {platformBusy ? 'Waiting for biometric…' : 'Register Biometric'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {mfaModal.step === 3 && (
+                      <div className="text-center py-6 space-y-6">
+                        <div className="w-20 h-20 rounded-full bg-green-50 dark:bg-green-950/40 flex items-center justify-center mx-auto">
+                          <CheckCircle size={40} className="text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-headline font-black text-black dark:text-white mb-2">Biometric registered</h3>
+                          <p className="text-on-surface-variant text-sm">"{platformName}" can now be used to sign in on this device.</p>
                         </div>
                         <button onClick={closeMfaModal} className="w-full py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-neutral-800 transition-all">Done</button>
                       </div>
