@@ -477,8 +477,8 @@ export default function Settings() {
   const [isWiping, setIsWiping] = useState(false);
 
   const handleArmDuress = async () => {
-    if (duressPassword.length < 8) { setDuressError('Duress password must be at least 8 characters.'); return; }
-    if (duressPassword !== confirmDuressPassword) { setDuressError('Passwords do not match.'); return; }
+    if (duressPassword.length < 8) { setDuressError(t('settings.duressPasswordMinError', 'Duress password must be at least 8 characters.')); return; }
+    if (duressPassword !== confirmDuressPassword) { setDuressError(t('settings.duressPasswordMismatch', 'Passwords do not match.')); return; }
     setIsArmingDuress(true);
     await armDuressMode(duressPassword, duressMaxAttempts);
     setDuressConfig(getDuressModeConfig());
@@ -1137,7 +1137,7 @@ export default function Settings() {
         <section>
           <div className="flex items-center gap-3 mb-8">
             <Download className="text-black dark:text-white" size={24} aria-hidden="true" />
-            <h2 className="text-2xl font-headline font-extrabold tracking-tight">Import & Export</h2>
+            <h2 className="text-2xl font-headline font-extrabold tracking-tight">{t('settings.importExport', 'Import & Export')}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1148,13 +1148,13 @@ export default function Settings() {
                   <Download size={18} className="text-white dark:text-black" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-black dark:text-white">Export Vault</h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">Download a copy of your credentials</p>
+                  <h3 className="font-bold text-base text-black dark:text-white">{t('settings.exportVaultTitle', 'Export Vault')}</h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">{t('settings.exportVaultDesc', 'Download a copy of your credentials')}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Format</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.exportFormat', 'Format')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(['pwdnow', 'bitwarden', '1password', 'nordpass'] as ExportFormat[]).map(fmt => (
                     <button
@@ -1180,11 +1180,11 @@ export default function Settings() {
                 className="w-full py-3.5 bg-black dark:bg-white text-white dark:text-black rounded-xl font-black uppercase tracking-widest text-xs hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-40"
               >
                 <Download size={15} />
-                Export {credentials.length} credential{credentials.length !== 1 ? 's' : ''}
+                {t('settings.exportButton', 'Export {{count}} credential(s)', { count: credentials.length })}
               </button>
 
               <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                Exports are unencrypted. Store the file securely and delete it after use.
+                {t('settings.exportWarning', 'Exports are unencrypted. Store the file securely and delete it after use.')}
               </p>
             </div>
 
@@ -1195,8 +1195,8 @@ export default function Settings() {
                   <Upload size={18} className="text-white dark:text-black" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-black dark:text-white">Import Vault</h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">Bring in credentials from another manager</p>
+                  <h3 className="font-bold text-base text-black dark:text-white">{t('settings.importVaultTitle', 'Import Vault')}</h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">{t('settings.importVaultDesc', 'Bring in credentials from another manager')}</p>
                 </div>
               </div>
 
@@ -1209,8 +1209,8 @@ export default function Settings() {
                 />
                 <FileUp size={28} className="text-on-surface-variant group-hover:text-black dark:group-hover:text-white transition-colors" />
                 <div className="text-center">
-                  <p className="text-sm font-bold text-black dark:text-white">Drop file or click to browse</p>
-                  <p className="text-xs text-on-surface-variant mt-1">Accepts .json and .csv</p>
+                  <p className="text-sm font-bold text-black dark:text-white">{t('settings.importDropzone', 'Drop file or click to browse')}</p>
+                  <p className="text-xs text-on-surface-variant mt-1">{t('settings.importAccepted', 'Accepts .json and .csv')}</p>
                 </div>
               </label>
 
@@ -1219,7 +1219,7 @@ export default function Settings() {
               )}
 
               <div className="space-y-1.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Supported sources</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.importSupportedSources', 'Supported sources')}</p>
                 <div className="flex flex-wrap gap-2">
                   {['PWDnow JSON', 'Bitwarden JSON', '1Password CSV', 'NordPass CSV'].map(s => (
                     <span key={s} className="text-[10px] px-2.5 py-1 bg-surface-container-high rounded-lg font-bold text-on-surface-variant">{s}</span>
@@ -1512,24 +1512,24 @@ export default function Settings() {
         <section>
           <div className="flex items-center gap-3 mb-8">
             <Plane className="text-black dark:text-white" size={24} aria-hidden="true" />
-            <h2 className="text-2xl font-headline font-extrabold tracking-tight">Travel Mode</h2>
+            <h2 className="text-2xl font-headline font-extrabold tracking-tight">{t('settings.offlineTravelMode', 'Travel Mode')}</h2>
           </div>
           <div className={`rounded-xl p-10 border-2 transition-all ${travelConfig.active ? 'bg-blue-950 border-blue-700' : 'bg-surface-container-low border-transparent'}`}>
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
                   <h3 className={`font-bold text-xl ${travelConfig.active ? 'text-white' : ''}`}>
-                    {travelConfig.active ? 'Travel Mode Active' : 'Travel Mode'}
+                    {travelConfig.active ? t('settings.travelModeActive', 'Travel Mode Active') : t('settings.travelMode', 'Travel Mode')}
                   </h3>
                   {travelConfig.active
-                    ? <span className="text-[9px] px-2.5 py-1 bg-blue-500 text-white rounded-full font-black uppercase tracking-widest animate-pulse">Active</span>
-                    : <span className="text-[9px] px-2.5 py-1 bg-surface-container-high text-on-surface-variant rounded-full font-black uppercase tracking-widest">Inactive</span>
+                    ? <span className="text-[9px] px-2.5 py-1 bg-blue-500 text-white rounded-full font-black uppercase tracking-widest animate-pulse">{t('settings.travelActive', 'Active')}</span>
+                    : <span className="text-[9px] px-2.5 py-1 bg-surface-container-high text-on-surface-variant rounded-full font-black uppercase tracking-widest">{t('settings.travelInactive', 'Inactive')}</span>
                   }
                 </div>
                 <p className={`text-sm leading-relaxed max-w-xl mb-4 ${travelConfig.active ? 'text-blue-200' : 'text-on-surface-variant'}`}>
                   {travelConfig.active
-                    ? `${travelConfig.hiddenFolderIds.length} folder${travelConfig.hiddenFolderIds.length !== 1 ? 's' : ''} hidden — vault appears sanitized. Hidden data is AES-256-GCM encrypted locally and invisible to device inspection.`
-                    : 'Hide designated vault folders when crossing borders or entering high-risk environments. Hidden data is encrypted on-device with your travel password — invisible to inspection, fully restorable with the travel password.'}
+                    ? t('settings.travelActiveDesc', '{{count}} folder(s) hidden — vault appears sanitized. Hidden data is AES-256-GCM encrypted locally and invisible to device inspection.', { count: travelConfig.hiddenFolderIds.length })
+                    : t('settings.travelInactiveDesc', 'Hide designated vault folders when crossing borders or entering high-risk environments. Hidden data is encrypted on-device with your travel password — invisible to inspection, fully restorable with the travel password.')}
                 </p>
               </div>
               <div className="shrink-0">
@@ -1539,7 +1539,7 @@ export default function Settings() {
                     className="px-8 py-4 bg-blue-500 hover:bg-blue-400 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-3 shadow-lg shadow-blue-900/50"
                   >
                     <Plane size={18} />
-                    Disable Travel Mode
+                    {t('settings.disableTravelMode', 'Disable Travel Mode')}
                   </button>
                 ) : (
                   <button
@@ -1547,7 +1547,7 @@ export default function Settings() {
                     className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:opacity-90 transition-all flex items-center gap-3 shadow-lg"
                   >
                     <Plane size={18} />
-                    Enable Travel Mode
+                    {t('settings.enableTravelMode', 'Enable Travel Mode')}
                   </button>
                 )}
               </div>
@@ -1559,30 +1559,30 @@ export default function Settings() {
         <section>
           <div className="flex items-center gap-3 mb-8">
             <Skull className="text-black dark:text-white" size={24} aria-hidden="true" />
-            <h2 className="text-2xl font-headline font-extrabold tracking-tight">Offline Duress Mode</h2>
+            <h2 className="text-2xl font-headline font-extrabold tracking-tight">{t('settings.offlineDuressMode', 'Offline Duress Mode')}</h2>
           </div>
           <div className={`rounded-xl p-10 border-2 transition-all ${duressConfig.armed ? 'bg-red-950 border-red-800' : 'bg-surface-container-low border-transparent'}`}>
             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-8">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
                   <h3 className={`font-bold text-xl ${duressConfig.armed ? 'text-white' : ''}`}>
-                    {duressConfig.armed ? 'Duress Mode Armed' : 'Duress Mode'}
+                    {duressConfig.armed ? t('settings.duressModeArmed', 'Duress Mode Armed') : t('settings.duressModeDisarmed', 'Duress Mode')}
                   </h3>
                   {duressConfig.armed
-                    ? <span className="text-[9px] px-2.5 py-1 bg-red-600 text-white rounded-full font-black uppercase tracking-widest animate-pulse">Armed</span>
-                    : <span className="text-[9px] px-2.5 py-1 bg-surface-container-high text-on-surface-variant rounded-full font-black uppercase tracking-widest">Disarmed</span>
+                    ? <span className="text-[9px] px-2.5 py-1 bg-red-600 text-white rounded-full font-black uppercase tracking-widest animate-pulse">{t('settings.duressArmed', 'Armed')}</span>
+                    : <span className="text-[9px] px-2.5 py-1 bg-surface-container-high text-on-surface-variant rounded-full font-black uppercase tracking-widest">{t('settings.duressDisarmed', 'Disarmed')}</span>
                   }
                 </div>
                 <p className={`text-sm leading-relaxed max-w-xl mb-6 ${duressConfig.armed ? 'text-red-200' : 'text-on-surface-variant'}`}>
                   {duressConfig.armed
-                    ? `Entering the duress password at login triggers an immediate forensic wipe. Auto-wipe after ${duressConfig.maxAttempts} failed attempt${duressConfig.maxAttempts !== 1 ? 's' : ''} (${duressConfig.attemptsRemaining} remaining).`
-                    : 'A separate duress password entered at login silently wipes all vault data (3-pass CSPRNG overwrite). Also auto-triggers after a configurable number of failed login attempts.'}
+                    ? t('settings.duressArmedDesc', 'Entering the duress password at login triggers an immediate forensic wipe. Auto-wipe after {{max}} failed attempt(s) ({{remaining}} remaining).', { max: duressConfig.maxAttempts, remaining: duressConfig.attemptsRemaining })
+                    : t('settings.duressDisarmedDesc', 'A separate duress password entered at login silently wipes all vault data (3-pass CSPRNG overwrite). Also auto-triggers after a configurable number of failed login attempts.')}
                 </p>
 
-                {/* Max attempts selector — always visible when armed or when configuring */}
+                {/* Max attempts selector */}
                 <div className="flex items-center gap-4">
                   <label className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${duressConfig.armed ? 'text-red-300' : 'text-on-surface-variant'}`}>
-                    Auto-wipe after
+                    {t('settings.duressAutoWipeAfter', 'Auto-wipe after')}
                   </label>
                   <div className="relative">
                     <select
@@ -1596,14 +1596,14 @@ export default function Settings() {
                       }`}
                     >
                       {[3, 5, 10, 35, 60].map(n => (
-                        <option key={n} value={n}>{n} failed attempt{n !== 1 ? 's' : ''}</option>
+                        <option key={n} value={n}>{t('settings.duressFailedAttempts', '{{count}} failed attempt(s)', { count: n })}</option>
                       ))}
                     </select>
                     <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${duressConfig.armed ? 'text-red-400' : 'text-on-surface-variant'}`} />
                   </div>
                   {duressConfig.armed && (
                     <span className={`text-xs font-bold ${duressConfig.attemptsRemaining <= 2 ? 'text-red-400 animate-pulse' : 'text-red-300'}`}>
-                      {duressConfig.attemptsRemaining} / {duressConfig.maxAttempts} remaining
+                      {t('settings.duressAttemptsRemaining', '{{remaining}} / {{max}} remaining', { remaining: duressConfig.attemptsRemaining, max: duressConfig.maxAttempts })}
                     </span>
                   )}
                 </div>
@@ -1617,14 +1617,14 @@ export default function Settings() {
                       className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-3 shadow-lg shadow-red-900/50"
                     >
                       <Flame size={18} />
-                      Trigger Wipe Now
+                      {t('settings.duressTriggerWipe', 'Trigger Wipe Now')}
                     </button>
                     <button
                       onClick={handleDisarmDuress}
                       className="px-8 py-4 bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 rounded-xl font-bold text-sm transition-all flex items-center gap-3"
                     >
                       <ShieldCheck size={18} />
-                      Disarm
+                      {t('settings.duressDisarm', 'Disarm')}
                     </button>
                   </>
                 ) : (
@@ -1633,7 +1633,7 @@ export default function Settings() {
                     className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:opacity-90 transition-all flex items-center gap-3 shadow-lg"
                   >
                     <Skull size={18} />
-                    Arm Duress Mode
+                    {t('settings.duressArm', 'Arm Duress Mode')}
                   </button>
                 )}
               </div>
@@ -2978,8 +2978,8 @@ export default function Settings() {
                     <Plane className="text-white" size={22} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-headline font-black text-black dark:text-white">Enable Travel Mode</h3>
-                    <p className="text-xs text-on-surface-variant mt-0.5">Step {travelStep} of 4</p>
+                    <h3 className="text-xl font-headline font-black text-black dark:text-white">{t('settings.enableTravelMode', 'Enable Travel Mode')}</h3>
+                    <p className="text-xs text-on-surface-variant mt-0.5">{t('settings.travelStep', 'Step {{step}} of 4', { step: travelStep })}</p>
                   </div>
                 </div>
                 <button onClick={() => setIsTravelModalOpen(false)} className="p-2 hover:bg-surface-container-high rounded-full transition-colors"><X size={20} /></button>
@@ -2990,11 +2990,11 @@ export default function Settings() {
                   <div className="space-y-6">
                     <div>
                       <p className="text-sm text-on-surface-variant leading-relaxed mb-5">
-                        Select which folders to hide when Travel Mode is active. These folders will be AES-256-GCM encrypted and invisible until you disable Travel Mode with your travel password.
+                        {t('settings.travelStep1Desc', 'Select which folders to hide when Travel Mode is active. These folders will be AES-256-GCM encrypted and invisible until you disable Travel Mode with your travel password.')}
                       </p>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-3">Select folders to hide</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-3">{t('settings.travelSelectFolders', 'Select folders to hide')}</p>
                       {folders.length === 0 ? (
-                        <p className="text-sm text-on-surface-variant text-center py-8">No folders found. Create folders in your vault first.</p>
+                        <p className="text-sm text-on-surface-variant text-center py-8">{t('settings.travelNoFolders', 'No folders found. Create folders in your vault first.')}</p>
                       ) : (
                         <div className="space-y-2">
                           {folders.map(folder => {
@@ -3016,10 +3016,10 @@ export default function Settings() {
                       )}
                     </div>
                     {travelError && <p className="text-xs font-bold text-red-600 uppercase tracking-widest">{travelError}</p>}
-                    <button onClick={() => { if (travelHiddenFolderIds.length === 0) { setTravelError('Select at least one folder to hide.'); return; } setTravelError(''); setTravelStep(2); }}
+                    <button onClick={() => { if (travelHiddenFolderIds.length === 0) { setTravelError(t('settings.travelSelectAtLeastOne', 'Select at least one folder to hide.')); return; } setTravelError(''); setTravelStep(2); }}
                       className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all"
                     >
-                      Next — Set Travel Password
+                      {t('settings.travelNextStep', 'Next — Set Travel Password')}
                     </button>
                   </div>
                 )}
@@ -3027,14 +3027,14 @@ export default function Settings() {
                 {travelStep === 2 && (
                   <div className="space-y-6">
                     <p className="text-sm text-on-surface-variant leading-relaxed">
-                      This password is required to restore hidden folders. It is separate from your main vault password and is used only to decrypt the hidden vault.
+                      {t('settings.travelPasswordDesc', 'This password is required to restore hidden folders. It is separate from your main vault password and is used only to decrypt the hidden vault.')}
                     </p>
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Password</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelPasswordLabel', 'Password')}</label>
                       <div className="relative">
                         <input type={showTravelPassword ? 'text' : 'password'} value={travelPassword}
                           onChange={e => { setTravelPassword(e.target.value); setTravelError(''); }}
-                          placeholder="Minimum 8 characters"
+                          placeholder={t('settings.travelPasswordMin', 'Minimum 8 characters')}
                           className="w-full px-5 py-4 pr-12 bg-surface-container-low rounded-xl border border-zinc-300 dark:border-zinc-600 text-black dark:text-white font-bold focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-all"
                         />
                         <button type="button" tabIndex={-1} onClick={() => setShowTravelPassword(v => !v)}
@@ -3045,17 +3045,17 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Confirm Password</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelPasswordConfirm', 'Confirm Password')}</label>
                       <input type="password" value={confirmTravelPassword}
                         onChange={e => { setConfirmTravelPassword(e.target.value); setTravelError(''); }}
-                        placeholder="Repeat password"
+                        placeholder={t('settings.travelRepeatPassword', 'Repeat password')}
                         className="w-full px-5 py-4 bg-surface-container-low rounded-xl border border-zinc-300 dark:border-zinc-600 text-black dark:text-white font-bold focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-400 outline-none transition-all"
                       />
                     </div>
                     {travelError && <p className="text-xs font-bold text-red-600 uppercase tracking-widest">{travelError}</p>}
                     <div className="flex gap-3">
                       <button onClick={() => setTravelStep(1)} className="flex-1 py-4 bg-surface-container-low rounded-xl font-black uppercase tracking-widest text-xs hover:bg-surface-container-high transition-all">Back</button>
-                      <button onClick={() => { if (travelPassword.length < 8) { setTravelError('Minimum 8 characters.'); return; } if (travelPassword !== confirmTravelPassword) { setTravelError('Passwords do not match.'); return; } setTravelError(''); setTravelStep(3); }}
+                      <button onClick={() => { if (travelPassword.length < 8) { setTravelError(t('settings.travelPasswordMinError', 'Minimum 8 characters.')); return; } if (travelPassword !== confirmTravelPassword) { setTravelError(t('settings.travelPasswordMismatch', 'Passwords do not match.')); return; } setTravelError(''); setTravelStep(3); }}
                         className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all"
                       >
                         Continue
@@ -3069,20 +3069,20 @@ export default function Settings() {
                     <div className="p-5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-start gap-3">
                       <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-bold text-sm text-amber-800 dark:text-amber-300 mb-1">Store your password safely</p>
+                        <p className="font-bold text-sm text-amber-800 dark:text-amber-300 mb-1">{t('settings.travelWarningTitle', 'Store your password safely')}</p>
                         <p className="text-xs text-amber-700/70 dark:text-amber-400/70 leading-relaxed">
-                          If you forget it, the hidden folders cannot be recovered — they are encrypted with your password. There is no backdoor.
+                          {t('settings.travelWarningDesc', 'If you forget it, the hidden folders cannot be recovered — they are encrypted with your password. There is no backdoor.')}
                         </p>
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Folders that will be hidden</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelFoldersToHide', 'Folders that will be hidden')}</p>
                       {folders.filter(f => travelHiddenFolderIds.includes(f.id)).map(f => (
                         <div key={f.id} className="flex items-center gap-3 p-3 bg-surface-container-low rounded-xl">
                           <Plane size={16} className="text-blue-600 shrink-0" />
                           <span className="font-bold text-sm text-black dark:text-white">{f.label}</span>
                           <span className="text-xs text-on-surface-variant ml-auto">
-                            {credentials.filter(c => c.folderId === f.id).length} credential{credentials.filter(c => c.folderId === f.id).length !== 1 ? 's' : ''}
+                            {t('settings.travelCredentialCount', '{{count}} credential(s)', { count: credentials.filter(c => c.folderId === f.id).length })}
                           </span>
                         </div>
                       ))}
@@ -3100,7 +3100,7 @@ export default function Settings() {
                               <circle cx="14" cy="14" r="11" stroke="white" strokeWidth="3" strokeLinecap="round" strokeDasharray="17 52"/>
                             </svg>
                           )
-                          : <><Plane size={16} />Activate Travel Mode</>
+                          : <><Plane size={16} />{t('settings.travelActivate', 'Activate Travel Mode')}</>
                         }
                       </button>
                     </div>
@@ -3113,9 +3113,9 @@ export default function Settings() {
                       <Plane size={40} className="text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">Travel Mode Active</h3>
+                      <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">{t('settings.travelActivateConfirmTitle', 'Travel Mode Active')}</h3>
                       <p className="text-sm text-on-surface-variant leading-relaxed">
-                        Hidden folders are encrypted and invisible. Your vault has been updated.
+                        {t('settings.travelActivateConfirmDesc', 'Hidden folders are encrypted and invisible. Your vault has been updated.')}
                       </p>
                     </div>
                     <button onClick={() => setIsTravelModalOpen(false)}
@@ -3149,7 +3149,7 @@ export default function Settings() {
                     <Upload size={18} className="text-white dark:text-black" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-headline font-black text-black dark:text-white">Import Preview</h3>
+                    <h3 className="text-lg font-headline font-black text-black dark:text-white">{t('settings.importPreviewTitle', 'Import Preview')}</h3>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] px-2 py-0.5 bg-surface-container-high rounded-full font-black uppercase tracking-widest text-on-surface-variant">
                         {FORMAT_LABELS[importResult.detectedFormat]}
@@ -3169,13 +3169,13 @@ export default function Settings() {
                 <div className="p-4 bg-surface-container-high rounded-xl flex items-center gap-3">
                   <CheckCircle size={18} className="text-green-600 shrink-0" />
                   <p className="text-sm font-bold text-black dark:text-white">
-                    {importResult.credentials.length} credential{importResult.credentials.length !== 1 ? 's' : ''} found
+                    {t('settings.importCredentialsFound', '{{count}} credential(s) found', { count: importResult.credentials.length })}
                   </p>
                 </div>
 
                 {/* Preview table */}
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Preview (first 8)</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">{t('settings.importPreviewLabel', 'Preview (first 8)')}</p>
                   <div className="rounded-xl border border-outline-variant/20 overflow-hidden">
                     <table className="w-full text-xs">
                       <thead>
@@ -3196,7 +3196,7 @@ export default function Settings() {
                         {importResult.credentials.length > 8 && (
                           <tr className="border-t border-outline-variant/10">
                             <td colSpan={3} className="px-3 py-2 text-center text-on-surface-variant text-[11px]">
-                              +{importResult.credentials.length - 8} more
+                              {t('settings.importMoreItems', '+{{count}} more', { count: importResult.credentials.length - 8 })}
                             </td>
                           </tr>
                         )}
@@ -3207,7 +3207,7 @@ export default function Settings() {
 
                 {/* Import mode toggle */}
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">Import mode</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2">{t('settings.importModeLabel', 'Import mode')}</p>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -3218,8 +3218,8 @@ export default function Settings() {
                           : 'border-outline-variant/30 hover:border-outline-variant/60 text-on-surface-variant'
                       }`}
                     >
-                      <p className="font-black">Merge</p>
-                      <p className={`text-[11px] mt-0.5 font-normal ${importMode === 'merge' ? 'text-white/70 dark:text-black/60' : 'text-on-surface-variant'}`}>Add alongside existing</p>
+                      <p className="font-black">{t('settings.importMergeName', 'Merge')}</p>
+                      <p className={`text-[11px] mt-0.5 font-normal ${importMode === 'merge' ? 'text-white/70 dark:text-black/60' : 'text-on-surface-variant'}`}>{t('settings.importMergeDesc', 'Add alongside existing')}</p>
                     </button>
                     <button
                       type="button"
@@ -3230,15 +3230,15 @@ export default function Settings() {
                           : 'border-outline-variant/30 hover:border-red-300 text-on-surface-variant'
                       }`}
                     >
-                      <p className="font-black">Replace All</p>
-                      <p className={`text-[11px] mt-0.5 font-normal ${importMode === 'replace' ? 'text-white/70' : 'text-on-surface-variant'}`}>Delete existing first</p>
+                      <p className="font-black">{t('settings.importReplaceName', 'Replace All')}</p>
+                      <p className={`text-[11px] mt-0.5 font-normal ${importMode === 'replace' ? 'text-white/70' : 'text-on-surface-variant'}`}>{t('settings.importReplaceDesc', 'Delete existing first')}</p>
                     </button>
                   </div>
                   {importMode === 'replace' && (
                     <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-2">
                       <AlertTriangle size={15} className="text-red-600 shrink-0 mt-0.5" />
                       <p className="text-xs text-red-700 dark:text-red-400 font-bold">
-                        This will permanently delete all {credentials.length} existing credential{credentials.length !== 1 ? 's' : ''} before importing. This cannot be undone.
+                        {t('settings.importReplaceWarning', 'This will permanently delete all {{count}} existing credential(s) before importing. This cannot be undone.', { count: credentials.length })}
                       </p>
                     </div>
                   )}
@@ -3265,7 +3265,7 @@ export default function Settings() {
                 >
                   {isImporting
                     ? <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="animate-spin"><circle cx="10" cy="10" r="8" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5"/><circle cx="10" cy="10" r="8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="12 38"/></svg>
-                    : <><Upload size={14} />Import {importResult.credentials.length} credential{importResult.credentials.length !== 1 ? 's' : ''}</>
+                    : <><Upload size={14} />{t('settings.importButton', 'Import {{count}} credential(s)', { count: importResult.credentials.length })}</>
                   }
                 </button>
               </div>
@@ -3291,15 +3291,15 @@ export default function Settings() {
                 </div>
                 <button onClick={() => setIsDisableTravelOpen(false)} className="p-2 hover:bg-surface-container-high rounded-full transition-colors"><X size={20} /></button>
               </div>
-              <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">Disable Travel Mode</h3>
+              <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">{t('settings.travelDisableTitle', 'Disable Travel Mode')}</h3>
               <p className="text-sm text-on-surface-variant leading-relaxed mb-8">
-                Enter your password to decrypt and restore {travelConfig.hiddenFolderIds.length} hidden folder{travelConfig.hiddenFolderIds.length !== 1 ? 's' : ''}.
+                {t('settings.travelDisableDesc', 'Enter your travel password to decrypt and restore {{count}} hidden folder(s).', { count: travelConfig.hiddenFolderIds.length })}
               </p>
               <div className="space-y-3 mb-6">
-                <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Password</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelPasswordLabel', 'Password')}</label>
                 <input type="password" value={disableTravelPw}
                   onChange={e => { setDisableTravelPw(e.target.value); setDisableTravelError(''); }}
-                  placeholder="Enter your password"
+                  placeholder={t('settings.travelPasswordPlaceholder', 'Enter your travel password')}
                   className="w-full px-5 py-4 bg-surface-container-low rounded-xl border border-zinc-300 dark:border-zinc-600 text-black dark:text-white font-bold focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all"
                   onKeyDown={e => e.key === 'Enter' && handleDisableTravel()}
                 />
@@ -3310,7 +3310,7 @@ export default function Settings() {
                 <button onClick={handleDisableTravel} disabled={isDisablingTravel || !disableTravelPw}
                   className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isDisablingTravel ? <><Loader2 size={16} className="animate-spin" />Decrypting…</> : 'Restore Folders'}
+                  {isDisablingTravel ? <><Loader2 size={16} className="animate-spin" />{t('settings.travelDecrypting', 'Decrypting…')}</> : t('settings.travelRestoreFolders', 'Restore Folders')}
                 </button>
               </div>
             </motion.div>
@@ -3343,9 +3343,9 @@ export default function Settings() {
                       <Skull size={40} className="text-red-600" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">Duress Mode Armed</h3>
+                      <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">{t('settings.duressArmedTitle', 'Duress Mode Armed')}</h3>
                       <p className="text-sm text-on-surface-variant">
-                        Entering the duress password at login will trigger an immediate forensic wipe. Auto-wipe activates after {duressMaxAttempts} failed attempt{duressMaxAttempts !== 1 ? 's' : ''}.
+                        {t('settings.duressArmedConfirmDesc', 'Entering the duress password at login will trigger an immediate forensic wipe. Auto-wipe activates after {{count}} failed attempt(s).', { count: duressMaxAttempts })}
                       </p>
                     </div>
                     <button onClick={() => setIsDuressModalOpen(false)}
@@ -3356,21 +3356,21 @@ export default function Settings() {
                   </div>
                 ) : (
                   <>
-                    <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">Arm Duress Mode</h3>
+                    <h3 className="text-xl font-headline font-black text-black dark:text-white mb-2">{t('settings.duressSetupTitle', 'Arm Duress Mode')}</h3>
                     <p className="text-sm text-on-surface-variant leading-relaxed mb-8">
                       {duressStep === 1
-                        ? 'Set a duress password — different from your main password. Entering it at login triggers an immediate forensic wipe of all vault data.'
-                        : 'Confirm your duress password. This cannot be recovered.'}
+                        ? t('settings.duressStep1Desc', 'Set a duress password — different from your main password. Entering it at login triggers an immediate forensic wipe of all vault data.')
+                        : t('settings.duressStep2Desc', 'Confirm your duress password. This cannot be recovered.')}
                     </p>
 
                     <div className="space-y-5">
                       {duressStep === 1 && (
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Duress Password</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.duressPasswordLabel', 'Duress Password')}</label>
                           <div className="relative">
                             <input type={showDuressPassword ? 'text' : 'password'} value={duressPassword}
                               onChange={e => { setDuressPassword(e.target.value); setDuressError(''); }}
-                              placeholder="Minimum 8 characters"
+                              placeholder={t('settings.duressPasswordMin', 'Minimum 8 characters')}
                               className="w-full px-5 py-4 pr-12 bg-surface-container-low rounded-xl border border-outline-variant/20 text-black dark:text-white font-bold focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none transition-all"
                             />
                             <button type="button" tabIndex={-1} onClick={() => setShowDuressPassword(v => !v)}
@@ -3384,10 +3384,10 @@ export default function Settings() {
 
                       {duressStep === 2 && (
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Confirm Duress Password</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.duressConfirmLabel', 'Confirm Duress Password')}</label>
                           <input type="password" value={confirmDuressPassword}
                             onChange={e => { setConfirmDuressPassword(e.target.value); setDuressError(''); }}
-                            placeholder="Repeat duress password"
+                            placeholder={t('settings.duressRepeat', 'Repeat duress password')}
                             autoFocus
                             className="w-full px-5 py-4 bg-surface-container-low rounded-xl border border-outline-variant/20 text-black dark:text-white font-bold focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none transition-all"
                           />
@@ -3399,7 +3399,7 @@ export default function Settings() {
                       <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl flex items-start gap-3">
                         <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
                         <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
-                          Triggering wipe performs a 3-pass CSPRNG overwrite of all localStorage, sessionStorage, IndexedDB, and Cache Storage. This is irreversible.
+                          {t('settings.duressWipeWarning', 'Triggering wipe performs a 3-pass CSPRNG overwrite of all localStorage, sessionStorage, IndexedDB, and Cache Storage. This is irreversible.')}
                         </p>
                       </div>
 
@@ -3410,7 +3410,7 @@ export default function Settings() {
                         <button
                           onClick={() => {
                             if (duressStep === 1) {
-                              if (duressPassword.length < 8) { setDuressError('Minimum 8 characters.'); return; }
+                              if (duressPassword.length < 8) { setDuressError(t('settings.duressPasswordMinError', 'Duress password must be at least 8 characters.')); return; }
                               setDuressError('');
                               setDuressStep(2);
                             } else {
@@ -3421,8 +3421,8 @@ export default function Settings() {
                           className="flex-1 py-4 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                           {isArmingDuress
-                            ? <><Loader2 size={16} className="animate-spin" />Arming…</>
-                            : duressStep === 1 ? 'Next' : <><Skull size={16} />Arm Duress Mode</>
+                            ? <><Loader2 size={16} className="animate-spin" />{t('settings.duressArming', 'Arming…')}</>
+                            : duressStep === 1 ? t('common.next', 'Next') : <><Skull size={16} />{t('settings.duressArm', 'Arm Duress Mode')}</>
                           }
                         </button>
                       </div>
