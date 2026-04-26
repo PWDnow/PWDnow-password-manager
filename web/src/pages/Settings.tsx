@@ -1355,16 +1355,16 @@ export default function Settings() {
                         {active && <div className="w-2 h-2 bg-white rounded-full" />}
                       </div>
                     </div>
-                    <h4 className="font-bold text-lg mb-2">Passkey</h4>
-                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">Synced passkey via iCloud Keychain or Google Password Manager. Works across your devices.</p>
+                    <h4 className="font-bold text-lg mb-2">{t('settings.passkeyTitle', 'Passkey')}</h4>
+                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">{t('settings.passkeyDesc', 'Synced passkey via iCloud Keychain or Google Password Manager. Works across your devices.')}</p>
                     <div className="mt-auto">
                       {active ? (
                         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 px-2.5 py-1 rounded-md">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />{count} passkey{count !== 1 ? 's' : ''} registered
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />{t('settings.passkeyCount', '{{count}} passkey(s) registered', { count })}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-md">
-                          <div className="w-1.5 h-1.5 rounded-full bg-outline-variant" />Not set up
+                          <div className="w-1.5 h-1.5 rounded-full bg-outline-variant" />{t('settings.notSetUp', 'Not set up')}
                         </span>
                       )}
                     </div>
@@ -1387,16 +1387,16 @@ export default function Settings() {
                         {active && <div className="w-2 h-2 bg-white rounded-full" />}
                       </div>
                     </div>
-                    <h4 className="font-bold text-lg mb-2">Touch ID / Windows Hello</h4>
-                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">Device-bound biometric. Your fingerprint or face stays on this device — never synced.</p>
+                    <h4 className="font-bold text-lg mb-2">{t('settings.platformTitle', 'Touch ID / Windows Hello')}</h4>
+                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">{t('settings.platformDesc', 'Device-bound biometric. Your fingerprint or face stays on this device — never synced.')}</p>
                     <div className="mt-auto">
                       {active ? (
                         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 px-2.5 py-1 rounded-md">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />{count} device{count !== 1 ? 's' : ''} registered
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />{t('settings.platformCount', '{{count}} device(s) registered', { count })}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-highest px-2.5 py-1 rounded-md">
-                          <div className="w-1.5 h-1.5 rounded-full bg-outline-variant" />Not set up
+                          <div className="w-1.5 h-1.5 rounded-full bg-outline-variant" />{t('settings.notSetUp', 'Not set up')}
                         </span>
                       )}
                     </div>
@@ -1413,11 +1413,11 @@ export default function Settings() {
                     <Fingerprint size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-base mb-1">Go Passwordless</h4>
+                    <h4 className="font-bold text-base mb-1">{t('settings.passwordlessTitle', 'Go Passwordless')}</h4>
                     <p className="text-xs text-on-surface-variant leading-relaxed max-w-lg">
                       {mfaConfig.passwordlessEnabled
-                        ? 'Password field is hidden at login. Sign in using your configured MFA method.'
-                        : 'You have 2+ authentication methods. Disable the password field at login and sign in with your biometric or security key instead.'}
+                        ? t('settings.passwordlessEnabledDesc', 'Password field is hidden at login. Sign in using your configured MFA method.')
+                        : t('settings.passwordlessDisabledDesc', 'You have 2+ authentication methods. Disable the password field at login and sign in with your biometric or security key instead.')}
                     </p>
                   </div>
                 </div>
@@ -1429,8 +1429,8 @@ export default function Settings() {
                     : { background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface)' }}
                 >
                   {mfaConfig.passwordlessEnabled
-                    ? <><ToggleRight size={16} />Enabled</>
-                    : <><ToggleLeft size={16} />Disabled</>}
+                    ? <><ToggleRight size={16} />{t('settings.passwordlessOn', 'Enabled')}</>
+                    : <><ToggleLeft size={16} />{t('settings.passwordlessOff', 'Disabled')}</>}
                 </button>
               </div>
             )}
