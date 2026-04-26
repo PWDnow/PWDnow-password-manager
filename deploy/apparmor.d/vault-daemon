@@ -1,0 +1,44 @@
+#include <tunables/global>
+
+/usr/local/bin/vault-daemon flags=(enforce) {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+
+  # Vault file read/write — C-06 fix: narrowed from /home/*/ wildcard to the
+  # service-owned directory only. Eliminates cross-user vault access.
+  /var/lib/vault-daemon/ rw,
+  /var/lib/vault-daemon/** rw,
+
+  # HIBP Cuckoo filter (read-only at runtime). The builder emits hibp.cuckoo
+  # plus a hibp.cuckoo.sha256 sidecar for integrity verification.
+  /var/lib/vault-daemon/*.cuckoo r,
+  /var/lib/vault-daemon/*.cuckoo.sha256 r,
+
+  # Unix socket
+  /run/vault-daemon/ rw,
+  /run/vault-daemon/vault.sock rw,
+
+  # System libraries — glob across architectures (aarch64, x86_64, etc.) so the
+  # profile is portable without install-time generation.
+  /usr/lib/*/libsodium.so* mr,
+  /usr/lib/*/libsqlcipher.so* mr,
+  /usr/lib/*/libfido2.so* mr,
+  /usr/local/lib/liboqs.so* mr,
+
+  # mlock() capability
+  capability ipc_lock,
+
+  # systemd sd_notify
+  /run/systemd/notify rw,
+
+  # Logging
+  /dev/log w,
+
+  # Explicitly deny dangerous access
+  deny /proc/*/mem rw,
+  deny /proc/*/maps r,
+  deny network,
+  deny /etc/shadow r,
+  deny /etc/passwd r,  # M-10 fix: prevent user enumeration from within sandbox
+  deny /root/** rw,
+}
