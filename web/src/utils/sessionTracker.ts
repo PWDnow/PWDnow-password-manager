@@ -53,7 +53,7 @@ function hasServerSession(): boolean {
 }
 
 export async function getSessions(): Promise<LoginSession[]> {
-  // 1. Try server-side audit log — only when a server session cookie is present.
+  // 1. Try server-side audit log - only when a server session cookie is present.
   //    Skipping this when unauthenticated at the server level avoids spurious 401s
   //    for daemon-mode and legacy localStorage users.
   if (hasServerSession()) {
@@ -80,20 +80,17 @@ export async function recordSession(): Promise<void> {
   const deviceName = `${os} - ${browser}`;
 
   let ip = window.location.hostname;
-  if (ip === 'localhost' || ip === '127.0.0.1' || ip === '::1') {
-    ip = '127.0.0.1';
-  }
 
-  // Attempt to get public IP only if not local
-  if (ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
-    try {
-      const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ip) ip = data.ip;
-      }
-    } catch { /* ignore */ }
-  }
+  // Proxy through our own server to avoid CSP restrictions on external fetches.
+  try {
+    const res = await fetch('/api/my-ip', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ip) ip = data.ip;
+    }
+  } catch { /* fallback to hostname */ }
+
+  if (!ip || ip === 'localhost' || ip === '::1') ip = '127.0.0.1';
 
   const existing = await readSessions();
   const trimmed = existing.length > 19 ? existing.slice(existing.length - 19) : existing;
@@ -103,7 +100,7 @@ export async function recordSession(): Promise<void> {
     timestamp: Date.now(),
     deviceName,
     ip,
-    userAgent: deviceName,
+    userAgent: ua,
     isCurrent: true,
   });
   await writeEncryptedLocal(SESSIONS_KEY, JSON.stringify(updated));

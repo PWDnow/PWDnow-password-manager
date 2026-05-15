@@ -17,6 +17,8 @@
   --color-primary-container: var(--theme-primary-container);
   --color-on-primary-container: var(--theme-on-primary-container);
   --color-surface: var(--theme-surface);
+  --color-background: var(--theme-surface);
+  --color-surface-container: var(--theme-surface-container);
   --color-surface-container-low: var(--theme-surface-container-low);
   --color-surface-container-high: var(--theme-surface-container-high);
   --color-surface-container-highest: var(--theme-surface-container-highest);
@@ -34,6 +36,7 @@
     --theme-primary-container: #00174b;
     --theme-on-primary-container: #ffffff;
     --theme-surface: #f7f9fb;
+    --theme-surface-container: #f4f6f8;
     --theme-surface-container-low: #ffffff;
     --theme-surface-container-high: #f1f3f5;
     --theme-surface-container-highest: #e9ecef;
@@ -50,6 +53,7 @@
     --theme-primary-container: #497cff;
     --theme-on-primary-container: #00174b;
     --theme-surface: #0f0f0f;
+    --theme-surface-container: #1e1e1e;
     --theme-surface-container-low: #1a1a1a;
     --theme-surface-container-high: #242424;
     --theme-surface-container-highest: #2a2a2a;

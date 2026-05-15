@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Check, Trash2, Folder, ShieldCheck, Clock, ShieldAlert } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check, Trash2, Folder, ShieldCheck, Clock, ShieldAlert, TimerReset } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 
 interface NotificationDropdownProps {
@@ -11,12 +12,20 @@ interface NotificationDropdownProps {
 
 export default function NotificationDropdown({ isOpen, onClose }: NotificationDropdownProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotification();
 
   const getTimeAgo = (timestamp: number) => {
-    const minutes = Math.floor((Date.now() - timestamp) / 60000);
-    if (minutes < 1) return 'Just now';
-    return t('notifications.timeAgo', { count: minutes, defaultValue: `${minutes}m ago` });
+    const diff = Date.now() - timestamp;
+    const mins  = Math.floor(diff / 60_000);
+    const hours = Math.floor(diff / 3_600_000);
+    const days  = Math.floor(diff / 86_400_000);
+    const weeks = Math.floor(diff / 604_800_000);
+    if (mins  < 1)  return t('notifications.justNow',  'Just now');
+    if (mins  < 60) return t('notifications.minsAgo',  '{{n}}m ago',   { n: mins });
+    if (hours < 24) return t('notifications.hoursAgo', '{{n}}h ago',   { n: hours });
+    if (days  < 7)  return t('notifications.daysAgo',  '{{n}} day{{s}} ago', { n: days,  s: days  === 1 ? '' : 's' });
+    return              t('notifications.weeksAgo', '{{n}} week{{s}} ago', { n: weeks, s: weeks === 1 ? '' : 's' });
   };
 
   return (
@@ -58,23 +67,22 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
             <div className="max-h-[400px] overflow-y-auto no-scrollbar">
               {notifications.length > 0 ? (
                 <div className="divide-y divide-outline-variant/5">
-                  {notifications.slice(0, 4).map((n) => (
-                    <div 
+                  {notifications.slice(0, 8).map((n) => (
+                    <div
                       key={n.id}
-                      onClick={() => {
-                        markAsRead(n.id);
-                        onClose();
-                      }}
+                      onClick={() => { markAsRead(n.id); onClose(); }}
                       className={`p-4 hover:bg-surface-container-low transition-colors cursor-pointer relative group ${!n.read ? 'bg-surface-container-low/50' : ''}`}
                     >
                       <div className="flex gap-3">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          n.type === 'folder_created' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800' : 
-                          n.type === 'credential_added' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-800' :
+                          n.type === 'folder_created'     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800' :
+                          n.type === 'credential_added'   ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-800' :
+                          n.type === 'credential_expiring'? 'bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 border border-orange-100 dark:border-orange-800' :
                           'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-800'
                         }`}>
-                          {n.type === 'folder_created' ? <Folder size={18} strokeWidth={2.5} /> : 
-                           n.type === 'credential_added' ? <ShieldCheck size={18} strokeWidth={2.5} /> :
+                          {n.type === 'folder_created'      ? <Folder size={18} strokeWidth={2.5} /> :
+                           n.type === 'credential_added'    ? <ShieldCheck size={18} strokeWidth={2.5} /> :
+                           n.type === 'credential_expiring' ? <TimerReset size={18} strokeWidth={2.5} /> :
                            <ShieldAlert size={18} strokeWidth={2.5} />}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -82,9 +90,27 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                           <p className="text-[11px] text-on-surface-variant font-medium mt-0.5 line-clamp-2 leading-relaxed">
                             {n.message}
                           </p>
-                          <div className="flex items-center gap-1.5 mt-2 text-[9px] font-black uppercase tracking-widest text-on-surface-variant/40">
-                            <Clock size={10} />
-                            {getTimeAgo(n.timestamp)}
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-on-surface-variant/40">
+                              <Clock size={10} />
+                              {getTimeAgo(n.timestamp)}
+                            </div>
+                            {n.type === 'credential_expiring' && n.data?.credentialId && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markAsRead(n.id);
+                                  onClose();
+                                  const folder = n.data.folderId && n.data.folderId !== 'vault'
+                                    ? `/vault/${n.data.folderId}`
+                                    : '/vault';
+                                  navigate(folder, { state: { editCredentialId: n.data.credentialId } });
+                                }}
+                                className="ml-auto text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors shrink-0"
+                              >
+                                {t('notifications.update', 'Update')}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -1,0 +1,810 @@
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::net::{UnixListener, UnixStream};
+use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
+use tracing::{info, warn};
+
+use crate::auth::{fido2::{self as fido2_auth, DeviceBackend, FidoDevice}, totp};
+use crate::crypto::hibp;
+use crate::error::VaultError;
+use crate::vault::{assets, audit, credentials, fido2_db, folders, state::{DaemonState, IDLE_TIMEOUT_SECS}, totp_db, user_profile};
+use super::protocol::{self, Request, Response};
+
+pub struct SocketListener {
+    inner: UnixListener,
+    state: Arc<DaemonState>,
+}
+
+impl SocketListener {
+    /// Bind a new Unix domain socket at `path`.
+    /// Removes a stale socket file if one exists.
+    pub async fn bind(path: &Path, state: Arc<DaemonState>) -> Result<Self, VaultError> {
+        if path.exists() {
+            std::fs::remove_file(path)?;
+        }
+        let listener = UnixListener::bind(path)?;
+        info!(path = %path.display(), "Unix socket bound");
+        Ok(Self { inner: listener, state })
+    }
+
+    /// Accept connections in a loop; verify peercred on each.
+    /// Spawns the idle auto-lock background task on start.
+    pub async fn run(self) -> Result<(), VaultError> {
+        let state = Arc::clone(&self.state);
+
+        // Idle auto-lock: check every 60 seconds.
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                ticker.tick().await;
+                if !state.is_locked() && state.idle_secs() >= IDLE_TIMEOUT_SECS {
+                    info!("idle timeout ({IDLE_TIMEOUT_SECS}s): locking vault");
+                    state.lock();
+                }
+            }
+        });
+
+        loop {
+            let (stream, _addr) = self.inner.accept().await?;
+            let uid = Self::peer_uid(&stream)?;
+            info!(uid, "client connected");
+            let state = Arc::clone(&self.state);
+            tokio::spawn(async move {
+                if let Err(e) = handle_connection(stream, state, uid).await {
+                    warn!(err = %e, uid, "connection error");
+                }
+            });
+        }
+    }
+
+    /// Extract the UID from SO_PEERCRED.
+    fn peer_uid(stream: &UnixStream) -> Result<u32, VaultError> {
+        let cred = getsockopt(stream, PeerCredentials)
+            .map_err(|e| VaultError::Ipc(format!("SO_PEERCRED failed: {e}")))?;
+        Ok(cred.uid())
+    }
+}
+
+// ── Connection handler ────────────────────────────────────────────────────────
+
+async fn handle_connection(
+    mut stream: UnixStream,
+    state: Arc<DaemonState>,
+    uid: u32,
+) -> Result<(), VaultError> {
+    loop {
+        let frame = match protocol::read_frame(&mut stream).await {
+            Ok(f) => f,
+            Err(_) => break, // client disconnected or I/O error
+        };
+
+        let request: Request = match rmp_serde::from_slice(&frame) {
+            Ok(r) => r,
+            Err(e) => {
+                let _ = send(&mut stream, Response::Error { code: 400, message: format!("bad request: {e}") }).await;
+                continue;
+            }
+        };
+
+        let response = dispatch(&state, uid, request).await;
+        if send(&mut stream, response).await.is_err() {
+            break;
+        }
+    }
+    Ok(())
+}
+
+async fn send(stream: &mut UnixStream, resp: Response) -> Result<(), VaultError> {
+    let bytes = rmp_serde::to_vec_named(&resp)
+        .map_err(|e| VaultError::Ipc(format!("serialize response: {e}")))?;
+    protocol::write_frame(stream, &bytes).await
+}
+
+// ── Dispatcher ────────────────────────────────────────────────────────────────
+
+async fn dispatch(state: &DaemonState, uid: u32, request: Request) -> Response {
+    match request {
+        // ── Unauthenticated ──────────────────────────────────────────────────
+        Request::Ping => Response::Pong,
+
+        Request::GetStatus => Response::Status { locked: state.is_locked() },
+
+        Request::GetLoginHints => match state.get_login_hints() {
+            Ok(r) => r,
+            Err(e) => err(500, e),
+        },
+
+        Request::Unlock { password, yubikey_response, totp_code } => {
+            let yk: Option<[u8; 20]> = yubikey_response.and_then(|v| v.try_into().ok());
+            match state.unlock(&password, yk.as_ref(), uid) {
+                Err(e) => Response::Error { code: 1, message: e.to_string() },
+                Ok(sess) => {
+                    // Check vault-level TOTP if active — must happen *after* unlock
+                    // because we need the DB and VMK to read the TOTP secret.
+                    let totp_ok = state.with_vmk(|vmk| {
+                        let guard = state.db.lock().unwrap();
+                        if let Some(conn) = guard.as_ref() {
+                            if totp_db::is_active(conn) {
+                                match totp_code.as_deref() {
+                                    None => Err(VaultError::Auth("TOTP code required".into())),
+                                    Some(code) => totp_db::verify_code(conn, vmk, code),
+                                }
+                            } else {
+                                Ok(())
+                            }
+                        } else {
+                            Ok(())
+                        }
+                    });
+                    match totp_ok {
+                        Err(e) => {
+                            // TOTP check failed — re-lock and reject
+                            state.lock();
+                            Response::Error { code: 401, message: e.to_string() }
+                        }
+                        Ok(()) => {
+                            if let Some(conn) = state.db.lock().unwrap().as_ref() {
+                                let _ = audit::log(conn, "UNLOCK", Some(&sess.user_id));
+                            }
+                            let wipe_ticket = state.wipe_ticket_bytes().unwrap_or_default();
+                            Response::Unlocked { session_token: sess.token, wipe_ticket }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── FIDO2 unauthenticated ────────────────────────────────────────────
+        Request::ListFido2Devices => {
+            let backend = FidoDevice::new();
+            match backend.list_devices() {
+                Ok(paths) => Response::Fido2Devices(paths),
+                Err(e) => err(500, e),
+            }
+        }
+
+        Request::GetPasskeyChallenge => {
+            // Generate a random 32-byte challenge for the client to pass to
+            // the authenticator. The challenge is stored in DaemonState so the
+            // daemon can verify it hasn't been swapped when UnlockWithPasskey arrives.
+            let challenge = state.new_passkey_challenge();
+            Response::PasskeyChallenge(challenge.to_vec())
+        }
+
+        Request::UnlockWithPasskey { credential_id, auth_data, signature } => {
+            // Look up the registered passkey in vault_meta / sidecar (vault may be locked).
+            // We read the encrypted VMK copy from a temporary unlocked DB opened with
+            // a known-key path — this is only possible because the passkey credential
+            // stores the VMK copy encrypted under the assertion-derived wrap key.
+            match state.unlock_with_passkey(&credential_id, &auth_data, &signature, uid) {
+                Ok(sess) => {
+                    if let Some(conn) = state.db.lock().unwrap().as_ref() {
+                        let _ = audit::log(conn, "UNLOCK_PASSKEY", Some(&sess.user_id));
+                    }
+                    let wipe_ticket = state.wipe_ticket_bytes().unwrap_or_default();
+                    Response::Unlocked { session_token: sess.token, wipe_ticket }
+                }
+                Err(e) => Response::Error { code: 1, message: e.to_string() },
+            }
+        }
+
+        // ── Forensic self-destruct (unauthenticated, ticket-gated) ──────────
+        Request::ForensicWipe { wipe_ticket } => {
+            match state.forensic_wipe(&wipe_ticket) {
+                Err(e) => Response::Error { code: 403, message: e.to_string() },
+                Ok(()) => {
+                    // Schedule process exit after the response frame has been sent.
+                    // 300 ms is enough for the frame to flush through the WS proxy
+                    // to the browser before the socket closes.
+                    tokio::spawn(async {
+                        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                        std::process::exit(0);
+                    });
+                    Response::WipeComplete
+                }
+            }
+        }
+
+        // ── Authenticated — validate session token first ─────────────────────
+        Request::Lock { session_token } => {
+            if let Err(e) = state.sessions.validate(&session_token, uid) {
+                return Response::Error { code: 401, message: e.to_string() };
+            }
+            if let Some(conn) = state.db.lock().unwrap().as_ref() {
+                let _ = audit::log(conn, "LOCK", None);
+            }
+            state.lock();
+            Response::Locked
+        }
+
+        Request::ListFolders { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match folders::list(conn) {
+                        Ok(list) => match serde_json::to_vec(&list) {
+                            Ok(bytes) => Response::Folders(bytes),
+                            Err(e) => err(500, VaultError::Crypto(e.to_string())),
+                        },
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::AddFolder { session_token, name, description, icon_svg } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match folders::add(conn, &name, description.as_deref(), icon_svg.as_deref()) {
+                        Ok(id) => {
+                            let _ = audit::log(conn, "FOLDER_ADD", Some(&id.to_string()));
+                            Response::Created { id }
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::UpdateFolder { session_token, id, name, description, icon_svg } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match folders::update(conn, id, &name, description.as_deref(), icon_svg.as_deref()) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "FOLDER_UPDATE", Some(&id.to_string()));
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::DeleteFolder { session_token, id, move_credentials_to } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match folders::delete(conn, id, move_credentials_to) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "FOLDER_DELETE", Some(&id.to_string()));
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::ReorderFolders { session_token, ordered_ids } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match folders::reorder(conn, &ordered_ids) {
+                        Ok(()) => Response::Ok,
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::ListCredentials { session_token, folder_id } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match credentials::list(conn, folder_id) {
+                        Ok(list) => match serde_json::to_vec(&list) {
+                            Ok(bytes) => Response::Credentials(bytes),
+                            Err(e) => err(500, VaultError::Crypto(e.to_string())),
+                        },
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::GetCredential { session_token, id } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match credentials::get(conn, vmk, id) {
+                        Ok(blob) => Response::Credential(blob),
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::AddCredential { session_token, folder_id, blob } => {
+            auth_then!(state, uid, session_token, {
+                let vault_uuid = state.vault_uuid.lock().unwrap().clone()
+                    .unwrap_or_default();
+                with_vmk_db!(state, vmk, conn, {
+                    match credentials::add(conn, vmk, &vault_uuid, folder_id, &blob) {
+                        Ok(id) => {
+                            let _ = audit::log(conn, "CRED_ADD", Some(&id.to_string()));
+                            Response::Created { id }
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::UpdateCredential { session_token, id, folder_id, blob } => {
+            auth_then!(state, uid, session_token, {
+                let vault_uuid = state.vault_uuid.lock().unwrap().clone()
+                    .unwrap_or_default();
+                with_vmk_db!(state, vmk, conn, {
+                    match credentials::update(conn, vmk, &vault_uuid, id, folder_id, &blob) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "CRED_UPDATE", Some(&id.to_string()));
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::DeleteCredential { session_token, id } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match credentials::delete(conn, id) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "CRED_DELETE", Some(&id.to_string()));
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::GetAssetHolder { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match assets::get(conn, vmk) {
+                        Ok(Some(blob)) => Response::AssetHolder(blob),
+                        Ok(None) => Response::AssetHolder(b"{}".to_vec()),
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::UpdateAssetHolder { session_token, blob } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match assets::update(conn, vmk, &blob) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "ASSET_UPDATE", None);
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::GetOtpCode { session_token, credential_id } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    // Decrypt the credential to extract the OTP secret
+                    match credentials::get(conn, vmk, credential_id) {
+                        Err(e) => err(500, e),
+                        Ok(blob) => {
+                            match serde_json::from_slice::<serde_json::Value>(&blob) {
+                                Err(e) => err(500, VaultError::Crypto(e.to_string())),
+                                Ok(json) => {
+                                    match json.get("otp_secret").and_then(|v| v.as_str()) {
+                                        None => err(404, VaultError::Auth("no OTP secret on credential".into())),
+                                        Some(secret) => {
+                                            let algo_str = json.get("otp_algorithm").and_then(|v| v.as_str()).unwrap_or("SHA1");
+                                            let digits = json.get("otp_digits").and_then(|v| v.as_u64()).unwrap_or(6) as usize;
+                                            let algorithm = match algo_str {
+                                                "SHA256" => totp_rs::Algorithm::SHA256,
+                                                "SHA512" => totp_rs::Algorithm::SHA512,
+                                                _ => totp_rs::Algorithm::SHA1,
+                                            };
+                                            match totp::current_code(secret, algorithm, digits) {
+                                                Ok(code) => Response::OtpCode(code),
+                                                Err(e) => err(500, e),
+                                            }
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+            })
+        }
+
+        // ── FIDO2 / Passkey management (authenticated) ───────────────────────
+
+        Request::ListFido2Keys { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match fido2_db::list(conn) {
+                        Ok(keys) => match serde_json::to_vec(&keys) {
+                            Ok(bytes) => Response::Fido2Keys(bytes),
+                            Err(e) => err(500, VaultError::Crypto(e.to_string())),
+                        },
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::RegisterFido2 { session_token, device_path, name, resident_key } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    // Use a local Result-returning closure so `?` propagates cleanly.
+                    let result: Result<Response, VaultError> = (|| {
+                        let vault_uuid = state.vault_uuid.lock().unwrap().clone()
+                            .unwrap_or_else(|| "default".into());
+                        let challenge = state.new_passkey_challenge();
+                        let user_id = vault_uuid.as_bytes().to_vec();
+
+                        let backend = FidoDevice::new();
+                        let reg = backend.make_credential(
+                            &device_path, "vault.local", &user_id, &challenge, resident_key,
+                        )?;
+
+                        // For passkeys, derive wrap key and encrypt a copy of the VMK
+                        let (enc_vmk, vmk_nonce): (Option<Vec<u8>>, Option<Vec<u8>>) = if resident_key {
+                            let header = state.read_header()?;
+                            let wrap_key = fido2_auth::derive_vmk_wrap_key(
+                                &reg.auth_data, &reg.credential_id, header.kem_suite,
+                            )?;
+                            
+                            let vmk: [u8; 32] = state.with_vmk(|v| Ok(*v))?;
+                            let (ct, nonce) = crate::crypto::xchacha20::encrypt(&wrap_key, &vmk, b"passkey-vmk-aad-v1")?;
+
+                            (Some(ct), Some(nonce.to_vec()))
+                        } else {
+                            (None, None)
+                        };
+
+                        let id = fido2_db::add(
+                            conn,
+                            &reg.credential_id,
+                            &reg.public_key_cbor,
+                            None,
+                            resident_key,
+                            enc_vmk.as_deref(),
+                            vmk_nonce.as_deref(),
+                            name.as_deref(),
+                        )?;
+
+                        // Passkeys: also persist to sidecar for passwordless unlock
+                        if resident_key {
+                            if let (Some(ct), Some(nonce)) = (&enc_vmk, &vmk_nonce) {
+                                let _ = state.add_passkey_to_sidecar(&reg.credential_id, ct, nonce, &[]);
+                            }
+                        }
+                        let _ = audit::log(conn, "FIDO2_REGISTER", Some(&id.to_string()));
+                        Ok(Response::Created { id })
+                    })();
+                    match result {
+                        Ok(r) => r,
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::RemoveFido2 { session_token, id } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match fido2_db::remove(conn, &id) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "FIDO2_REMOVE", Some(&id));
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        // ── Vault-level TOTP 2FA (authenticated) ─────────────────────────────
+
+        Request::SetupVaultTotp { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match totp_db::begin_setup(conn, vmk, "vault", "VaultManager") {
+                        Ok(info) => Response::TotpSetup {
+                            secret_b32: info.secret_b32,
+                            otp_uri: info.otp_uri,
+                            backup_codes: info.backup_codes,
+                        },
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::ConfirmVaultTotp { session_token, code } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match totp_db::confirm_setup(conn, vmk, &code) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "TOTP_ENABLE", None);
+                            Response::Ok
+                        }
+                        Err(e) => err(400, e),
+                    }
+                })
+            })
+        }
+
+        Request::RemoveVaultTotp { session_token, code } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match totp_db::remove(conn, vmk, &code) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "TOTP_DISABLE", None);
+                            Response::Ok
+                        }
+                        Err(e) => err(400, e),
+                    }
+                })
+            })
+        }
+
+        Request::GetVaultTotpStatus { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    Response::VaultTotpStatus { active: totp_db::is_active(conn) }
+                })
+            })
+        }
+
+        // ── HIBP breach check ─────────────────────────────────────────────────
+
+        // ── Audit log ─────────────────────────────────────────────────────────
+
+        Request::GetAuditLog { session_token, limit } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match audit::list(conn, limit) {
+                        Ok(entries) => match serde_json::to_vec(&entries) {
+                            Ok(bytes) => Response::AuditLog(bytes),
+                            Err(e) => err(500, VaultError::Crypto(e.to_string())),
+                        },
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::VerifyAuditChain { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match audit::verify_chain(conn) {
+                        Ok(()) => Response::Ok,
+                        Err(e) => err(409, e),
+                    }
+                })
+            })
+        }
+
+        // ── HIBP breach check ─────────────────────────────────────────────────
+
+        Request::CheckPasswordBreached { session_token, mut password_bytes } => {
+            use zeroize::Zeroize;
+            let resp = auth_then!(state, uid, session_token, {
+                // Locate the HIBP filter from vault_meta (stored at setup time)
+                let filter_path_opt: Option<String> = {
+                    let guard = state.db.lock().unwrap();
+                    guard.as_ref().and_then(|conn| {
+                        conn.query_row(
+                            "SELECT value FROM vault_meta WHERE key = 'hibp_filter_path'",
+                            [],
+                            |r| r.get(0),
+                        ).ok()
+                    })
+                };
+                match filter_path_opt {
+                    None => Response::PwnedStatus { pwned: false, filter_available: false },
+                    Some(path_str) => {
+                        let path = std::path::Path::new(&path_str);
+                        match hibp::check_password(path, &password_bytes) {
+                            Ok(pwned) => Response::PwnedStatus { pwned, filter_available: true },
+                            Err(_) => Response::PwnedStatus { pwned: false, filter_available: false },
+                        }
+                    }
+                }
+            });
+            // Scrub the caller's plaintext as soon as the filter has consumed it;
+            // the SHA-1 inside `check_password` is the only place these bytes
+            // ever needed to be readable.
+            password_bytes.zeroize();
+            resp
+        }
+
+        // ── Backup-code unlock ────────────────────────────────────────────────
+
+        Request::UnlockWithBackupCode { password, yubikey_response, backup_code } => {
+            let yk: Option<[u8; 20]> = yubikey_response.and_then(|v| v.try_into().ok());
+            match state.unlock(&password, yk.as_ref(), uid) {
+                Err(e) => Response::Error { code: 1, message: e.to_string() },
+                Ok(sess) => {
+                    // Backup code replaces TOTP — verify against stored hashes
+                    let result = state.with_vmk(|vmk| {
+                        let guard = state.db.lock().unwrap();
+                        match guard.as_ref() {
+                            None => Err(VaultError::Auth("vault locked after unlock (internal)".into())),
+                            Some(conn) => {
+                                if !totp_db::is_active(conn) {
+                                    // TOTP not configured — backup codes don't apply
+                                    return Err(VaultError::Auth("TOTP not configured; use normal Unlock".into()));
+                                }
+                                totp_db::verify_backup_code(conn, vmk, &backup_code)
+                            }
+                        }
+                    });
+                    match result {
+                        Err(e) => {
+                            state.lock();
+                            Response::Error { code: 401, message: e.to_string() }
+                        }
+                        Ok(false) => {
+                            state.lock();
+                            Response::Error { code: 401, message: "invalid or already-used backup code".into() }
+                        }
+                        Ok(true) => {
+                            if let Some(conn) = state.db.lock().unwrap().as_ref() {
+                                let _ = audit::log(conn, "UNLOCK_BACKUP_CODE", Some(&sess.user_id));
+                            }
+                            let wipe_ticket = state.wipe_ticket_bytes().unwrap_or_default();
+                            Response::Unlocked { session_token: sess.token, wipe_ticket }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── User profile ──────────────────────────────────────────────────────
+
+        Request::GetProfile { session_token } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match user_profile::get(conn, vmk) {
+                        Ok(None) => Response::Profile {
+                            first_name: String::new(),
+                            last_name: String::new(),
+                            email: String::new(),
+                            profile_pic: None,
+                            password_changed_at: None,
+                        },
+                        Ok(Some(p)) => Response::Profile {
+                            first_name: p.first_name,
+                            last_name: p.last_name,
+                            email: p.email,
+                            profile_pic: p.profile_pic,
+                            password_changed_at: p.password_changed_at,
+                        },
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::UpdateProfile { session_token, first_name, last_name, email } => {
+            auth_then!(state, uid, session_token, {
+                with_db!(state, conn, {
+                    match user_profile::update(conn, &first_name, &last_name, &email) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "PROFILE_UPDATE", None);
+                            Response::Ok
+                        }
+                        Err(e) => err(500, e),
+                    }
+                })
+            })
+        }
+
+        Request::ChangePassword { session_token, old_password, new_password } => {
+            auth_then!(state, uid, session_token, {
+                match state.change_password(&old_password, &new_password, None) {
+                    Ok(()) => {
+                        with_db!(state, conn, {
+                            let _ = audit::log(conn, "PASSWORD_CHANGE", None);
+                            Response::Ok
+                        })
+                    }
+                    Err(e) => err(500, e),
+                }
+            })
+        }
+
+        Request::VerifyMasterPassword { session_token, password } => {
+            auth_then!(state, uid, session_token, {
+                match state.verify_master_password(&password) {
+                    Ok(()) => Response::Ok,
+                    Err(_) => Response::Error { code: 401, message: "InvalidPassword".into() },
+                }
+            })
+        }
+
+        Request::UpdateLoginPolicy { session_token, password_login_enabled, totp_enabled, email_otp_enabled } => {
+            auth_then!(state, uid, session_token, {
+                match state.update_login_policy(password_login_enabled, totp_enabled, email_otp_enabled) {
+                    Ok(()) => Response::Ok,
+                    Err(e) => err(500, e),
+                }
+            })
+        }
+
+        Request::UploadProfilePicture { session_token, image_bytes } => {
+            auth_then!(state, uid, session_token, {
+                with_vmk_db!(state, vmk, conn, {
+                    match user_profile::upload_picture(conn, vmk, &image_bytes) {
+                        Ok(()) => {
+                            let _ = audit::log(conn, "PROFILE_PIC_UPDATE", None);
+                            Response::Ok
+                        }
+                        Err(e) => err(400, e),
+                    }
+                })
+            })
+        }
+    }
+}
+
+// ── Helper macros ─────────────────────────────────────────────────────────────
+
+/// Validate session token, then evaluate `$body`. Returns Error{401} on
+/// failure. Activity touches (session idle slide + vault idle timer) happen
+/// AFTER `$body` produces a response — a slow handler therefore does not
+/// count as user activity, closing the TOCTOU that would otherwise let a
+/// client keep the session alive indefinitely via long requests.
+macro_rules! auth_then {
+    ($state:expr, $uid:expr, $token:expr, $body:block) => {{
+        if let Err(e) = $state.sessions.validate(&$token, $uid) {
+            Response::Error { code: 401, message: e.to_string() }
+        } else {
+            let __resp: Response = $body;
+            $state.touch();
+            $state.sessions.touch(&$token, crate::auth::session::DEFAULT_TTL_SECS);
+            __resp
+        }
+    }};
+}
+
+/// Lock the DB mutex and bind `$conn` to the open connection.
+/// Returns Error{503} if the vault is locked.
+macro_rules! with_db {
+    ($state:expr, $conn:ident, $body:block) => {{
+        let guard = $state.db.lock().unwrap();
+        match guard.as_ref() {
+            None => Response::Error { code: 503, message: "vault is locked".into() },
+            Some($conn) => $body,
+        }
+    }};
+}
+
+/// Acquire both VMK and DB. Returns Error{503} if either is unavailable.
+/// `$body` must evaluate to `Response`.
+macro_rules! with_vmk_db {
+    ($state:expr, $vmk:ident, $conn:ident, $body:block) => {{
+        match $state.with_vmk(|$vmk| {
+            let guard = $state.db.lock().unwrap();
+            match guard.as_ref() {
+                None => Err(VaultError::Auth("vault is locked".into())),
+                Some($conn) => Ok($body),
+            }
+        }) {
+            Ok(r) => r,
+            Err(e) => Response::Error { code: 503, message: e.to_string() },
+        }
+    }};
+}
+
+use auth_then;
+use with_db;
+use with_vmk_db;
+
+// ── Small helpers ─────────────────────────────────────────────────────────────
+
+fn err(code: u32, e: impl std::fmt::Display) -> Response {
+    Response::Error { code, message: e.to_string() }
+}

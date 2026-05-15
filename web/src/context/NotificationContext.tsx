@@ -19,12 +19,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Async load on mount — decryption requires keyStore local key to be set
+  // Async load on mount - decryption requires keyStore local key to be set
   useEffect(() => {
     readDecryptedLocal(NOTIF_KEY)
       .then(s => {
         if (s) {
-          try { setNotifications(JSON.parse(s) as Notification[]); } catch { /* corrupt — start empty */ }
+          try { setNotifications(JSON.parse(s) as Notification[]); } catch { /* corrupt - start empty */ }
         }
       })
       .catch(() => {})
@@ -46,7 +46,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('demoKeyAvailable', handler);
   }, []);
 
-  // When daemon connects successfully, the notifications key becomes irrelevant —
+  // When daemon connects successfully, the notifications key becomes irrelevant -
   // clear it so nothing lingers in localStorage.
   useEffect(() => {
     const handler = () => {

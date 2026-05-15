@@ -1,75 +1,126 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import AppLayout from './layouts/AppLayout';
-import Vault from './pages/Vault';
-import BreachMonitor from './pages/BreachMonitor';
-import Settings from './pages/Settings';
-import ManageFolders from './pages/ManageFolders';
-import Dashboard from './pages/Dashboard';
-import AssetHolder from './pages/AssetHolder';
-import NotFound from './pages/NotFound';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import Setup from './pages/Setup';
+import { keyStore } from './crypto/keystore';
+import { RouteErrorBoundary } from './components/ErrorBoundary';
+
+const AppLayout = lazy(() => import('./layouts/AppLayout'));
+
+const Vault = lazy(() => import('./pages/Vault'));
+const BreachMonitor = lazy(() => import('./pages/BreachMonitor'));
+const Settings = lazy(() => import('./pages/Settings'));
+const ManageFolders = lazy(() => import('./pages/ManageFolders'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AssetHolder = lazy(() => import('./pages/AssetHolder'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const Setup = lazy(() => import('./pages/Setup'));
+const EmergencyRequest = lazy(() => import('./pages/EmergencyRequest'));
+const VaultHealth = lazy(() => import('./pages/VaultHealth'));
+const ShareView = lazy(() => import('./pages/ShareView'));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="w-8 h-8 border-4 border-current border-t-transparent rounded-full animate-spin opacity-40" />
+  </div>
+);
+
+const AuthPageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen" />
+);
+
+const wrap = (Component: React.ComponentType, fallback = <PageLoader />) => (
+  <Suspense fallback={fallback}><Component /></Suspense>
+);
+
+// Synchronous auth check: skip loading AppLayout (and vendor-motion) entirely
+// when the session is already known to be absent on the first render.
+function isAuthenticated(): boolean {
+  return keyStore.hasToken ||
+    document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+}
+
+function AuthedLayout() {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  return <Suspense fallback={<div />}><AppLayout /></Suspense>;
+}
 
 export const router = createBrowserRouter([
   {
-    path: '/setup',
-    element: <Setup />
-  },
-  {
-    path: '/login',
-    element: <Login />
-  },
-  {
-    path: '/register',
-    element: <Register />
-  },
-  {
-    path: '/forgot-password',
-    element: <ForgotPassword />
-  },
-  {
     path: '/',
-    element: <AppLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
-        index: true,
-        element: <Navigate to="/vault" replace />
+        path: '/setup',
+        element: wrap(Setup, <AuthPageLoader />),
       },
       {
-        path: 'vault',
-        element: <Vault />
+        path: '/login',
+        element: wrap(Login, <AuthPageLoader />),
       },
       {
-        path: 'vault/:folderId',
-        element: <Vault />
+        path: '/register',
+        element: wrap(Register, <AuthPageLoader />),
       },
       {
-        path: 'security',
-        element: <BreachMonitor />
+        path: '/forgot-password',
+        element: wrap(ForgotPassword, <AuthPageLoader />),
       },
       {
-        path: 'settings',
-        element: <Settings />
+        path: '/emergency/request/:token',
+        element: wrap(EmergencyRequest, <AuthPageLoader />),
       },
       {
-        path: 'manage-folders',
-        element: <ManageFolders />
+        path: '/share/:shareId',
+        element: wrap(ShareView, <AuthPageLoader />),
       },
       {
-        path: 'dashboard',
-        element: <Dashboard />
+        path: '/',
+        element: <AuthedLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/vault" replace />,
+          },
+          {
+            path: 'vault',
+            element: wrap(Vault),
+          },
+          {
+            path: 'vault/:folderId',
+            element: wrap(Vault),
+          },
+          {
+            path: 'security',
+            element: wrap(BreachMonitor),
+          },
+          {
+            path: 'settings',
+            element: wrap(Settings),
+          },
+          {
+            path: 'manage-folders',
+            element: wrap(ManageFolders),
+          },
+          {
+            path: 'dashboard',
+            element: wrap(Dashboard),
+          },
+          {
+            path: 'asset-holder',
+            element: wrap(AssetHolder),
+          },
+          {
+            path: 'health',
+            element: wrap(VaultHealth),
+          },
+        ],
       },
       {
-        path: 'asset-holder',
-        element: <AssetHolder />
-      }
+        path: '*',
+        element: wrap(NotFound),
+      },
     ]
-  },
-  {
-    path: '*',
-    element: <NotFound />
   }
 ]);

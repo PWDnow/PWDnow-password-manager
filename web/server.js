@@ -1,14 +1,17 @@
 import express from 'express';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { randomBytes, timingSafeEqual } from 'crypto';
-import { exec, execFile, spawn } from 'child_process';
+import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
+import { randomBytes, timingSafeEqual, createHash } from 'crypto';
+import { execFile } from 'child_process';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import net from 'net';
-import { initAuth, mountAuthAndVault } from './auth.js';
+import { initAuth, mountAuthAndVault, getServerPublicIp } from './auth.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -25,8 +28,18 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 // Initialize auth backend for demo/offline mode
 initAuth({ dataDir: path.join(__dirname, 'auth_data') });
 
-import cookieParser from 'cookie-parser';
+app.use(compression());
 app.use(cookieParser());
+
+// Request logger
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+  });
+  next();
+});
 
 
 // ── Setup token (C-03 / H-02) ─────────────────────────────────────────────────
@@ -100,17 +113,25 @@ app.use((req, res, next) => {
     contentSecurityPolicy: {
       directives: {
         defaultSrc:     ["'none'"],
-        scriptSrc:      ["'self'", `'nonce-${nonce}'`],
-        styleSrc:       ["'self'", "'unsafe-inline'"],  // Tailwind requires unsafe-inline; HIGH-08 tracked
+        // 'wasm-unsafe-eval' enables WebAssembly.compile / instantiate ONLY.
+        // It does NOT re-enable JS string-eval; that still requires the
+        // separate 'unsafe-eval' token (which we never grant). Required so
+        // the Argon2id KDF (hash-wasm) can run both on the main thread and
+        // inside kdf.worker.ts. See LOGIN_PERFORMANCE_PLAN.md.
+        scriptSrc:      ["'self'", `'nonce-${nonce}'`, "'wasm-unsafe-eval'"],
+        // D.7 / S-10: Tailwind v4 @tailwindcss/vite emits a static CSS file at build
+        // time — no runtime style injection. 'unsafe-inline' is no longer needed.
+        styleSrc:       ["'self'"],
         // MED-10 fixed: Google Fonts removed; system fonts used; no external font requests
         fontSrc:        ["'self'"],
         imgSrc:         ["'self'", "blob:"],  // MED-09: removed data: (exfil vector)
-        connectSrc:     ["'self'", "ws:", "wss:"],  // HIGH-01: allow WS/WSS on current host
+        connectSrc:     ["'self'", "ws:", "wss:", "https://api.pwnedpasswords.com"],  // HIGH-01: allow WS/WSS on current host; HIBP k-anonymity API (Plan B breach check)
         formAction:     ["'self'"],
         frameAncestors: ["'none'"],
         baseUri:        ["'none'"],
         objectSrc:      ["'none'"],
         workerSrc:               ["'self'", "blob:"],
+        manifestSrc:             ["'self'"],
         requireTrustedTypesFor:  ["'script'"],
         // dompurify: DOMPurify sanitizer policy.
         // react-dom: React 19 internal Trusted Types policy for HTML props.
@@ -124,7 +145,8 @@ app.use((req, res, next) => {
     strictTransportSecurity: IS_PROD
       ? { maxAge: 31536000, includeSubDomains: true, preload: true }
       : false,
-    crossOriginEmbedderPolicy: false,
+    // S-17 / D.8: COEP required for SharedArrayBuffer isolation; COOP+COEP = full cross-origin isolation.
+    crossOriginEmbedderPolicy: { policy: 'require-corp' },
     crossOriginOpenerPolicy: { policy: 'same-origin' },
     crossOriginResourcePolicy: { policy: 'same-origin' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
@@ -133,8 +155,9 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-// JSON body parser (needed for POST endpoints)
-app.use(express.json());
+// S-12 / D.10: cap JSON body size at 512 KB for most routes. Vault import
+// uploads (which can be larger) must use a dedicated chunked endpoint.
+app.use(express.json({ limit: '512kb' }));
 
 // LOW-05: add X-Request-ID correlation header to every response
 app.use((_req, res, next) => {
@@ -143,7 +166,11 @@ app.use((_req, res, next) => {
 });
 
 // LOW-03: prevent MIME-sniffing on API JSON responses by setting Content-Disposition
+// Also set no-store on all API responses so service workers never cache auth data.
 app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
   const origJson = res.json.bind(res);
   res.json = function(body) {
     if (!res.getHeader('Content-Disposition')) {
@@ -156,15 +183,94 @@ app.use((req, res, next) => {
 
 // Serve static files from the React build
 const distPath = path.join(__dirname, 'dist');
+
+// Service workers run in an isolated global scope — they do no DOM manipulation
+// and must not receive require-trusted-types-for 'script' or they cannot call
+// importScripts(). Intercept sw.js and its Workbox chunk before express.static
+// so we can replace the page-level CSP with a minimal SW-appropriate one.
+const SW_CSP = "default-src 'self'; script-src 'self'";
+app.get('/sw.js', (_req, res) => {
+  res.setHeader('Content-Security-Policy', SW_CSP);
+  res.setHeader('Cache-Control', 'public, max-age=0');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.sendFile(path.join(distPath, 'sw.js'));
+});
+app.get(/^\/workbox-[0-9a-f]+\.js$/, (req, res) => {
+  res.setHeader('Content-Security-Policy', SW_CSP);
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.sendFile(path.join(distPath, req.path.slice(1)));
+});
+// Hashed assets (JS/CSS with content-hash filenames) are immutable — cache for 1 year
+app.use('/assets', express.static(path.join(distPath, 'assets'), {
+  index: false,
+  maxAge: '1y',
+  immutable: true,
+}));
+
+// Return a script that forces a reload for missing JS assets instead of 404,
+// which fixes the white-screen issue when a stale index.html requests old assets.
+app.use('/assets', (req, res) => {
+  if (req.path.endsWith('.js')) {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(`
+      console.warn("Stale asset requested. Forcing update.");
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for (let r of regs) r.update();
+        });
+      }
+      setTimeout(() => window.location.reload(), 1000);
+    `);
+  }
+  res.status(404).send('Asset not found');
+});
+
 app.use(express.static(distPath, { index: false }));
 
 // SPA fallback: inject CSP nonce into index.html before serving.
 // Vite builds a small inline <script> for module preloading; we replace the
 // placeholder attribute `nonce=""` with the real per-request nonce so the
 // browser accepts it without 'unsafe-inline'.
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-
 const indexHtmlPath = path.join(distPath, 'index.html');
+
+// S-16 / D.9: compute SRI (sha384) hashes for all referenced assets at startup.
+// The HTML is modified once at load time to add integrity= attributes.
+function computeSriForAssets(htmlStr, assetDir) {
+  return htmlStr.replace(
+    /((?:src|href)="(\/assets\/[^"]+)")/g,
+    (match, attr, assetPath) => {
+      const filePath = path.join(assetDir, assetPath.replace(/^\/assets\//, ''));
+      try {
+        const content = readFileSync(filePath);
+        const hash = createHash('sha384').update(content).digest('base64');
+        const integrityAttr = `integrity="sha384-${hash}"`;
+        return attr.includes('integrity') ? match : `${attr} ${integrityAttr}`;
+      } catch { return match; }
+    }
+  );
+}
+let _sriHtml = null;
+let _sriHtmlMtime = 0;
+
+function getSriHtml() {
+  try {
+    const stats = statSync(indexHtmlPath);
+    const mtime = stats.mtimeMs;
+
+    // If file has changed on disk, or cache is empty, re-compute
+    if (!_sriHtml || mtime > _sriHtmlMtime) {
+      const raw = readFileSync(indexHtmlPath, 'utf-8');
+      _sriHtml = computeSriForAssets(raw, distPath);
+      _sriHtmlMtime = mtime;
+      console.log(`[Server] index.html updated (mtime: ${mtime}), refreshed SRI cache.`);
+    }
+  } catch (err) {
+    console.error('[Server] Failed to read index.html for SRI cache:', err.message);
+    _sriHtml = null;
+  }
+  return _sriHtml;
+}
 
 // ── First-run setup API ───────────────────────────────────────────────────────
 
@@ -215,8 +321,8 @@ app.post('/api/setup-complete', refuseIfSetupDone, requireSetupToken, (_req, res
   }
 });
 
-// Run detect-system.sh and return JSON — requires setup token
-app.get('/api/system-info', requireSetupToken, (_req, res) => {
+// Run detect-system.sh and return JSON — only during setup phase (D.6 / S-04).
+app.get('/api/system-info', refuseIfSetupDone, requireSetupToken, (_req, res) => {
   const script = path.join(__dirname, 'scripts', 'detect-system.sh');
   // Use execFile so the script path is passed as an argument to bash, not interpolated
   // into a shell string. The path is server-controlled (no user input).
@@ -262,20 +368,34 @@ app.post('/api/ubuntu-pro/enable-fips', requireSetupToken, (_req, res) => {
   });
 });
 
-// ── Health probe (Phase E) ────────────────────────────────────────────────────
-// Opens a transient Unix socket connection to the daemon, sends a Ping,
-// and returns 200 OK if the daemon responds or 503 if it is unreachable.
-// Consumed by Nginx proxy_next_upstream and external monitoring probes.
+// ── Health probe ──────────────────────────────────────────────────────────────
+// PWDnowMonitoringENV polls this endpoint every 10 s to verify application-layer
+// liveness of both the Express server and the vault-daemon IPC socket.
+//
+// Returns 200 with rich diagnostics when healthy, 503 when the daemon is unreachable.
+// Not behind authentication — safe because it reveals no user data.
+
+const SERVER_START_TIME = Date.now();
 
 app.get('/health', (_req, res) => {
   const socket = net.createConnection(DAEMON_SOCKET);
   let responded = false;
+  const probeStart = Date.now();
 
   const fail = (reason) => {
     if (!responded) {
       responded = true;
       socket.destroy();
-      res.status(503).json({ status: 'unhealthy', reason });
+      const mem = process.memoryUsage();
+      res.status(503).json({
+        status:      'unhealthy',
+        reason,
+        pid:         process.pid,
+        uptime_secs: Math.floor(process.uptime()),
+        node_version: process.version,
+        mem_rss_mib:  +(mem.rss / 1048576).toFixed(1),
+        daemon_ok:   false,
+      });
     }
   };
 
@@ -283,12 +403,34 @@ app.get('/health', (_req, res) => {
   socket.on('connect', () => {
     if (!responded) {
       responded = true;
+      const latency_ms = Date.now() - probeStart;
       socket.destroy();
-      res.status(200).json({ status: 'ok' });
+      const mem = process.memoryUsage();
+      res.status(200).json({
+        status:         'ok',
+        pid:            process.pid,
+        uptime_secs:    Math.floor(process.uptime()),
+        node_version:   process.version,
+        mem_rss_mib:    +(mem.rss / 1048576).toFixed(1),
+        mem_heap_mib:   +(mem.heapUsed / 1048576).toFixed(1),
+        daemon_ok:      true,
+        daemon_latency_ms: latency_ms,
+        server_start_iso: new Date(SERVER_START_TIME).toISOString(),
+      });
     }
   });
-  socket.on('timeout', () => fail('daemon timeout'));
-  socket.on('error', (err) => fail(err.message));
+  socket.on('timeout', () => fail('daemon_timeout'));
+  socket.on('error',   (err) => fail(err.message));
+});
+
+// ── Public IP proxy (avoids CSP restriction on direct fetch to ipify.org) ────
+// Returns the caller's public-facing IP. Loopback callers (same machine as the
+// server) receive the server's outbound public IP instead.
+const LOOPBACK_RE_SRV = /^(127\.|::1$|::ffff:127\.)/;
+app.get('/api/my-ip', async (req, res) => {
+  const clientIp = req.headers['x-real-ip'] || req.socket.remoteAddress || '';
+  if (!LOOPBACK_RE_SRV.test(clientIp)) return res.json({ ip: clientIp });
+  res.json({ ip: (await getServerPublicIp()) ?? '127.0.0.1' });
 });
 
 // ── Mount offline demo-mode API routes ───────────────────────────────────────
@@ -297,10 +439,8 @@ mountAuthAndVault(app);
 // ─────────────────────────────────────────────────────────────────────────────
 
 app.get('*', (req, res) => {
-  let indexHtml;
-  try {
-    indexHtml = readFileSync(indexHtmlPath, 'utf-8');
-  } catch {
+  const indexHtml = getSriHtml();
+  if (!indexHtml) {
     return res.status(503).send('Application not built. Run: npm run build');
   }
   const nonce = res.locals.cspNonce;
@@ -330,7 +470,8 @@ app.get('*', (req, res) => {
 //   → send as WebSocket binary message to browser
 
 const httpServer = createServer(app);
-const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+// S-08 / D.5: cap WebSocket frame size at 4 MiB (matches daemon's MAX_FRAME_SIZE).
+const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: 4 * 1024 * 1024 });
 
 // HIGH-01 fix: allowed WebSocket origins (same host, both http and https).
 // Populated once at startup; the WS server checks each incoming Origin header.
@@ -343,7 +484,30 @@ const ALLOWED_WS_ORIGINS = new Set([
   ...(process.env.VAULT_ORIGIN ? [process.env.VAULT_ORIGIN] : []),
 ]);
 
+// S-09 / D.5: per-IP reconnect throttle — max 30 connections per minute per IP.
+const wsConnectCounts = new Map(); // ip -> { count, resetAt }
+const WS_CONNECT_WINDOW_MS = 60_000;
+const WS_CONNECT_LIMIT = 30;
+
+function isWsRateLimited(ip) {
+  const now = Date.now();
+  let entry = wsConnectCounts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + WS_CONNECT_WINDOW_MS };
+    wsConnectCounts.set(ip, entry);
+  }
+  entry.count += 1;
+  return entry.count > WS_CONNECT_LIMIT;
+}
+
 wss.on('connection', (ws, req) => {
+  // S-09: per-IP reconnect throttle.
+  const clientIp = req.headers['x-real-ip'] || req.socket.remoteAddress || '';
+  if (isWsRateLimited(clientIp)) {
+    ws.close(1013, 'too many connections from this IP');
+    return;
+  }
+
   // HIGH-01: validate the Origin header to prevent Cross-Site WebSocket Hijacking.
   // When deployed behind Nginx all socket connections appear from 127.0.0.1, so
   // IP-based checks alone are insufficient — we must also check the browser-sent
@@ -361,6 +525,8 @@ wss.on('connection', (ws, req) => {
 
   const daemon = net.createConnection(DAEMON_SOCKET);
   let readBuf = Buffer.alloc(0);
+
+  daemon.on('connect', () => {});
 
   // Browser → Daemon
   ws.on('message', (data) => {
@@ -393,9 +559,10 @@ wss.on('connection', (ws, req) => {
     if (ws.readyState === ws.OPEN) ws.close(1001, 'daemon disconnected');
   });
 
-  ws.on('close', () => daemon.destroy());
-  ws.on('error', () => daemon.destroy());
+  ws.on('close', () => { daemon.destroy(); });
+  ws.on('error', (e) => { daemon.destroy(); });
 });
+
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 

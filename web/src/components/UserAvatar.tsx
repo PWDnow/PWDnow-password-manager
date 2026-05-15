@@ -8,7 +8,12 @@ interface UserAvatarProps {
 }
 
 export default function UserAvatar({ firstName, lastName, photoUrl, className }: UserAvatarProps) {
-  if (photoUrl && photoUrl.startsWith('data:')) {
+  // Accept either `blob:` (preferred — CSP allows it; UserContext uses it) or
+  // `data:` (legacy callers / FileReader previews) so this component renders
+  // photos regardless of how the URL was produced. `http(s):` is intentionally
+  // NOT accepted: external image sources would defeat the same-origin avatar
+  // policy and the CSP's `img-src 'self' blob:` would block them anyway.
+  if (photoUrl && (photoUrl.startsWith('blob:') || photoUrl.startsWith('data:'))) {
     return (
       <img
         src={photoUrl}

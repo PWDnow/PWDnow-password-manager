@@ -9,8 +9,10 @@
  *            Requires a secure context (HTTPS or localhost).
  */
 
-import { TOTP } from 'totp-generator';
 import { keyStore } from '../crypto/keystore';
+import { writeEncryptedLocal, readDecryptedLocal, encryptForServer, decryptFromServer } from './localCrypto';
+import { daemon } from './daemonClient';
+import { generateUUID } from './crypto';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +29,16 @@ export interface MfaConfig {
     enabled: boolean;
     secret?: string;     // base32-encoded, stored on device
     enabledAt?: number;
+    algorithm?: 'SHA-1' | 'SHA-256' | 'SHA-512';
+    digits?: number;
+  };
+  hotp?: {
+    enabled: boolean;
+    secret?: string;
+    counter: number;
+    enabledAt?: number;
+    algorithm?: 'SHA-1' | 'SHA-256' | 'SHA-512';
+    digits?: number;
   };
   webauthn: {
     enabled: boolean;
@@ -45,7 +57,63 @@ export interface MfaConfig {
     address?: string;
     enabledAt?: number;
   };
-  passwordlessEnabled?: boolean;  // when true, password field is hidden at login
+  passwordlessEnabled?: boolean;   // when true, password field is hidden at login (passkey-only)
+  passwordLoginEnabled?: boolean;  // when false, password-only login card is hidden; default true
+}
+
+// ─── CSRF helper (shared by all server-side fetch calls in this module) ───────
+function getCsrfToken(): string {
+  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('_pwd_csrf='))?.split('=')[1] ?? '';
+}
+
+// ─── Login Hints ──────────────────────────────────────────────────────────────
+// Hints are fetched live from the daemon/server on the email step and held in
+// React state. They are NOT persisted to localStorage - doing so would expose
+// which MFA methods are enabled for an account (information useful to attackers).
+
+export interface LoginHints {
+  totp: boolean;
+  emailOtp: boolean;
+  passwordEnabled: boolean;  // false = password-only login card hidden
+  webauthn?: boolean;        // true = hardware security key registered
+  passwordlessEnabled?: boolean; // true = vault requires passkey/security key to unlock
+}
+
+const DEFAULT_LOGIN_HINTS: LoginHints = {
+  totp: false,
+  emailOtp: false,
+  passwordEnabled: true,
+  webauthn: false,
+  passwordlessEnabled: false,
+};
+
+/** Returns safe defaults - real hints come from the daemon/server per-login. */
+export function getLoginHints(): LoginHints {
+  return { ...DEFAULT_LOGIN_HINTS };
+}
+
+/** Sync policy to server only - never persists to localStorage. */
+export function refreshLoginHints(): void {
+  const cfg = getMfaConfig();
+  const hasHardware = (cfg.passkey?.enabled || cfg.platform?.enabled || cfg.webauthn?.enabled) ?? false;
+  const hints: LoginHints = {
+    totp:               cfg.totp.enabled || (cfg.hotp?.enabled ?? false),
+    emailOtp:           cfg.email.enabled,
+    passwordEnabled:    cfg.passwordLoginEnabled !== false,
+    webauthn:           cfg.webauthn?.enabled && cfg.webauthn.credentials.length > 0,
+    passwordlessEnabled: (cfg.passwordlessEnabled === true) && hasHardware,
+  };
+
+  // Sync to server only
+  const csrf = getCsrfToken();
+  if (csrf) {
+    fetch('/api/auth/login-hints', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+      body: JSON.stringify({ hints }),
+    }).catch(() => { /* silent fail */ });
+  }
 }
 
 // ─── LocalStorage helpers (CRIT-06: AES-GCM encrypted) ───────────────────────
@@ -70,58 +138,103 @@ const DEFAULT_MFA = (): MfaConfig => ({
 
 let _mfaCache: MfaConfig | null = null;
 
-function bytesToB64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
-}
-function b64ToBytes(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-}
-
-/** Call once at login (after keyStore.storeLocalKey is called) to decrypt MFA config into memory. */
+/**
+ * Call once at login to decrypt MFA config into the in-memory cache.
+ * Uses the centralised readDecryptedLocal (JWT-like signed+encrypted format).
+ * Falls back to server when local key is unavailable (page refresh in server mode).
+ */
 export async function loadMfaConfig(): Promise<void> {
-  try {
-    const raw = localStorage.getItem(MFA_KEY);
-    if (!raw) { _mfaCache = DEFAULT_MFA(); return; }
-    const parsed = JSON.parse(raw);
-
-    if (parsed.enc === 1) {
-      const key = keyStore.getLocalKey();
-      if (!key) { _mfaCache = DEFAULT_MFA(); return; }
-      const iv = b64ToBytes(parsed.iv);
-      const ct = b64ToBytes(parsed.ct);
-      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
-      _mfaCache = JSON.parse(new TextDecoder().decode(plaintext)) as MfaConfig;
-    } else {
-      // Legacy plaintext — load into cache; will be re-encrypted on next save
-      _mfaCache = parsed as MfaConfig;
-    }
-  } catch {
-    _mfaCache = DEFAULT_MFA();
+  const decrypted = await readDecryptedLocal(MFA_KEY);
+  if (decrypted) {
+    try {
+      _mfaCache = JSON.parse(decrypted) as MfaConfig;
+      return;
+    } catch { /* corrupt blob - fall through to server */ }
   }
+  await loadMfaConfigFromServer();
+  if (!_mfaCache) _mfaCache = DEFAULT_MFA();
 }
 
-/** Clear the in-memory cache on logout or tab close. */
-export function clearMfaCache(): void {
-  _mfaCache = null;
-}
-
-/** Synchronous read from in-memory cache. */
+/** Synchronous read from in-memory cache. Returns DEFAULT_MFA if not yet loaded. */
 export function getMfaConfig(): MfaConfig {
   return _mfaCache ?? DEFAULT_MFA();
 }
 
-/** Update cache and persist encrypted ciphertext to localStorage. */
+/**
+ * Update cache, persist to localStorage as a signed+encrypted compact token,
+ * and sync to server. TOTP secrets are never written in plaintext.
+ */
 export function saveMfaConfig(cfg: MfaConfig): void {
   _mfaCache = cfg;
-  const key = keyStore.getLocalKey();
-  if (key) {
-    // Async encrypt — fire and forget (the cache is already updated synchronously)
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const plaintext = new TextEncoder().encode(JSON.stringify(cfg));
-    crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext).then(ct => {
-      localStorage.setItem(MFA_KEY, JSON.stringify({ enc: 1, iv: bytesToB64(iv), ct: bytesToB64(new Uint8Array(ct)) }));
-    }).catch(() => { /* non-fatal: cache is authoritative */ });
+
+  // Persist to server so config survives logout/login cycles.
+  saveMfaConfigToServer(cfg).catch(() => { /* non-fatal */ });
+
+  // Sync policy flags to daemon if connected.
+  if (daemon.isConnected) {
+    daemon.updateLoginPolicy(
+      cfg.passwordLoginEnabled !== false,
+      cfg.totp.enabled,
+      cfg.email.enabled,
+    ).catch(() => { /* non-fatal */ });
   }
+
+  // Persist to localStorage using the shared signed+encrypted format.
+  writeEncryptedLocal(MFA_KEY, JSON.stringify(cfg)).catch(() => { /* non-fatal */ });
+}
+
+// ─── Server-side MFA persistence ─────────────────────────────────────────────
+// Stores the full MFA config (including TOTP secrets) in the server vault,
+// encrypted at rest like credentials and folders. This survives logout/login.
+
+async function saveMfaConfigToServer(cfg: MfaConfig): Promise<void> {
+  const csrf = getCsrfToken();
+  if (!csrf) return; // not in a server session
+
+  const encData = await encryptForServer(JSON.stringify(cfg));
+  if (!encData) return;
+
+  await fetch('/api/vault/mfa', {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+    body: JSON.stringify({ data: encData }),
+  });
+}
+
+/** Load MFA config from server and merge into cache. Call after server login. */
+export async function loadMfaConfigFromServer(): Promise<void> {
+  // Daemon-only sessions don't have a `_pwd_csrf` cookie and the server route
+  // requires one — hitting it guarantees a 401 that shows up in the DevTools
+  // console and obscures real errors. Skip the fetch entirely in that case;
+  // MFA config lives in the encrypted localStorage blob for daemon-mode users.
+  if (!getCsrfToken()) return;
+  try {
+    const res = await fetch('/api/vault/mfa', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const body = await res.json();
+    let data: MfaConfig | null = null;
+    
+    if (body && typeof body.data === 'string') {
+      const dec = await decryptFromServer(body.data);
+      if (dec) data = JSON.parse(dec);
+    } else if (body && typeof body === 'object' && 'totp' in body) {
+      data = body as MfaConfig; // legacy fallback
+    }
+
+    if (data && typeof data === 'object' && 'totp' in data) {
+      _mfaCache = data;
+    }
+  } catch { /* non-fatal */ }
+}
+
+/** Clear the in-memory cache AND localStorage on logout so the next user
+ *  on the same device does not see a previous account's MFA config. */
+export function clearMfaCache(): void {
+  _mfaCache = null;
+  localStorage.removeItem(MFA_KEY);
+  // Remove legacy plaintext backup if present from a previous version.
+  localStorage.removeItem('mfa_config_plain');
 }
 
 // ─── Base32 encode (RFC 4648) ─────────────────────────────────────────────────
@@ -160,16 +273,66 @@ export function generateTotpSecret(): string {
  * Build an otpauth:// URI as defined by the Google Authenticator Key URI Format.
  * Compatible with all RFC 6238 authenticator apps.
  */
-export function buildTotpUri(secret: string, accountEmail: string, issuer = 'PWDnow'): string {
+export function buildTotpUri(secret: string, accountEmail: string, issuer = 'PWDnow', algorithm = 'SHA256', digits = 8): string {
   const label = encodeURIComponent(`${issuer}:${accountEmail}`);
   return (
     `otpauth://totp/${label}` +
     `?secret=${secret}` +
     `&issuer=${encodeURIComponent(issuer)}` +
-    `&algorithm=SHA1` +
-    `&digits=6` +
+    `&algorithm=${algorithm}` +
+    `&digits=${digits}` +
     `&period=30`
   );
+}
+
+export function buildHotpUri(secret: string, accountEmail: string, counter = 0, issuer = 'PWDnow', algorithm = 'SHA256', digits = 8): string {
+  const label = encodeURIComponent(`${issuer}:${accountEmail}`);
+  return `otpauth://hotp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=${algorithm}&digits=${digits}&counter=${counter}`;
+}
+
+function base32Decode(base32: string): Uint8Array {
+  const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = base32.toUpperCase().replace(/=+$/, '');
+  let bits = 0, value = 0;
+  const out: number[] = [];
+  for (const ch of clean) {
+    const idx = alpha.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) { out.push((value >>> (bits - 8)) & 0xFF); bits -= 8; }
+  }
+  return new Uint8Array(out);
+}
+
+async function computeHotp(secret: string, counter: number, algorithm = 'SHA-1', digits = 6): Promise<string> {
+  const secretBytes = base32Decode(secret);
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  view.setUint32(0, Math.floor(counter / 0x100000000), false);
+  view.setUint32(4, counter >>> 0, false);
+  const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: algorithm }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, buf));
+  const offset = sig[sig.length - 1] & 0xF;
+  const code = ((sig[offset] & 0x7F) << 24) | (sig[offset + 1] << 16) | (sig[offset + 2] << 8) | sig[offset + 3];
+  return String(code % Math.pow(10, digits)).padStart(digits, '0');
+}
+
+export async function verifyHotp(
+  secret: string,
+  storedCounter: number,
+  token: string,
+  lookahead = 10,
+  algorithm = 'SHA-1',
+  digits = 6,
+): Promise<{ ok: boolean; nextCounter: number }> {
+  const clean = token.replace(/\s/g, '');
+  if (!new RegExp(`^\\d{${digits}}$`).test(clean)) return { ok: false, nextCounter: storedCounter };
+  for (let i = 0; i <= lookahead; i++) {
+    const code = await computeHotp(secret, storedCounter + i, algorithm, digits);
+    if (code === clean) return { ok: true, nextCounter: storedCounter + i + 1 };
+  }
+  return { ok: false, nextCounter: storedCounter };
 }
 
 // MED-04: in-memory set of recently consumed TOTP periods.
@@ -178,13 +341,13 @@ export function buildTotpUri(secret: string, accountEmail: string, issuer = 'PWD
 const _usedTotpPeriods = new Map<string, number>();
 
 /**
- * Verify a 6-digit TOTP code against the stored secret.
+ * Verify a TOTP code against the stored secret.
  * Checks current period ± 1 step to tolerate ≤30 s clock drift.
  * MED-04: rejects codes that have already been used in the same period (replay).
  */
-export async function verifyTotp(secret: string, token: string): Promise<boolean> {
+export async function verifyTotp(secret: string, token: string, algorithm = 'SHA-1', digits = 6): Promise<boolean> {
   const clean = token.replace(/\s/g, '');
-  if (!/^\d{6}$/.test(clean)) return false;
+  if (!new RegExp(`^\\d{${digits}}$`).test(clean)) return false;
   const now = Date.now();
 
   // Garbage-collect expired entries
@@ -192,14 +355,14 @@ export async function verifyTotp(secret: string, token: string): Promise<boolean
     if (now > expiry) _usedTotpPeriods.delete(key);
   }
 
-  for (const drift of [-30000, 0, 30000]) {
+  // Only check the current period and one step forward.
+  for (const drift of [0, 30000]) {
     const ts = now + drift;
-    const { otp } = await TOTP.generate(secret, { timestamp: ts });
-    if (otp === clean) {
-      const period = Math.floor(ts / 30_000);
-      const replayKey = `${secret}:${period}`;
+    const period = Math.floor(ts / 30_000);
+    const code = await computeHotp(secret, period, algorithm, digits);
+    if (code === clean) {
+      const replayKey = `${secret}:${period}:${algorithm}:${digits}`;
       if (_usedTotpPeriods.has(replayKey)) return false; // replay detected
-      // Mark this period as consumed; expire after 2 full periods (60 s safety margin)
       _usedTotpPeriods.set(replayKey, (period + 2) * 30_000);
       return true;
     }
@@ -208,7 +371,7 @@ export async function verifyTotp(secret: string, token: string): Promise<boolean
 }
 
 // ─── Email OTP ─────────────────────────────────────────────────────────────────
-// Code is held ONLY in module memory — never written to localStorage/sessionStorage.
+// Code is held ONLY in module memory - never written to localStorage/sessionStorage.
 // TTL is 5 minutes. This is a client-side simulation for the demo.
 
 interface PendingEmailOtp {
@@ -221,8 +384,10 @@ let _pendingOtp: PendingEmailOtp | null = null;
 
 /** Generate a 6-digit OTP and return it (caller shows it in simulated email). */
 export function generateEmailCode(email: string): string {
+  // Rejection sampling avoids modulo bias (2^32 is not divisible by 1_000_000).
+  const LIMIT = Math.floor(0x1_0000_0000 / 1_000_000) * 1_000_000; // 4_294_000_000
   const buf = new Uint32Array(1);
-  crypto.getRandomValues(buf);
+  do { crypto.getRandomValues(buf); } while (buf[0] >= LIMIT);
   const code = String(buf[0] % 1_000_000).padStart(6, '0');
   _pendingOtp = { code, email, expires: Date.now() + 5 * 60 * 1000 };
   return code;
@@ -254,6 +419,66 @@ export function isWebAuthnSupported(): boolean {
   );
 }
 
+/**
+ * Returns true when the browser/OS has a platform authenticator available
+ * (Touch ID, Windows Hello, Android fingerprint…).
+ * Returns false in environments without biometric hardware, such as Linux VMs
+ * running inside Parallels / VMware where no biometric sensor is exposed.
+ */
+export async function isPlatformAuthAvailable(): Promise<boolean> {
+  if (!isWebAuthnSupported()) return false;
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Converts a WebAuthn DOMException into a human-readable message that explains
+ * what went wrong and, where possible, how to fix it.
+ *
+ * @param type  'securitykey' | 'passkey' | 'platform'
+ */
+export function describeWebAuthnError(err: unknown, type: 'securitykey' | 'passkey' | 'platform'): string {
+  const e = err instanceof Error ? err : new Error(String(err));
+  const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
+
+  // NotAllowedError covers: operation cancelled, no authenticator found, OS denied access.
+  if (e.name === 'NotAllowedError') {
+    if (type === 'platform' || type === 'passkey') {
+      return (
+        'Platform authenticator not available. ' +
+        'Touch ID, Windows Hello, and Face ID require biometric hardware that is not accessible ' +
+        'inside a virtual machine. Run the app directly on macOS/Windows to use these features.'
+      );
+    }
+    if (type === 'securitykey' && isLinux) {
+      return (
+        'Security key access denied. Three common causes on Linux:\n' +
+        '1. Key not connected to this VM - in Parallels: Devices → USB → [YubiKey] → Connect to Ubuntu\n' +
+        '2. Missing udev permissions - run the setup commands shown above\n' +
+        '3. Not in plugdev group - run: sudo adduser $USER plugdev  (then log out/in)'
+      );
+    }
+    return 'The operation was cancelled or no compatible authenticator was found. Make sure your key is plugged in and try again.';
+  }
+
+  if (e.name === 'TimeoutError' || e.message.toLowerCase().includes('timed out')) {
+    return 'The operation timed out. Plug in your security key before clicking the button, then respond promptly to the browser prompt.';
+  }
+
+  if (e.name === 'InvalidStateError') {
+    return 'This credential is already registered. Remove the existing entry and try again.';
+  }
+
+  if (e.name === 'NotSupportedError') {
+    return 'This authenticator type is not supported in the current browser or environment.';
+  }
+
+  return e.message || 'Registration failed. Check your authenticator and try again.';
+}
+
 export function isSecureContext(): boolean {
   return window.isSecureContext;
 }
@@ -272,7 +497,7 @@ function b64urlToBuf(b64: string): Uint8Array {
 }
 
 /**
- * WebAuthn Registration Ceremony (FIDO2 MakeCredential).
+ * WebAuthn Registration Ceremony (FIDO2 MakeCredential) via Daemon.
  * Returns metadata to store, or throws on failure.
  */
 export async function registerWebAuthn(
@@ -284,55 +509,25 @@ export async function registerWebAuthn(
   if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported in this browser.');
   if (!isSecureContext()) throw new Error('WebAuthn requires a secure context (HTTPS or localhost).');
 
-  const challenge = crypto.getRandomValues(new Uint8Array(32));
-  const userIdBytes = new TextEncoder().encode(userId);
+  if (!daemon.isConnected) await daemon.connect();
+  
+  // 1. List devices
+  const devices = await daemon.listFido2Devices();
+  if (!devices.length) throw new Error('No hardware security keys found. Make sure your key is connected.');
 
-  const credential = await navigator.credentials.create({
-    publicKey: {
-      challenge,
-      rp: {
-        name: 'PWDnow',
-        id: window.location.hostname,
-      },
-      user: {
-        id: userIdBytes,
-        name: email,
-        displayName,
-      },
-      pubKeyCredParams: [
-        { alg: -7,   type: 'public-key' }, // ES256  (ECDSA P-256)
-        { alg: -257, type: 'public-key' }, // RS256  (RSA-PKCS1-v1_5)
-        { alg: -37,  type: 'public-key' }, // PS256  (RSA-PSS)
-      ],
-      authenticatorSelection: {
-        // 'cross-platform' = external keys (YubiKey, Titan); 'platform' = TPM/Touch ID
-        authenticatorAttachment: 'cross-platform',
-        userVerification: 'preferred',
-        requireResidentKey: false,
-        residentKey: 'preferred',
-      },
-      timeout: 60_000,
-      attestation: 'none', // we don't need to verify manufacturer attestation
-      extensions: { credProps: true },
-    },
-  }) as PublicKeyCredential;
+  // 2. Register via daemon (this will prompt the user to touch the key)
+  // We use the first found device for simplicity.
+  const id = await daemon.registerFido2(devices[0], credentialName, false);
 
-  if (!credential) throw new Error('Registration cancelled.');
-
-  const response = credential.response as AuthenticatorAttestationResponse;
-  const credId = bufToB64url(credential.rawId);
-
-  // Extract the public key bytes from the attestation object for future storage
-  // (we store the raw credentialId; full CBOR parsing is server-side in real apps)
   const meta: WebAuthnCredentialMeta = {
-    id:        credId,
-    rawId:     credId,
+    id,
+    rawId:     id,
     name:      credentialName,
     createdAt: Date.now(),
     counter:   0,
   };
 
-  // Persist to mfa_config
+  // Persist to local cache (for hints)
   const cfg = getMfaConfig();
   cfg.webauthn.credentials.push(meta);
   cfg.webauthn.enabled = true;
@@ -380,7 +575,7 @@ export async function authenticateWebAuthn(credentialId: string): Promise<boolea
   const newCounter = new DataView(authData).getUint32(33, false);
   // Counter must be ≥ stored value (0 = counter not implemented by authenticator)
   if (newCounter > 0 && newCounter <= stored.counter) {
-    throw new Error('Signature counter decreased — possible cloned authenticator!');
+    throw new Error('Signature counter decreased - possible cloned authenticator!');
   }
   stored.counter = newCounter;
   saveMfaConfig(cfg);
@@ -390,23 +585,40 @@ export async function authenticateWebAuthn(credentialId: string): Promise<boolea
 
 // ─── Passkey / Platform Auth ──────────────────────────────────────────────────
 
-/**
- * Non-sensitive hint stored in plaintext so the login page can show the
- * "Use Passkey" button and target the right credentials without decrypting
- * the full MFA config (which requires the password-derived local key).
- */
+// Passkey credential ID hints are stored encrypted in localStorage under this key.
+// They are loaded into memory after login (when the session key is available).
+// Before login, getPasskeyHint() returns [] - the daemon provides credential IDs
+// via GetLoginHints (for daemon mode), and WebAuthn falls back to discoverable
+// credentials (residentKey lookup) when no local hint is available.
 const PASSKEY_HINT_KEY = '_pwdn_pk_hint';
+let _passkeyHintCache: Array<{ id: string; name: string }> | null = null;
 
+/** Encrypt and persist the passkey credential ID list after login. */
 function savePasskeyHint(credentials: WebAuthnCredentialMeta[]): void {
   const ids = credentials.map(c => ({ id: c.rawId, name: c.name }));
-  localStorage.setItem(PASSKEY_HINT_KEY, JSON.stringify(ids));
+  _passkeyHintCache = ids;
+  writeEncryptedLocal(PASSKEY_HINT_KEY, JSON.stringify(ids)).catch(() => { /* non-fatal */ });
 }
 
-export function getPasskeyHint(): Array<{ id: string; name: string }> {
+/**
+ * Load passkey hints from encrypted localStorage into the in-memory cache.
+ * Call once after login when the session key is in memory.
+ */
+export async function loadPasskeyHint(): Promise<void> {
   try {
-    const s = localStorage.getItem(PASSKEY_HINT_KEY);
-    return s ? (JSON.parse(s) as Array<{ id: string; name: string }>) : [];
-  } catch { return []; }
+    const raw = await readDecryptedLocal(PASSKEY_HINT_KEY);
+    _passkeyHintCache = raw ? (JSON.parse(raw) as Array<{ id: string; name: string }>) : [];
+  } catch {
+    _passkeyHintCache = [];
+  }
+  // Remove any legacy plaintext hint that may have been written before this version.
+  const legacy = localStorage.getItem(PASSKEY_HINT_KEY);
+  if (legacy && !legacy.includes('.')) localStorage.removeItem(PASSKEY_HINT_KEY);
+}
+
+/** Returns credential ID hints from the in-memory cache. Empty before loadPasskeyHint(). */
+export function getPasskeyHint(): Array<{ id: string; name: string }> {
+  return _passkeyHintCache ?? [];
 }
 
 function refreshPasskeyHint(): void {
@@ -572,14 +784,68 @@ export async function authenticateWithPasskeyForLogin(): Promise<boolean> {
   );
 }
 
+/**
+ * WebAuthn Authentication Ceremony (FIDO2 GetAssertion) via Daemon.
+ * Returns true if the daemon accepts the assertion and unlocks the vault.
+ */
+export async function authenticateWebAuthnForLogin(): Promise<boolean> {
+  if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported.');
+  if (!isSecureContext())     throw new Error('WebAuthn requires HTTPS or localhost.');
+
+  if (!daemon.isConnected) await daemon.connect();
+  const hints = await daemon.getLoginHints();
+  if (!hints.fido2_ids.length) return false;
+
+  const challenge = await daemon.getPasskeyChallenge();
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      rpId: window.location.hostname,
+      allowCredentials: hints.fido2_ids.map(id => ({
+        id,
+        type:       'public-key' as const,
+        transports: ['usb', 'nfc', 'ble', 'internal'] as AuthenticatorTransport[],
+      })),
+      userVerification: 'required',
+      timeout: 60_000,
+    },
+  }) as PublicKeyCredential;
+
+  if (!assertion) return false;
+
+  const resp = assertion.response as AuthenticatorAssertionResponse;
+  await daemon.unlockWithPasskey(
+    new Uint8Array(assertion.rawId),
+    new Uint8Array(resp.authenticatorData),
+    new Uint8Array(resp.signature),
+  );
+
+  return true;
+}
+
 /** Count how many distinct MFA methods are currently enabled. */
 export function countActiveMfaMethods(cfg?: MfaConfig): number {
   const c = cfg ?? getMfaConfig();
+  const hints = getLoginHints(); // from daemon if possible
+  
   return [
-    c.totp.enabled,
-    c.webauthn.enabled,
-    c.passkey?.enabled ?? false,
+    c.totp.enabled || hints.totp,
+    c.webauthn.enabled || hints.webauthn,
+    c.passkey?.enabled || hints.passwordlessEnabled, // passkey hint means enabled
     c.platform?.enabled ?? false,
-    c.email.enabled,
+    c.email.enabled || hints.emailOtp,
   ].filter(Boolean).length;
 }
+
+/**
+ * Stretch Goal H.5: Browser passkey export via WebAuthn Level 3 conditional UI.
+ * This outlines the interface for the emerging W3C passkey export standard.
+ */
+export async function exportPasskeys(): Promise<Uint8Array> {
+  if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported in this browser.');
+  
+  // Note: True passkey export requires OS-level support (e.g. Android 14+ Credential Manager API)
+  // and specific WebAuthn Level 3 extensions that are not yet universally available.
+  throw new Error('Passkey export is not yet natively supported by this browser/OS via WebAuthn Level 3.');
+}
+

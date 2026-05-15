@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronRight, ShieldCheck, RefreshCw, Copy, Info, Lock, Briefcase, User, Wallet, MoreHorizontal, Check, X, Wand2, Hash, Type, Globe, Plus, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, CreditCard, Key, Clock, Eye, EyeOff, Smartphone, HelpCircle, Shield } from 'lucide-react';
+import { ChevronRight, RefreshCw, Copy, Info, Lock, Briefcase, User, Wallet, MoreHorizontal, Check, X, Wand2, Hash, Type, Globe, Plus, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, CreditCard, Key, Clock, Eye, EyeOff, Smartphone, HelpCircle, Shield, Bold, Italic, Underline, List, Eraser, ToggleLeft, ToggleRight, FileText, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Folder, Credential } from '../types';
+import { Folder, Credential, type CredentialType } from '../types';
 import { useVault } from '../context/VaultContext';
 import { generateUUID } from '../utils/crypto';
 import { sanitizeSvg } from '../utils/sanitize';
+import { useNotification } from '../context/NotificationContext';
 import { daemon } from '../utils/daemonClient';
+import { secureClipboard } from '../utils/clipboardGuard';
+import { readDecryptedLocal } from '../utils/localCrypto';
 import PhoneCountrySelect from '../components/PhoneCountrySelect';
 
 type BreachStatus = 'idle' | 'checking' | 'pwned' | 'clean' | 'unavailable' | 'error';
@@ -36,12 +39,52 @@ const ICON_MAP: Record<string, React.FC<any>> = {
   Bitcoin,
   Dices,
   Folder: FolderIcon,
-  ShieldCheck,
+  Shield,
   CreditCard,
   Key
 };
 
 import COUNTRIES from '../data/countries.json';
+
+// Renders **bold**, *italic*, __underline__, and - bullet lists as React elements.
+function parseMarkdown(text: string): React.ReactNode[] {
+  let k = 0;
+
+  const parseInline = (str: string): React.ReactNode[] => {
+    const re = /(\*\*[\s\S]+?\*\*|__[\s\S]+?__|(?<!\*)\*(?!\*)[\s\S]+?(?<!\*)\*(?!\*))/g;
+    const out: React.ReactNode[] = [];
+    let last = 0;
+    for (const m of str.matchAll(re)) {
+      if (m.index! > last) out.push(str.slice(last, m.index));
+      const tok = m[0];
+      if (tok.startsWith('**'))      out.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
+      else if (tok.startsWith('__')) out.push(<u key={k++}>{tok.slice(2, -2)}</u>);
+      else                           out.push(<em key={k++}>{tok.slice(1, -1)}</em>);
+      last = m.index! + tok.length;
+    }
+    if (last < str.length) out.push(str.slice(last));
+    return out;
+  };
+
+  const result: React.ReactNode[] = [];
+  const lines = text.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].startsWith('- ')) {
+      const items: React.ReactNode[] = [];
+      while (i < lines.length && lines[i].startsWith('- ')) {
+        items.push(<li key={k++}>{parseInline(lines[i].slice(2))}</li>);
+        i++;
+      }
+      result.push(<ul key={k++} className="list-disc list-inside space-y-0.5 my-1">{items}</ul>);
+    } else {
+      const content = parseInline(lines[i]);
+      result.push(<p key={k++} className="min-h-[1.25em]">{content}</p>);
+      i++;
+    }
+  }
+  return result;
+}
 
 export default function AddCredential({ folders, activeTab, initialData, onCreateFolder, onAddCredential, onUpdateCredential, onCancel }: AddCredentialProps) {
   const { t } = useTranslation();
@@ -56,6 +99,35 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       effWordListRef.current = m.default as string[];
     }).catch(() => { /* stay on fallback */ });
   }, []);
+
+  useEffect(() => {
+    readDecryptedLocal('email_server_config').then(raw => {
+      if (!raw) return;
+      try {
+        const cfg = JSON.parse(raw);
+        setHasSmtp(!!(cfg?.host && cfg?.username && cfg?.password));
+      } catch { /* noop */ }
+    });
+  }, []);
+  const [credentialType, setCredentialType] = useState<CredentialType>(initialData?.credentialType || 'login');
+  // Passkey fields
+  const [rpId, setRpId]                         = useState(initialData?.rpId || '');
+  const [rpName, setRpName]                     = useState(initialData?.rpName || '');
+  const [credentialId, setCredentialId]         = useState(initialData?.credentialId || '');
+  const [userHandle, setUserHandle]             = useState(initialData?.userHandle || '');
+  const [authenticatorName, setAuthenticatorName] = useState(initialData?.authenticatorName || '');
+  const [backedUp, setBackedUp]                 = useState(initialData?.backedUp ?? false);
+  // Secure note fields
+  const [noteContent, setNoteContent]           = useState(initialData?.noteContent || '');
+  // Payment card fields
+  const [cardholderName, setCardholderName]     = useState(initialData?.cardholderName || '');
+  const [cardNumber, setCardNumber]             = useState(initialData?.cardNumber || '');
+  const [cardExpiry, setCardExpiry]             = useState(initialData?.cardExpiry || '');
+  const [cardCvv, setCardCvv]                   = useState(initialData?.cardCvv || '');
+  const [cardBillingAddress, setCardBillingAddress] = useState(initialData?.cardBillingAddress || '');
+  const [showCardNumber, setShowCardNumber]     = useState(false);
+  const [showCvv, setShowCvv]                   = useState(false);
+
   const [title, setTitle] = useState(initialData?.service || '');
   const [username, setUsername] = useState(initialData?.username === 'No username' ? '' : (initialData?.username || ''));
   const [url, setUrl] = useState(initialData?.url || '');
@@ -73,7 +145,16 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   const [urlError, setUrlError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [otpSecret, setOtpSecret] = useState(initialData?.otpSecret || '');
-  // HIBP breach status for the current password. Advisory only — does not
+  const { addNotification } = useNotification();
+  const [description, setDescription] = useState(initialData?.description ?? '');
+  const descTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [accountType, setAccountType] = useState(initialData?.accountType ?? '');
+  const [expiryEnabled, setExpiryEnabled] = useState(initialData?.expiryEnabled ?? false);
+  const [expiryValue, setExpiryValue] = useState(initialData?.expiryValue ?? 90);
+  const [expiryUnit, setExpiryUnit] = useState<'days' | 'months' | 'years'>(initialData?.expiryUnit ?? 'days');
+  const [expiryNotifyEmail, setExpiryNotifyEmail] = useState(initialData?.expiryNotifyEmail ?? false);
+  const [hasSmtp, setHasSmtp] = useState(false);
+  // HIBP breach status for the current password. Advisory only - does not
   // block submit. Kept in state rather than derived so the UI can show
   // "checking…" feedback during the async daemon round-trip.
   const [breachStatus, setBreachStatus] = useState<BreachStatus>('idle');
@@ -154,6 +235,90 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     }
     return [{ id: generateUUID(), value: '' }];
   });
+
+  // Toggles markdown formatting markers around the selection.
+  // Applying bold to already-bold text removes the markers instead of double-wrapping.
+  const toggleWrap = (marker: string) => {
+    const el = descTextareaRef.current;
+    if (!el) return;
+    const { selectionStart: s, selectionEnd: e, value } = el;
+    const m = marker.length;
+
+    // No selection → insert empty marker pair, place cursor between them.
+    if (s === e) {
+      setDescription(value.slice(0, s) + marker + marker + value.slice(s));
+      requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + m, s + m); });
+      return;
+    }
+
+    const selected = value.slice(s, e);
+
+    // Case 1: the selection itself IS the wrapped text (e.g. user selected "**bold**").
+    if (
+      selected.length > m * 2 &&
+      selected.slice(0, m) === marker &&
+      selected.slice(-m) === marker &&
+      // For '*', ensure it isn't actually '**bold**' being processed by the italic handler.
+      !(marker === '*' && (selected[1] === '*' || selected[selected.length - 2] === '*'))
+    ) {
+      const inner = selected.slice(m, -m);
+      setDescription(value.slice(0, s) + inner + value.slice(e));
+      requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s, s + inner.length); });
+      return;
+    }
+
+    // Case 2: markers sit OUTSIDE the selection boundary in the full text
+    //         (e.g. textarea has "**bold**" but only "bold" is selected).
+    if (s >= m && e + m <= value.length) {
+      const before = value.slice(s - m, s);
+      const after  = value.slice(e, e + m);
+      if (before === marker && after === marker) {
+        // For '*', guard against accidentally stripping a '**' wrap.
+        const bogus = marker === '*' && (
+          (s - m - 1 >= 0 && value[s - m - 1] === '*') ||
+          (e + m < value.length && value[e + m] === '*')
+        );
+        if (!bogus) {
+          setDescription(value.slice(0, s - m) + selected + value.slice(e + m));
+          requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s - m, s - m + selected.length); });
+          return;
+        }
+      }
+    }
+
+    // Case 3: not wrapped → wrap.
+    setDescription(value.slice(0, s) + marker + selected + marker + value.slice(e));
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + m, e + m); });
+  };
+
+  // Toggles a "- " bullet prefix on the current line.
+  const toggleBulletList = () => {
+    const el = descTextareaRef.current;
+    if (!el) return;
+    const { selectionStart: s, value } = el;
+    const lineStart = value.lastIndexOf('\n', s - 1) + 1;
+    const lineEnd   = value.indexOf('\n', s);
+    const line      = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd);
+    if (line.startsWith('- ')) {
+      const next = value.slice(0, lineStart) + line.slice(2) + (lineEnd === -1 ? '' : value.slice(lineEnd));
+      setDescription(next);
+      requestAnimationFrame(() => { el.focus(); el.setSelectionRange(Math.max(lineStart, s - 2), Math.max(lineStart, s - 2)); });
+    } else {
+      const next = value.slice(0, lineStart) + '- ' + line + (lineEnd === -1 ? '' : value.slice(lineEnd));
+      setDescription(next);
+      requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + 2, s + 2); });
+    }
+  };
+
+  const clearMarkdown = () => {
+    const el = descTextareaRef.current;
+    if (!el) return;
+    const { selectionStart: s, selectionEnd: e, value } = el;
+    const cleaned = value.slice(s, e).replace(/\*\*|__|(?<!\*)\*(?!\*)/g, '');
+    const newVal = value.slice(0, s) + cleaned + value.slice(e);
+    setDescription(newVal);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s, s + cleaned.length); });
+  };
 
   const addPhoneNumber = () => {
     if (phoneNumbers.length < 2) {
@@ -243,7 +408,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       );
     }
     
-    const IconComponent = folder.iconName ? ICON_MAP[folder.iconName] : FolderIcon;
+    const IconComponent = (folder.iconName && ICON_MAP[folder.iconName]) ? ICON_MAP[folder.iconName] : FolderIcon;
     return <IconComponent size={16} fill={isSelected ? "currentColor" : "none"} aria-hidden="true" />;
   };
 
@@ -323,7 +488,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   }, [generatePassword]);
 
   // HIBP breach lookup, debounced. Only runs against the local daemon filter
-  // (architecture §4 — passwords never leave the machine). Debounced so
+  // (architecture §4 - passwords never leave the machine). Debounced so
   // typing doesn't hammer the socket; reset to idle for empty inputs.
   useEffect(() => {
     if (!password) { setBreachStatus('idle'); return; }
@@ -351,7 +516,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     const hasNumber = /[0-9]/.test(pwd);
     const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
 
-    // Password Strength Rules — barText uses bright variants for dark generator bg
+    // Password Strength Rules - barText uses bright variants for dark generator bg
     if (len >= 16 && hasUpper && hasLower && hasNumber && hasSpecial) {
       return { label: t('vault.strength.excellent', 'Excellent'), color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-100', dot: 'bg-green-600', bar: 'bg-green-500', barText: 'text-green-400', barWidth: 'w-full' };
     }
@@ -381,11 +546,9 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   const strength = getStrength(password);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(password);
+    secureClipboard(password, () => {}, () => {}, 10);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    // HIGH-06: clear clipboard after 30 s so the password doesn't linger
-    setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 30_000);
   };
 
   return (
@@ -406,9 +569,49 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
             <h1 className="text-4xl md:text-5xl font-headline font-black tracking-tighter text-black dark:text-white leading-none">{initialData ? t('addCredential.editTitle', 'Edit Credential') : t('addCredential.addTitle', 'New Credential')}</h1>
             <p className="text-on-surface-variant text-base font-medium mt-3 max-w-2xl leading-relaxed">{t('addCredential.description', 'Securely store your login information with enterprise-grade encryption and advanced security protocols.')}</p>
           </div>
-          <form className="space-y-10" onSubmit={(e) => {
+          <form className="space-y-10" onSubmit={async (e) => {
             e.preventDefault();
             if (!title.trim()) return;
+
+            // Non-login types bypass the URL/password validation flow
+            if (credentialType !== 'login') {
+              function detectCardType(num: string): string {
+                if (/^4/.test(num)) return 'visa';
+                if (/^(51|52|53|54|55|2[2-7])/.test(num)) return 'mastercard';
+                if (/^3[47]/.test(num)) return 'amex';
+                if (/^(6011|622|64[4-9]|65)/.test(num)) return 'discover';
+                return '';
+              }
+              const nonLoginCred: Credential = {
+                id: initialData?.id || generateUUID(),
+                service: title.trim(),
+                url: rpId || '',
+                username: '',
+                password: '',
+                status: 'good',
+                statusColor: '',
+                logo: initialData?.logo || '',
+                folderId: selectedFolder,
+                tags: [],
+                credentialType,
+                ...(credentialType === 'passkey' ? { rpId, rpName, credentialId, userHandle, authenticatorName, backedUp } : {}),
+                ...(credentialType === 'secure_note' ? { noteContent } : {}),
+                ...(credentialType === 'payment_card' ? { cardholderName, cardNumber, cardExpiry, cardCvv, cardBillingAddress, cardType: detectCardType(cardNumber) } : {}),
+                description: description.trim() || undefined,
+              };
+              try {
+                if (initialData && onUpdateCredential) await onUpdateCredential(nonLoginCred);
+                else if (onAddCredential) await onAddCredential(nonLoginCred);
+                if (onCancel) onCancel();
+              } catch (err: any) {
+                addNotification({
+                  type: 'credential_deleted',
+                  title: 'Error Saving Credential',
+                  message: err.message || 'An error occurred while saving.',
+                });
+              }
+              return;
+            }
 
             let formattedUrl = url.trim();
             if (formattedUrl && !/^https?:\/\//i.test(formattedUrl)) {
@@ -441,18 +644,72 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 }) : undefined,
                 kba: tags.includes('KBA') ? kba.map(({ id, ...rest }) => rest) : undefined,
                 u2fKeyName: tags.includes('U2F') ? u2fKeys.map(u => u.value).filter(Boolean) : undefined,
-                otpSecret: tags.includes('OTP') ? otpSecret : undefined
+                otpSecret: tags.includes('OTP') ? otpSecret : undefined,
+                otpAlgorithm: tags.includes('OTP') ? (initialData?.otpAlgorithm || 'SHA256') : undefined,
+                otpDigits: tags.includes('OTP') ? (initialData?.otpDigits || 8) : undefined,
+                accountType: accountType.trim() || undefined,
+                expiryEnabled,
+                expiryValue: expiryEnabled ? expiryValue : undefined,
+                expiryUnit: expiryEnabled ? expiryUnit : undefined,
+                expiryNotifyEmail: expiryEnabled ? expiryNotifyEmail : undefined,
+                expirySetAt: expiryEnabled
+                  ? (initialData?.expiryEnabled ? initialData.expirySetAt : Date.now())
+                  : undefined,
+                description: description.trim() || undefined,
+                credentialType: 'login' as const,
               };
 
-            if (initialData && onUpdateCredential) {
-              onUpdateCredential(credData);
-            } else if (onAddCredential) {
-              onAddCredential(credData);
+            try {
+              if (initialData && onUpdateCredential) {
+                await onUpdateCredential(credData);
+                // Positive reinforcement: password changed AND expiry is configured
+                const passwordChanged = !!password && !!initialData.password && password !== initialData.password;
+                if (passwordChanged && expiryEnabled) {
+                  addNotification({
+                    type: 'credential_added',
+                    title: t('notifications.goodShapeTitle', 'Account in good shape!'),
+                    message: t('notifications.goodShapeMessage',
+                      '{{service}} password updated with expiry tracking. Great security hygiene!',
+                      { service: title }),
+                  });
+                }
+              } else if (onAddCredential) {
+                await onAddCredential(credData);
+              }
+              if (onCancel) onCancel();
+            } catch (err: any) {
+              addNotification({
+                type: 'credential_deleted',
+                title: 'Error Saving Credential',
+                message: err.message || 'An error occurred while saving.',
+              });
             }
-            if (onCancel) onCancel();
           }}>
+            {/* Credential type selector */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+              {([
+                { type: 'login',        icon: <Key size={18} />,      label: t('addCredential.typeLogin', 'Login') },
+                { type: 'passkey',      icon: <Shield size={18} />,   label: t('addCredential.typePasskey', 'Passkey') },
+                { type: 'secure_note',  icon: <FileText size={18} />, label: t('addCredential.typeNote', 'Note') },
+                { type: 'payment_card', icon: <CreditCard size={18} />,label: t('addCredential.typeCard', 'Card') },
+              ] as const).map(({ type, icon, label }) => (
+                <button
+                  key={type} type="button"
+                  onClick={() => setCredentialType(type)}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${credentialType === type ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'}`}
+                >
+                  {icon}{label}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-3">
-              <label htmlFor="service-title" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.serviceLabel', 'Title / Service Name')} <span className="text-red-500">*</span></label>
+              <label htmlFor="service-title" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                {credentialType === 'secure_note' ? t('addCredential.noteTitle', 'Note Title') :
+                 credentialType === 'payment_card' ? t('addCredential.cardLabel', 'Card Label') :
+                 credentialType === 'passkey' ? t('addCredential.passkeyTitle', 'Passkey Name') :
+                 t('addCredential.serviceLabel', 'Title / Service Name')} <span className="text-red-500">*</span>
+              </label>
               <input 
                 id="service-title"
                 type="text" 
@@ -465,6 +722,127 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
               />
             </div>
 
+            {/* Non-login credential type forms */}
+            {credentialType !== 'login' && (
+              <div className="space-y-8">
+                {/* Folder selector (all non-login types) */}
+                <div className="space-y-4 pt-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.folderAssignment', 'Folder Assignment')}</label>
+                  <div className="flex flex-wrap gap-3">
+                    {folders.map(folder => (
+                      <button key={folder.id} type="button" onClick={() => setSelectedFolder(folder.id)}
+                        className={`px-5 py-2.5 rounded-xl flex items-center gap-2 transition-all text-xs font-bold ${selectedFolder === folder.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-surface-container-high text-black dark:text-white hover:bg-surface-container-highest'}`}
+                      >
+                        {renderFolderIcon(folder, selectedFolder === folder.id)}
+                        {folder.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Passkey-specific fields */}
+                {credentialType === 'passkey' && (
+                  <div className="space-y-6">
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-400">
+                      {t('addCredential.passkeyNote', 'Private key stays on your authenticator - only metadata is stored here, never the key material.')}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpId', 'Relying Party ID')}</label>
+                        <input type="text" value={rpId} onChange={e => setRpId(e.target.value)} placeholder="github.com"
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpName', 'Site Name')}</label>
+                        <input type="text" value={rpName} onChange={e => setRpName(e.target.value)} placeholder="GitHub"
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.credentialId', 'Credential ID (optional)')}</label>
+                        <input type="text" value={credentialId} onChange={e => setCredentialId(e.target.value)} placeholder="base64url…"
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono text-sm outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.authenticatorName', 'Authenticator')}</label>
+                        <input type="text" value={authenticatorName} onChange={e => setAuthenticatorName(e.target.value)} placeholder="YubiKey 5C NFC"
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => setBackedUp(b => !b)}>
+                      {backedUp ? <ToggleRight size={28} className="text-black dark:text-white shrink-0" /> : <ToggleLeft size={28} className="text-on-surface-variant shrink-0" />}
+                      <span className="text-sm font-bold">{t('addCredential.backedUp', 'Backed up (synced passkey)')}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Secure note fields */}
+                {credentialType === 'secure_note' && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.noteContent', 'Note')} <span className="text-red-500">*</span></label>
+                    <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} rows={12}
+                      placeholder={t('addCredential.noteContentPlaceholder', 'Write your secure note here…')}
+                      className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant resize-y outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                    {noteContent.length > 45000 && <p className="text-xs text-error">{t('addCredential.noteTooLong', 'Note is very long - consider splitting into multiple notes.')}</p>}
+                  </div>
+                )}
+
+                {/* Payment card fields */}
+                {credentialType === 'payment_card' && (
+                  <div className="space-y-6">
+                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-700 dark:text-yellow-400">
+                      {t('addCredential.cardDisclaimer', 'Personal reference storage only - not PCI-DSS certified.')}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardholderName', 'Cardholder Name')}</label>
+                        <input type="text" value={cardholderName} onChange={e => setCardholderName(e.target.value)} placeholder="John Doe"
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardNumber', 'Card Number')}</label>
+                        <div className="relative">
+                          <input type={showCardNumber ? 'text' : 'password'} value={cardNumber}
+                            onChange={e => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 19))}
+                            placeholder="•••• •••• •••• ••••" inputMode="numeric"
+                            className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12" />
+                          <button type="button" onClick={() => setShowCardNumber(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
+                            {showCardNumber ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardExpiry', 'Expiry (MM/YYYY)')}</label>
+                        <input type="text" value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} placeholder="12/2028" maxLength={7}
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardCvv', 'CVV')}</label>
+                        <div className="relative">
+                          <input type={showCvv ? 'text' : 'password'} value={cardCvv}
+                            onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            placeholder="•••" inputMode="numeric"
+                            className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12" />
+                          <button type="button" onClick={() => setShowCvv(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
+                            {showCvv ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardBillingAddress', 'Billing Address (optional)')}</label>
+                      <input type="text" value={cardBillingAddress} onChange={e => setCardBillingAddress(e.target.value)} placeholder="123 Main St, City"
+                        className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {credentialType === 'login' && <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-3 relative">
                 <label htmlFor="username" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.usernameLabel', 'Username / Email')}</label>
@@ -600,11 +978,109 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   <span className="text-[11px] font-semibold leading-snug">
                     {t(
                       'addCredential.breachWarning',
-                      'This password appears in public breaches — consider regenerating.'
+                      'This password appears in public breaches - consider regenerating.'
                     )}
                   </span>
                 </motion.div>
               )}
+            </div>
+
+            {/* Account Type */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                {t('addCredential.accountTypeLabel', 'Account Type')}
+              </label>
+              <input
+                type="text"
+                value={accountType}
+                onChange={e => setAccountType(e.target.value.slice(0, 50))}
+                placeholder={t('addCredential.accountTypePlaceholder', 'e.g. Free, Starter, Pro')}
+                className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none text-sm"
+              />
+            </div>
+
+            {/* Password Expiry */}
+            <div className="border border-outline-variant/20 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-black text-black dark:text-white">
+                    {t('addCredential.expiryLabel', 'Password Expiry')}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">
+                    {t('addCredential.expiryDesc', 'Get reminded when this password should be changed')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpiryEnabled(v => !v)}
+                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${expiryEnabled ? 'bg-black dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                  aria-pressed={expiryEnabled}
+                  aria-label={t('addCredential.expiryLabel', 'Password Expiry')}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white dark:bg-black shadow transition-transform ${expiryEnabled ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {expiryEnabled && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 overflow-hidden"
+                  >
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant mb-2 block">
+                          {t('addCredential.expiryEvery', 'Every')}
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={1000}
+                          value={expiryValue}
+                          onChange={e => {
+                            const n = parseInt(e.target.value, 10);
+                            if (!isNaN(n)) setExpiryValue(Math.min(1000, Math.max(1, n)));
+                          }}
+                          className="w-full px-4 py-3 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none text-sm font-mono"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant mb-2 block">
+                          {t('addCredential.expiryPeriod', 'Period')}
+                        </label>
+                        <select
+                          value={expiryUnit}
+                          onChange={e => setExpiryUnit(e.target.value as 'days' | 'months' | 'years')}
+                          className="w-full px-4 py-3 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none text-sm"
+                        >
+                          <option value="days">{t('addCredential.expiryDays', 'Days')}</option>
+                          <option value="months">{t('addCredential.expiryMonths', 'Months')}</option>
+                          <option value="years">{t('addCredential.expiryYears', 'Years')}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {hasSmtp && (
+                      <div className="flex items-center justify-between py-3 border-t border-outline-variant/10">
+                        <p className="text-sm font-medium text-black dark:text-white">
+                          {t('addCredential.expiryNotifyEmail', 'Notify me by email on expiry')}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setExpiryNotifyEmail(v => !v)}
+                          className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${expiryNotifyEmail ? 'bg-black dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                          aria-pressed={expiryNotifyEmail}
+                          aria-label={t('addCredential.expiryNotifyEmail', 'Notify me by email on expiry')}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white dark:bg-black shadow transition-transform ${expiryNotifyEmail ? 'translate-x-5' : ''}`} />
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="space-y-3">
@@ -979,6 +1455,83 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 </div>
               </div>
             </div>
+
+            {/* Notes - stored as plain markdown text, encrypted in the credential blob */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                {t('addCredential.descriptionLabel', 'Notes')}
+              </label>
+
+              {/* Word-processor-style editor card */}
+              <div className="rounded-xl overflow-hidden border border-black/10 dark:border-white/10 shadow-sm focus-within:ring-2 focus-within:ring-on-primary-container/20 focus-within:border-black/25 dark:focus-within:border-white/25 transition-all">
+
+                {/* Toolbar */}
+                <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-surface-container-low border-b border-black/8 dark:border-white/8">
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleWrap('**'); }}
+                    className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
+                    title="Bold - toggle **text**">
+                    <Bold size={13} strokeWidth={2.5} />
+                  </button>
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleWrap('*'); }}
+                    className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
+                    title="Italic - toggle *text*">
+                    <Italic size={13} strokeWidth={2} />
+                  </button>
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleWrap('__'); }}
+                    className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
+                    title="Underline - toggle __text__">
+                    <Underline size={13} strokeWidth={2} />
+                  </button>
+
+                  <div className="h-4 w-px bg-outline-variant/25 mx-1.5" />
+
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleBulletList(); }}
+                    className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
+                    title="Bullet list">
+                    <List size={13} strokeWidth={2} />
+                  </button>
+
+                  <div className="grow" />
+
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); clearMarkdown(); }}
+                    className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
+                    title="Remove formatting from selection">
+                    <Eraser size={12} strokeWidth={2} />
+                  </button>
+                </div>
+
+                {/* Writing area - no monospace, document-like feel */}
+                <textarea
+                  ref={descTextareaRef}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  onKeyDown={e => {
+                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                      if (e.key === 'b') { e.preventDefault(); toggleWrap('**'); }
+                      if (e.key === 'i') { e.preventDefault(); toggleWrap('*'); }
+                      if (e.key === 'u') { e.preventDefault(); toggleWrap('__'); }
+                    }
+                  }}
+                  rows={6}
+                  placeholder={t('addCredential.descriptionPlaceholder', 'Write your notes here… Ctrl+B bold, Ctrl+I italic')}
+                  className="w-full px-5 py-4 bg-white dark:bg-[#111111] text-black dark:text-white text-[13.5px] leading-7 resize-y outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 block"
+                />
+
+                {/* Rendered preview - shows below the textarea when there is content */}
+                {description.trim() && (
+                  <div className="border-t border-black/8 dark:border-white/8 px-5 py-3.5 bg-surface-container-lowest dark:bg-[#0d0d0d]">
+                    <p className="text-[8.5px] font-black uppercase tracking-widest text-outline-variant/50 mb-2.5 select-none">
+                      {t('addCredential.descriptionPreview', 'Preview')}
+                    </p>
+                    <div className="text-[13px] leading-7 text-black dark:text-white [&_strong]:font-bold [&_em]:italic [&_u]:underline [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-0.5 [&_p]:min-h-[1.25em]">
+                      {parseMarkdown(description)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            </>}
 
             <div className="pt-12 flex items-center gap-6 border-t border-outline-variant/10">
               <button 

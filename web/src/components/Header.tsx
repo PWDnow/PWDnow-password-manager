@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Menu, Settings, LogOut } from 'lucide-react';
+import { Search, Bell, Menu, Settings, LogOut, Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import LanguageModal from './LanguageModal';
@@ -57,23 +57,18 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
     try {
       const csrfMatch = document.cookie.match(/(?:^|;\s*)_pwd_csrf=([^;]*)/);
       const csrf = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        headers: { 'X-CSRF-Token': csrf }
-      });
+      if (csrf) {
+        await fetch('/api/auth/logout', { 
+          method: 'POST',
+          headers: { 'X-CSRF-Token': csrf }
+        });
+      }
     } catch { /* ignore offline errors */ }
     
     navigate('/login');
   };
 
-  const getPlaceholder = () => {
-    switch (activeTab) {
-      case 'banking': return t('header.searchBanking', 'Search Banking & Investment...');
-      case 'social': return t('header.searchSocial', 'Search Social Media...');
-      case 'work': return t('header.searchWork', 'Search Work Assets...');
-      default: return t('header.searchPlaceholder', 'Search your sanctuary...');
-    }
-  };
+  const getPlaceholder = () => t('header.searchPlaceholder', 'Search your sanctuary...');
 
   return (
     <>
@@ -139,7 +134,7 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
             >
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-bold text-black dark:text-white leading-none">{profile.firstName} {profile.lastName}</p>
-                <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mt-1">{t('header.premiumPlan', 'Premium Plan')}</p>
+                <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mt-1">{t('header.openSource', 'Open Source')}</p>
               </div>
               <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-xl overflow-hidden ring-2 ring-surface-container-high transition-transform group-hover:scale-105 shrink-0">
                 <UserAvatar
@@ -164,8 +159,18 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
                     <Settings size={16} className="text-on-surface-variant" />
                     {t('sidebar.settings', 'Settings')}
                   </button>
+                  <button
+                    onClick={() => {
+                      setIsProfileDropdownOpen(false);
+                      window.open('https://github.com/PWDnow/PWDnow/issues/new?labels=enhancement&template=feature_request.md', '_blank', 'noopener,noreferrer');
+                    }}
+                    className="w-full px-4 py-2.5 text-sm font-medium text-left text-black dark:text-white hover:bg-surface-container-high transition-colors flex items-center gap-3"
+                  >
+                    <Lightbulb size={16} className="text-on-surface-variant" />
+                    {t('header.suggestFeature', 'Suggest a Feature')}
+                  </button>
                   <div className="h-px bg-outline-variant/10 my-1"></div>
-                  <button 
+                  <button
                     onClick={handleLogout}
                     className="w-full px-4 py-2.5 text-sm font-medium text-left text-error hover:bg-error/5 transition-colors flex items-center gap-3"
                   >

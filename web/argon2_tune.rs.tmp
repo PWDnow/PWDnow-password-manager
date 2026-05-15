@@ -1,0 +1,72 @@
+use std::time::Instant;
+use argon2::{Algorithm, Argon2, Params, Version};
+use zeroize::Zeroize;
+
+/// Minimum parameters for L5: 1 GiB memory, 4 iterations, 2 lanes
+pub const MIN_M_COST: u32 = 1024 * 1024; // 1 GiB
+pub const MIN_T_COST: u32 = 4;
+pub const MIN_P_COST: u32 = 2;
+
+/// Auto-tune Argon2id to target 1.0s ± 0.2s
+pub fn tune_params() -> (u32, u32, u32) {
+    if std::env::var("PWDNOW_ARGON2_FAST").is_ok() || cfg!(test) {
+        return (64 * 1024, 1, 1);
+    }
+    
+    let m = MIN_M_COST;
+    let p = MIN_P_COST;
+    let mut t;
+    
+    let mut low = MIN_T_COST;
+    let mut high = 16;
+    let target = 1.0;
+    
+    let mut best_t = MIN_T_COST;
+    let mut best_diff = f64::MAX;
+    
+    let mut input = b"tuning-password".to_vec();
+    let salt = [0x42u8; 32];
+    
+    while low <= high {
+        t = low + (high - low) / 2;
+        let start = Instant::now();
+        
+        let params = Params::new(m, t, p, Some(64)).unwrap();
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+        let mut out = [0u8; 64];
+        let _ = argon2.hash_password_into(&input, &salt, &mut out);
+        
+        let elapsed = start.elapsed().as_secs_f64();
+        let diff = (elapsed - target).abs();
+        
+        if diff < best_diff {
+            best_diff = diff;
+            best_t = t;
+        }
+        
+        if elapsed > target {
+            if t == 0 { break; }
+            high = t - 1;
+        } else if elapsed < target {
+            low = t + 1;
+        } else {
+            break;
+        }
+    }
+    
+    input.zeroize();
+    (m, best_t, p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tune_params() {
+        let (m, t, p) = tune_params();
+        assert_eq!(m, 64 * 1024);
+        assert_eq!(t, 1);
+        assert_eq!(p, 1);
+    }
+}

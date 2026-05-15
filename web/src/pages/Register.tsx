@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Shield, ArrowRight, Building2, Users, Loader2, Check, X, Minus } from 'lucide-react';
@@ -11,7 +11,14 @@ import { generateUUID } from '../utils/crypto';
 export default function Register() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  
+
+  useEffect(() => {
+    const hasServerSession = document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+    if (keyStore.hasToken || hasServerSession) {
+      navigate('/vault', { replace: true });
+    }
+  }, [navigate]);
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -97,7 +104,7 @@ export default function Register() {
         setError(t('register.errorPasswordPwned', 'This password was found in a known data breach. Please choose a different one.'));
         return;
       }
-    } catch { /* daemon unavailable — skip HIBP check */ }
+    } catch { /* daemon unavailable - skip HIBP check */ }
 
     setLoading(true);
 
@@ -113,7 +120,7 @@ export default function Register() {
         setLoading(false);
         return;
       }
-      // Daemon unavailable — fall through to offline registration
+      // Daemon unavailable - fall through to offline registration
     }
 
     if (daemonOk) {
@@ -122,12 +129,14 @@ export default function Register() {
         const localKey = await deriveLocalKey(formData.password, salt);
         keyStore.storeLocalKey(localKey);
       } catch { /* non-fatal on plain HTTP */ }
+      window.dispatchEvent(new CustomEvent('daemonUnlocked'));
       navigate('/vault');
       return;
     }
 
     // ── Offline / demo-mode registration ─────────────────────────────────────
     try {
+      const lkSalt = getOrCreateLocalKeySalt();
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +144,8 @@ export default function Register() {
           email: formData.email, 
           password: formData.password, 
           firstName: formData.firstName, 
-          lastName: formData.lastName 
+          lastName: formData.lastName,
+          cryptoSalt: lkSalt
         })
       });
       
@@ -156,7 +166,6 @@ export default function Register() {
 
       // Derive local encryption key
       try {
-        const lkSalt = getOrCreateLocalKeySalt();
         const localKey = await deriveLocalKey(formData.password, lkSalt);
         keyStore.storeLocalKey(localKey);
       } catch { /* expected on plain HTTP */ }
@@ -216,7 +225,7 @@ export default function Register() {
         </div>
 
         <div className="relative z-10 mt-12">
-          <p className="text-slate-500 text-sm font-medium">
+          <p className="text-slate-400 text-sm font-medium">
             © {new Date().getFullYear()} PWDnow. {t('register.allRightsReserved', 'All rights reserved.')}
           </p>
         </div>

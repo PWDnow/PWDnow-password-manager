@@ -18,7 +18,7 @@ DEPLOY_DIR   := $(PROJECT_ROOT)/deploy
 BINARY       := $(DAEMON_DIR)/target/release/vault-daemon
 INSTALL_BIN  := /usr/local/bin/vault-daemon
 
-.PHONY: all build build-pq test install install-daemon install-systemd install-apparmor install-nginx install-hibp clean
+.PHONY: all build build-pq test install install-daemon install-systemd install-apparmor install-nginx install-hibp install-monitor build-monitor monitor-status clean
 
 all: build
 
@@ -101,11 +101,52 @@ install-hibp:
 	chmod 0640 $(HIBP_OUTPUT) $(HIBP_OUTPUT).sha256
 	@echo "==> HIBP filter installed at $(HIBP_OUTPUT)"
 
+# ── PWDnowMonitoringENV ───────────────────────────────────────────────────────
+#
+# Build and install the lightweight Rust monitoring daemon.
+# 'make install-monitor' must be run as root.
+
+MONITOR_DIR    := $(PROJECT_ROOT)/monitor
+MONITOR_BIN    := $(MONITOR_DIR)/target/release/pwdnow-monitor
+MONITOR_INSTALL := /usr/local/bin/pwdnow-monitor
+
+build-monitor:
+	@echo "==> Building PWDnowMonitoringENV..."
+	cd $(MONITOR_DIR) && cargo build --release
+	@echo "==> Monitor build complete: $(MONITOR_BIN)"
+
+install-monitor: build-monitor
+	@echo "==> Installing pwdnow-monitor binary..."
+	install -Dm755 $(MONITOR_BIN) $(MONITOR_INSTALL)
+	@echo "==> Installing default config (will not overwrite existing)..."
+	install -Dm644 $(DEPLOY_DIR)/pwdnow-monitor.toml /etc/pwdnow-monitor.toml
+	@echo "==> Installing systemd unit..."
+	install -Dm644 $(DEPLOY_DIR)/pwdnow-monitor.service /etc/systemd/system/pwdnow-monitor.service
+	systemctl daemon-reload
+	systemctl enable pwdnow-monitor
+	systemctl restart pwdnow-monitor
+	@echo ""
+	@echo "==> PWDnowMonitoringENV installed and started."
+	@echo "    Check status : systemctl status pwdnow-monitor"
+	@echo "    Live logs    : journalctl -u pwdnow-monitor -f"
+	@echo "    JSON log     : tail -f /var/log/pwdnow-monitor.log"
+
+monitor-status:
+	@echo "==> PWDnowMonitoringENV status:"
+	@systemctl status pwdnow-monitor --no-pager 2>/dev/null || echo "  (service not installed)"
+	@echo ""
+	@echo "==> Last 20 monitoring log entries:"
+	@tail -n 20 /var/log/pwdnow-monitor.log 2>/dev/null \
+	  | python3 -c "import sys,json; [print(json.dumps(json.loads(l), indent=2)) for l in sys.stdin if l.strip()]" \
+	  2>/dev/null || tail -n 20 /var/log/pwdnow-monitor.log 2>/dev/null || echo "  (no log file yet)"
+
 # ── Clean ─────────────────────────────────────────────────────────────────────
 
 clean:
 	@echo "==> Cleaning daemon build artefacts..."
 	cd $(DAEMON_DIR) && cargo clean
+	@echo "==> Cleaning monitor build artefacts..."
+	cd $(MONITOR_DIR) && cargo clean
 	@echo "==> Cleaning web build artefacts..."
 	cd $(WEB_DIR) && npm run clean
 	@echo "==> Clean complete."

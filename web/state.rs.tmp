@@ -1,0 +1,1012 @@
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use hkdf::Hkdf;
+use rand_core::{OsRng, RngCore};
+use rusqlite::{Connection, params};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use uuid::Uuid;
+use zeroize::Zeroize;
+
+use crate::auth::session::{Session, SessionStore, DEFAULT_TTL_SECS};
+use crate::crypto::{argon2, xchacha20, secure_store::LockedKey};
+use crate::error::VaultError;
+use crate::ipc::protocol;
+use crate::vault::db;
+
+pub const IDLE_TIMEOUT_SECS: u64 = 15 * 60;
+
+/// Exponential back-off schedule for failed unlock attempts (H-01 fix).
+/// Index = number of consecutive failures; value = lock duration in seconds.
+/// Attempts 0-4 are free; from attempt 5 onward the vault refuses all unlock
+/// requests until the lock duration elapses.
+const LOCKOUT_SCHEDULE_SECS: &[u64] = &[0, 0, 0, 0, 0, 30, 60, 120, 300, 600];
+
+fn default_true() -> bool { true }
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Sidecar entry for a registered passkey (resident key / Option B).
+/// Stored in the `.meta` file so the vault DB can be opened without a password.
+/// The encrypted_vmk_copy is safe to store here because it is only decryptable
+/// by the holder of the physical FIDO2 authenticator.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PasskeyEntry {
+    /// Hex-encoded raw credential_id returned by the authenticator.
+    pub credential_id_hex: String,
+    /// Hex-encoded XChaCha20-Poly1305 ciphertext of the VMK.
+    pub encrypted_vmk_copy: String,
+    /// Hex-encoded 24-byte nonce.
+    pub vmk_copy_nonce: String,
+    /// Hex-encoded KEM ciphertext (ephemeral public key or hybrid blob).
+    #[serde(default)]
+    pub kem_ciphertext: String,
+}
+
+/// Unencrypted vault header stored alongside the SQLite file as `{vault}.meta`.
+/// Contains only data that is safe to store in plaintext:
+///   - vault_uuid: an identifier, not a secret
+///   - argon2_salt: public by design (Argon2 salt)
+///   - encrypted_vmk: protected by KEK; useless without the master password
+///   - passkey_credentials: encrypted VMK copies for passkey unlock (Option B)
+///   - wipe_ticket: random 32-byte token authorising a ForensicWipe command
+#[derive(Serialize, Deserialize, Clone)]
+pub struct VaultHeader {
+    pub vault_uuid: String,
+    pub argon2_salt: String,    // hex-encoded 32 bytes
+    pub argon2_m_cost: u32,     // kibibytes
+    pub argon2_t_cost: u32,
+    pub argon2_p_cost: u32,
+    #[serde(default)]
+    pub kem_suite: u8,           // 0 = Classical, 1 = Hybrid-768, 2 = Hybrid-1024 (L5)
+    pub encrypted_vmk: String,  // hex-encoded XChaCha20-Poly1305 ciphertext
+    pub vmk_nonce: String,      // hex-encoded 24-byte nonce
+    #[serde(default = "default_true")]
+    pub password_login_enabled: bool,
+    #[serde(default)]
+    pub totp_enabled: bool,
+    #[serde(default)]
+    pub email_otp_enabled: bool,
+    #[serde(default)]
+    pub passkey_credentials: Vec<PasskeyEntry>,
+    /// Hex-encoded 32-byte random token.  Presented by the frontend to authorise
+    /// `ForensicWipe`.  Stored in plaintext here (no secret value — just a
+    /// capability token) so the wipe can be triggered even when the vault is locked.
+    #[serde(default)]
+    pub wipe_ticket: String,
+}
+
+/// Shared daemon state — wrapped in `Arc` and passed to every connection handler.
+///
+/// Lock discipline (to avoid deadlocks): always acquire `vmk` before `db`.
+pub struct DaemonState {
+    pub sessions: SessionStore,
+    /// Open vault DB connection; `None` when the vault is locked.
+    pub db: Mutex<Option<Connection>>,
+    /// Decrypted 256-bit VMK in mlock'd memory; `None` when locked.
+    vmk: RwLock<Option<LockedKey>>,
+    /// Vault UUID (cached after unlock for use in credential AAD).
+    pub vault_uuid: Mutex<Option<String>>,
+    /// Hex-encoded wipe ticket (cached from VaultHeader after unlock).
+    wipe_ticket: Mutex<Option<String>>,
+    /// Absolute path to the SQLite vault file.
+    pub vault_path: PathBuf,
+    /// Unix timestamp of the last vault operation (for idle auto-lock).
+    pub last_activity: Arc<AtomicU64>,
+    /// Pending passkey challenge (32 bytes). Consumed on first use to prevent replay.
+    passkey_challenge: Mutex<Option<[u8; 32]>>,
+    /// H-01: consecutive failed unlock attempts since last successful unlock.
+    failed_unlock_attempts: AtomicU32,
+    /// H-01: if Some(t), reject all unlock attempts until Instant t.
+    unlock_locked_until: Mutex<Option<Instant>>,
+}
+
+impl DaemonState {
+    pub fn new(vault_path: PathBuf) -> Self {
+        Self {
+            sessions: SessionStore::new(),
+            db: Mutex::new(None),
+            vmk: RwLock::new(None),
+            vault_uuid: Mutex::new(None),
+            wipe_ticket: Mutex::new(None),
+            vault_path,
+            last_activity: Arc::new(AtomicU64::new(now_secs())),
+            passkey_challenge: Mutex::new(None),
+            failed_unlock_attempts: AtomicU32::new(0),
+            unlock_locked_until: Mutex::new(None),
+        }
+    }
+
+    /// `true` when the vault is locked (VMK not loaded).
+    pub fn is_locked(&self) -> bool {
+        self.vmk.read().unwrap().is_none()
+    }
+
+    /// Returns metadata about enabled MFA methods and login policy.
+    /// Safe to call even when the vault is locked.
+    pub fn get_login_hints(&self) -> Result<protocol::Response, VaultError> {
+        if !self.vault_path.exists() {
+            // New vault: default to password-only
+            return Ok(protocol::Response::LoginHints {
+                password_login_enabled: true,
+                totp_enabled: false,
+                email_otp_enabled: false,
+                fido2_ids: vec![],
+            });
+        }
+
+        let header = self.read_header()?;
+        let fido2_ids = header.passkey_credentials.iter()
+            .map(|e| hex::decode(&e.credential_id_hex).unwrap_or_default())
+            .collect();
+
+        Ok(protocol::Response::LoginHints {
+            password_login_enabled: header.password_login_enabled,
+            totp_enabled: header.totp_enabled,
+            email_otp_enabled: header.email_otp_enabled,
+            fido2_ids,
+        })
+    }
+
+    // ── H-01: brute-force back-off helpers ───────────────────────────────────
+
+    /// Check whether the unlock back-off period is active.
+    /// Returns `Err` with a human-readable message when locked out.
+    fn check_unlock_lockout(&self) -> Result<(), VaultError> {
+        let guard = self.unlock_locked_until.lock().unwrap();
+        if let Some(until) = *guard {
+            if Instant::now() < until {
+                let remaining = until.duration_since(Instant::now()).as_secs() + 1;
+                return Err(VaultError::Auth(format!(
+                    "too many failed unlock attempts; retry in {remaining}s"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Record a failed unlock attempt and apply exponential back-off if needed.
+    fn record_failed_unlock(&self) {
+        let attempts = self.failed_unlock_attempts.fetch_add(1, Ordering::SeqCst) + 1;
+        let idx = (attempts as usize).min(LOCKOUT_SCHEDULE_SECS.len() - 1);
+        let lock_secs = LOCKOUT_SCHEDULE_SECS[idx];
+        if lock_secs > 0 {
+            *self.unlock_locked_until.lock().unwrap() =
+                Some(Instant::now() + Duration::from_secs(lock_secs));
+        }
+    }
+
+    /// Reset the failed-attempt counter and any active lockout on success.
+    fn reset_unlock_counter(&self) {
+        self.failed_unlock_attempts.store(0, Ordering::SeqCst);
+        *self.unlock_locked_until.lock().unwrap() = None;
+    }
+
+    /// Verify the master password is correct without making any changes.
+    /// Derives KEK from the provided password and attempts to decrypt VMK,
+    /// then compares against the in-memory VMK. Read-only — no side effects.
+    pub fn verify_master_password(&self, password: &[u8]) -> Result<(), VaultError> {
+        let header = self.read_header()?;
+        let salt_bytes = hex::decode(&header.argon2_salt)
+            .map_err(|_| VaultError::Crypto("invalid salt in header".into()))?;
+        let mut salt = [0u8; 32];
+        salt.copy_from_slice(&salt_bytes);
+
+        let kek_buf = argon2::derive_kek(
+            password,
+            None,
+            &salt,
+            header.argon2_m_cost,
+            header.argon2_t_cost,
+            header.argon2_p_cost,
+        )?;
+        let kek: [u8; 32] = kek_buf.as_bytes()[..32].try_into().unwrap();
+
+        let ct = hex::decode(&header.encrypted_vmk)
+            .map_err(|_| VaultError::Crypto("invalid vmk".into()))?;
+        let nonce_vec = hex::decode(&header.vmk_nonce)
+            .map_err(|_| VaultError::Crypto("invalid nonce".into()))?;
+        let mut nonce = [0u8; 24];
+        nonce.copy_from_slice(&nonce_vec);
+
+        let candidate_vmk = xchacha20::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1")?;
+
+        self.with_vmk(|k| {
+            if k != candidate_vmk.as_slice() {
+                return Err(VaultError::Auth("old password verification failed".into()));
+            }
+            Ok(())
+        })
+    }
+
+    /// Update the master password and rotate the vault master key (VMK).
+    ///
+    /// This is a multi-step atomic-ish operation:
+    /// 1. Verify old_password by re-deriving current KEK and decrypting VMK.
+    /// 2. Generate new Argon2 salt and new VMK.
+    /// 3. Derive new KEK from new_password + new salt.
+    /// 4. Encrypt new VMK with new KEK.
+    /// 5. SQLCipher REKEY the database from old SQLCipher key to new.
+    /// 6. Update VaultHeader with new salt, new encrypted VMK, and new nonce.
+    /// 7. Update VMK in memory and sessions.
+    pub fn change_password(
+        &self,
+        old_password: &[u8],
+        new_password: &[u8],
+        yubikey_response: Option<&[u8; 20]>,
+    ) -> Result<(), VaultError> {
+        // 1. Verify old password (even though already authenticated via session token)
+        let header = self.read_header()?;
+        let salt_bytes = hex::decode(&header.argon2_salt)
+            .map_err(|_| VaultError::Crypto("invalid salt in header".into()))?;
+        let mut salt = [0u8; 32];
+        salt.copy_from_slice(&salt_bytes);
+
+        let kek_buf = argon2::derive_kek(
+            old_password,
+            yubikey_response,
+            &salt,
+            header.argon2_m_cost,
+            header.argon2_t_cost,
+            header.argon2_p_cost,
+        )?;
+        let kek: [u8; 32] = kek_buf.as_bytes()[..32].try_into().unwrap();
+
+        let ct = hex::decode(&header.encrypted_vmk).map_err(|_| VaultError::Crypto("invalid vmk".into()))?;
+        let nonce_vec = hex::decode(&header.vmk_nonce).map_err(|_| VaultError::Crypto("invalid nonce".into()))?;
+        let mut nonce = [0u8; 24];
+        nonce.copy_from_slice(&nonce_vec);
+
+        let current_vmk = xchacha20::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1")?;
+        
+        // Ensure the decrypted VMK matches the one we have in memory
+        self.with_vmk(|k| {
+            if k != current_vmk.as_slice() {
+                return Err(VaultError::Auth("old password verification failed".into()));
+            }
+            Ok(())
+        })?;
+
+        // 2. Setup new keys
+        let mut new_salt = [0u8; 32];
+        OsRng.fill_bytes(&mut new_salt);
+
+        let mut new_vmk = [0u8; 32];
+        OsRng.fill_bytes(&mut new_vmk);
+
+        let (new_m, new_t, new_p) = crate::crypto::argon2_tune::tune_params();
+        let new_kek_buf = argon2::derive_kek(new_password, yubikey_response, &new_salt, new_m, new_t, new_p)?;
+        let new_kek: [u8; 32] = new_kek_buf.as_bytes()[..32].try_into().unwrap();
+
+        let (new_enc_vmk, new_vmk_nonce) = xchacha20::encrypt(&new_kek, &new_vmk, b"vmk-aad-v1")?;
+
+        // 3. REKEY the database
+        let old_sc_key = Self::sqlcipher_key(&current_vmk);
+        let new_sc_key = Self::sqlcipher_key(&new_vmk);
+
+        {
+            let mut guard = self.db.lock().unwrap();
+            let conn = guard.as_mut().ok_or_else(|| VaultError::Auth("vault is locked".into()))?;
+            db::rekey_vault(conn, &old_sc_key, &new_sc_key)?;
+            
+            // Record the password change timestamp
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            conn.execute(
+                "INSERT OR REPLACE INTO vault_meta (key, value) VALUES ('password_changed_at', ?1)",
+                params![now],
+            )?;
+        }
+
+        // 4. Update Header
+        let mut new_header = header.clone();
+        new_header.argon2_salt = hex::encode(new_salt);
+        new_header.encrypted_vmk = hex::encode(new_enc_vmk);
+        new_header.vmk_nonce = hex::encode(new_vmk_nonce);
+        
+        // Note: Passkeys are now invalid because they wrapped the OLD VMK.
+        // We clear them to prevent "phantom" passkey options that will fail to unlock.
+        // The user must re-register their passkeys after changing the master password.
+        new_header.passkey_credentials.clear();
+
+        self.write_header(&new_header)?;
+
+        // 5. Update memory state
+        let mut locked_vmk = LockedKey::new(32)?;
+        locked_vmk.as_bytes_mut().copy_from_slice(&new_vmk);
+        *self.vmk.write().unwrap() = Some(locked_vmk);
+        
+        self.touch();
+        Ok(())
+    }
+
+    /// Update the idle-timeout clock.
+    pub fn touch(&self) {
+        self.last_activity.store(now_secs(), Ordering::Relaxed);
+    }
+
+    /// Seconds since the last vault operation.
+    pub fn idle_secs(&self) -> u64 {
+        now_secs().saturating_sub(self.last_activity.load(Ordering::Relaxed))
+    }
+
+    // ── sidecar file helpers ──────────────────────────────────────────────────
+
+    fn meta_path(&self) -> PathBuf {
+        let mut p = self.vault_path.clone();
+        let name = p
+            .file_name()
+            .map(|n| format!("{}.meta", n.to_string_lossy()))
+            .unwrap_or_else(|| "vault.db.meta".into());
+        p.set_file_name(name);
+        p
+    }
+
+    pub fn read_header(&self) -> Result<VaultHeader, VaultError> {
+        let data = std::fs::read_to_string(self.meta_path())?;
+        serde_json::from_str(&data)
+            .map_err(|e| VaultError::Crypto(format!("invalid vault header: {e}")))
+    }
+
+    fn write_header(&self, header: &VaultHeader) -> Result<(), VaultError> {
+        let path = self.meta_path();
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let data = serde_json::to_string_pretty(header)
+            .map_err(|e| VaultError::Crypto(format!("serialize header: {e}")))?;
+        std::fs::write(path, data)?;
+        Ok(())
+    }
+
+    // ── Passkey helpers ───────────────────────────────────────────────────────
+
+    /// Generate a fresh 32-byte random challenge, store it (overwriting any
+    /// previous one), and return it. The challenge is consumed by
+    /// `unlock_with_passkey` to prevent replay.
+    pub fn new_passkey_challenge(&self) -> [u8; 32] {
+        let mut challenge = [0u8; 32];
+        OsRng.fill_bytes(&mut challenge);
+        *self.passkey_challenge.lock().unwrap() = Some(challenge);
+        challenge
+    }
+
+    /// Add a passkey entry to the sidecar so the DB can be opened without a
+    /// password on subsequent unlocks (Option B). Called during FIDO2 registration.
+    pub fn add_passkey_to_sidecar(
+        &self,
+        credential_id: &[u8],
+        encrypted_vmk_copy: &[u8],
+        vmk_copy_nonce: &[u8],
+        kem_ciphertext: &[u8],
+    ) -> Result<(), VaultError> {
+        let mut header = self.read_header()?;
+        // Remove any existing entry for this credential_id before adding
+        let cid_hex = hex::encode(credential_id);
+        header.passkey_credentials.retain(|e| e.credential_id_hex != cid_hex);
+        header.passkey_credentials.push(PasskeyEntry {
+            credential_id_hex: cid_hex,
+            encrypted_vmk_copy: hex::encode(encrypted_vmk_copy),
+            vmk_copy_nonce: hex::encode(vmk_copy_nonce),
+            kem_ciphertext: hex::encode(kem_ciphertext),
+        });
+        self.write_header(&header)
+    }
+
+    /// Remove a passkey entry from the sidecar when the key is deregistered.
+    pub fn remove_passkey_from_sidecar(&self, credential_id: &[u8]) -> Result<(), VaultError> {
+        let mut header = self.read_header()?;
+        let cid_hex = hex::encode(credential_id);
+        header.passkey_credentials.retain(|e| e.credential_id_hex != cid_hex);
+        self.write_header(&header)
+    }
+
+    /// Update the login policy (password enabled, TOTP enabled, etc.) in the header.
+    pub fn update_login_policy(
+        &self,
+        password_login_enabled: bool,
+        totp_enabled: bool,
+        email_otp_enabled: bool,
+    ) -> Result<(), VaultError> {
+        let mut header = self.read_header()?;
+        header.password_login_enabled = password_login_enabled;
+        header.totp_enabled = totp_enabled;
+        header.email_otp_enabled = email_otp_enabled;
+        self.write_header(&header)
+    }
+
+    /// Unlock the vault using a FIDO2 passkey assertion (Option B — passwordless).
+    ///
+    /// Steps:
+    /// 1. Consume the pending challenge (anti-replay).
+    /// 2. Look up the passkey entry in the sidecar by `credential_id`.
+    /// 3. Derive the VMK wrap key from `auth_data[0..33]` + `credential_id`.
+    /// 4. Decrypt the encrypted VMK copy → VMK.
+    /// 5. Open the SQLCipher DB with the derived SQLCipher key.
+    /// 6. Issue a session token.
+    pub fn unlock_with_passkey(
+        &self,
+        credential_id: &[u8],
+        auth_data: &[u8],
+        _signature: &[u8],
+        uid: u32,
+    ) -> Result<Session, VaultError> {
+        use crate::auth::fido2::derive_vmk_wrap_key;
+
+        // 1. Consume the pending challenge
+        let _challenge = self.passkey_challenge.lock().unwrap().take()
+            .ok_or_else(|| VaultError::Auth("no pending passkey challenge — call GetPasskeyChallenge first".into()))?;
+
+        // 2. Find the passkey entry in the sidecar
+        let header = self.read_header()?;
+        let cid_hex = hex::encode(credential_id);
+        let entry = header.passkey_credentials.iter()
+            .find(|e| e.credential_id_hex == cid_hex)
+            .ok_or_else(|| VaultError::Auth("passkey not registered for this vault".into()))?;
+
+        // 3. Derive VMK wrap key from auth_data (first 33 bytes: rpIdHash + flags)
+        let wrap_key = derive_vmk_wrap_key(auth_data, credential_id, header.kem_suite)?;
+
+        // 4. Decrypt the VMK copy
+        let ct = hex::decode(&entry.encrypted_vmk_copy)
+            .map_err(|_| VaultError::Crypto("invalid encrypted_vmk_copy hex in sidecar".into()))?;
+        let nonce_vec = hex::decode(&entry.vmk_copy_nonce)
+            .map_err(|_| VaultError::Crypto("invalid vmk_copy_nonce hex in sidecar".into()))?;
+        if nonce_vec.len() != 24 {
+            return Err(VaultError::Crypto("vmk_copy_nonce must be 24 bytes".into()));
+        }
+        let mut nonce = [0u8; 24];
+        nonce.copy_from_slice(&nonce_vec);
+        let mut vmk_plain = xchacha20::decrypt(&wrap_key, &ct, &nonce, b"passkey-vmk-aad-v1")?;
+
+        // 5. Open the SQLCipher DB
+        let mut sc_key = Self::sqlcipher_key(&vmk_plain);
+        let conn = db::open_vault(&self.vault_path, &sc_key)?;
+        sc_key.zeroize();
+
+        // 6. Move VMK into mlock'd memory and issue session
+        let mut vmk_locked = LockedKey::new(32)?;
+        vmk_locked.as_bytes_mut().copy_from_slice(&vmk_plain);
+        vmk_plain.zeroize();
+
+        // Migrate wipe_ticket if missing (same as unlock_existing)
+        let wipe_ticket_hex = if header.wipe_ticket.is_empty() {
+            let mut ticket = [0u8; 32];
+            OsRng.fill_bytes(&mut ticket);
+            let hex = hex::encode(ticket);
+            let mut updated_header = header.clone();
+            updated_header.wipe_ticket = hex.clone();
+            let _ = self.write_header(&updated_header);
+            hex
+        } else {
+            header.wipe_ticket.clone()
+        };
+
+        *self.vmk.write().unwrap() = Some(vmk_locked);
+        *self.db.lock().unwrap() = Some(conn);
+        *self.vault_uuid.lock().unwrap() = Some(header.vault_uuid.clone());
+        *self.wipe_ticket.lock().unwrap() = Some(wipe_ticket_hex);
+
+        let session = self.sessions.create(&header.vault_uuid, uid, DEFAULT_TTL_SECS);
+        self.touch();
+        Ok(session)
+    }
+
+    // ── key derivation helpers ────────────────────────────────────────────────
+
+    /// Derive the 32-byte SQLCipher page-encryption key from the VMK via HKDF-SHA256.
+    /// The SQLCipher key is NOT the VMK itself — separation prevents key reuse.
+    fn sqlcipher_key(vmk: &[u8]) -> [u8; 32] {
+        let hk = Hkdf::<Sha256>::new(None, vmk);
+        let mut key = [0u8; 32];
+        hk.expand(b"vault-sqlcipher-key-v1", &mut key)
+            .expect("HKDF expand: output length is valid");
+        key
+    }
+
+    // ── vault lifecycle ───────────────────────────────────────────────────────
+
+    /// Unlock the vault.  If the vault file does not yet exist, creates it
+    /// (first-time setup).  Returns a new session on success.
+    ///
+    /// H-01: tracks failed attempts and applies exponential back-off lockout
+    /// when the threshold is exceeded. Counter resets on success.
+    pub fn unlock(
+        &self,
+        password: &[u8],
+        yubikey_response: Option<&[u8; 20]>,
+        uid: u32,
+    ) -> Result<Session, VaultError> {
+        let result = if self.vault_path.exists() {
+            self.unlock_existing(password, yubikey_response, uid)
+        } else {
+            self.create_and_unlock(password, yubikey_response, uid)
+        };
+        match &result {
+            Ok(_)  => self.reset_unlock_counter(),
+            Err(_) => self.record_failed_unlock(),
+        }
+        result
+    }
+
+    fn unlock_existing(
+        &self,
+        password: &[u8],
+        yubikey_response: Option<&[u8; 20]>,
+        uid: u32,
+    ) -> Result<Session, VaultError> {
+        // H-01: reject immediately if in back-off window
+        self.check_unlock_lockout()?;
+
+        let header = self.read_header()?;
+
+        // Anti-DoS heuristic: Refuse to load if params would take > 5s on this host.
+        // We use a quick 64MB 1-iter benchmark.
+        let start = Instant::now();
+        let _ = argon2::derive_kek(b"benchmark", None, &[0u8; 32], 64 * 1024, 1, 1);
+        let baseline = start.elapsed().as_secs_f64();
+        let expected_time = baseline * (header.argon2_m_cost as f64 / 65536.0) * (header.argon2_t_cost as f64);
+        if expected_time > 5.0 {
+            return Err(VaultError::Auth(format!("Vault parameters require too much compute on this host (expected {}s, baseline {}s, m {}, t {})", expected_time, baseline, header.argon2_m_cost, header.argon2_t_cost)));
+        }
+
+        // Decode and parse the Argon2 salt
+        let salt_bytes = hex::decode(&header.argon2_salt)
+            .map_err(|_| VaultError::Crypto("invalid argon2_salt hex in header".into()))?;
+        if salt_bytes.len() != 32 {
+            return Err(VaultError::Crypto("argon2_salt must be 32 bytes".into()));
+        }
+        let mut salt = [0u8; 32];
+        salt.copy_from_slice(&salt_bytes);
+
+        // Derive 64-byte key material: bytes [0..32] = KEK
+        let kek_buf = argon2::derive_kek(
+            password,
+            yubikey_response,
+            &salt,
+            header.argon2_m_cost,
+            header.argon2_t_cost,
+            header.argon2_p_cost,
+        )?;
+        let kek: [u8; 32] = kek_buf.as_bytes()[..32]
+            .try_into()
+            .map_err(|_| VaultError::Crypto("KEK slice length error".into()))?;
+
+        // Decrypt VMK
+        let ct = hex::decode(&header.encrypted_vmk)
+            .map_err(|_| VaultError::Crypto("invalid encrypted_vmk hex".into()))?;
+        let nonce_bytes = hex::decode(&header.vmk_nonce)
+            .map_err(|_| VaultError::Crypto("invalid vmk_nonce hex".into()))?;
+        if nonce_bytes.len() != 24 {
+            return Err(VaultError::Crypto("vmk_nonce must be 24 bytes".into()));
+        }
+        let mut nonce = [0u8; 24];
+        nonce.copy_from_slice(&nonce_bytes);
+
+        let mut vmk_plain = xchacha20::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1")?;
+
+        // Move VMK into mlock'd memory
+        let mut vmk_locked = LockedKey::new(32)?;
+        vmk_locked.as_bytes_mut().copy_from_slice(&vmk_plain);
+        vmk_plain.zeroize();
+
+        // Derive SQLCipher key and open DB (brief PROT_READ window via as_bytes)
+        let mut sc_key = Self::sqlcipher_key(&vmk_locked.as_bytes());
+        let conn = db::open_vault(&self.vault_path, &sc_key)?;
+        sc_key.zeroize();
+
+        // Migrate: generate wipe_ticket if this is a pre-existing vault that has none
+        let wipe_ticket_hex = if header.wipe_ticket.is_empty() {
+            let mut ticket = [0u8; 32];
+            OsRng.fill_bytes(&mut ticket);
+            let hex = hex::encode(ticket);
+            let mut updated_header = header.clone();
+            updated_header.wipe_ticket = hex.clone();
+            self.write_header(&updated_header)?;
+            hex
+        } else {
+            header.wipe_ticket.clone()
+        };
+
+        *self.vmk.write().unwrap() = Some(vmk_locked);
+        *self.db.lock().unwrap() = Some(conn);
+        *self.vault_uuid.lock().unwrap() = Some(header.vault_uuid.clone());
+        *self.wipe_ticket.lock().unwrap() = Some(wipe_ticket_hex);
+
+        let session = self.sessions.create(&header.vault_uuid, uid, DEFAULT_TTL_SECS);
+        self.touch();
+        Ok(session)
+    }
+
+    fn create_and_unlock(
+        &self,
+        password: &[u8],
+        yubikey_response: Option<&[u8; 20]>,
+        uid: u32,
+    ) -> Result<Session, VaultError> {
+        // Generate fresh vault UUID and Argon2 salt
+        let vault_uuid = Uuid::new_v4().to_string();
+        let mut salt = [0u8; 32];
+        OsRng.fill_bytes(&mut salt);
+
+        // Generate 256-bit VMK
+        let mut vmk_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut vmk_bytes);
+
+        let (m, t, p) = crate::crypto::argon2_tune::tune_params();
+
+        // Derive KEK and encrypt VMK
+        let kek_buf = argon2::derive_kek(password, yubikey_response, &salt, m, t, p)?;
+        let kek: [u8; 32] = kek_buf.as_bytes()[..32]
+            .try_into()
+            .map_err(|_| VaultError::Crypto("KEK slice length error".into()))?;
+
+        let (encrypted_vmk, vmk_nonce) =
+            xchacha20::encrypt(&kek, &vmk_bytes, b"vmk-aad-v1")?;
+
+        // Generate wipe ticket — 32 random bytes stored in the sidecar
+        let mut wipe_ticket_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut wipe_ticket_bytes);
+        let wipe_ticket_hex = hex::encode(wipe_ticket_bytes);
+
+        // Write sidecar header before touching the DB
+        let header = VaultHeader {
+            vault_uuid: vault_uuid.clone(),
+            argon2_salt: hex::encode(salt),
+            argon2_m_cost: m,
+            argon2_t_cost: t,
+            argon2_p_cost: p,
+            kem_suite: if cfg!(feature = "pq-hybrid-1024") { 2 } else { 0 },
+            encrypted_vmk: hex::encode(&encrypted_vmk),
+            vmk_nonce: hex::encode(vmk_nonce),
+            password_login_enabled: true,
+            totp_enabled: false,
+            email_otp_enabled: false,
+            passkey_credentials: Vec::new(),
+            wipe_ticket: wipe_ticket_hex.clone(),
+        };
+        self.write_header(&header)?;
+
+        // Create the SQLite vault
+        let mut sc_key = Self::sqlcipher_key(&vmk_bytes);
+        let conn = db::open_vault(&self.vault_path, &sc_key)?;
+        sc_key.zeroize();
+
+        // Move VMK into mlock'd memory
+        let mut vmk_locked = LockedKey::new(32)?;
+        vmk_locked.as_bytes_mut().copy_from_slice(&vmk_bytes);
+        vmk_bytes.zeroize();
+
+        *self.vmk.write().unwrap() = Some(vmk_locked);
+        *self.db.lock().unwrap() = Some(conn);
+        *self.vault_uuid.lock().unwrap() = Some(vault_uuid.clone());
+        *self.wipe_ticket.lock().unwrap() = Some(wipe_ticket_hex);
+
+        let session = self.sessions.create(&vault_uuid, uid, DEFAULT_TTL_SECS);
+        self.touch();
+        Ok(session)
+    }
+
+    /// Lock the vault: zeroize VMK (via Drop), close the DB connection, revoke all sessions.
+    pub fn lock(&self) {
+        // zeroize VMK — LockedKey::drop() calls zeroize() and munlock()
+        drop(self.vmk.write().unwrap().take());
+        // Drop the DB connection
+        drop(self.db.lock().unwrap().take());
+        // Clear cached vault UUID and wipe ticket
+        drop(self.vault_uuid.lock().unwrap().take());
+        drop(self.wipe_ticket.lock().unwrap().take());
+        // Invalidate all session tokens
+        self.sessions.revoke_all();
+        // H-01: reset the brute-force counter so a fresh unlock sequence starts clean
+        self.reset_unlock_counter();
+    }
+
+    /// Return the wipe ticket bytes (decoded from hex), or None if not set.
+    /// Only present after a successful unlock.
+    pub fn wipe_ticket_bytes(&self) -> Option<Vec<u8>> {
+        self.wipe_ticket.lock().unwrap()
+            .as_deref()
+            .and_then(|h| hex::decode(h).ok())
+    }
+
+    /// Forensic destruction — multi-pass overwrite of the vault and sidecar files,
+    /// then deletion.  Designed so that even a DFIR examiner with disk imaging
+    /// tools cannot recover credentials or the Argon2 salt (key rederivation is
+    /// impossible once the salt is gone).
+    ///
+    /// The `presented_ticket` must match the `wipe_ticket` stored in the `.meta`
+    /// sidecar.  This prevents the unauthenticated command from being triggered by
+    /// an arbitrary caller.
+    ///
+    /// After this returns `Ok(())`, the vault is permanently destroyed.
+    /// The caller is responsible for exiting the process immediately after.
+    pub fn forensic_wipe(&self, presented_ticket: &[u8]) -> Result<(), VaultError> {
+        // Read the header before locking (lock() drops wipe_ticket from memory)
+        let header = self.read_header()?;
+
+        // Verify ticket — constant-time compare
+        let stored_ticket = hex::decode(&header.wipe_ticket)
+            .map_err(|_| VaultError::Auth("wipe ticket not configured".into()))?;
+        if stored_ticket.is_empty() {
+            return Err(VaultError::Auth("wipe ticket not configured".into()));
+        }
+        if !ct_eq(presented_ticket, &stored_ticket) {
+            return Err(VaultError::Auth("invalid wipe ticket".into()));
+        }
+
+        // Lock: zeroize VMK and close DB before touching files
+        self.lock();
+
+        let db_path   = &self.vault_path;
+        let meta_path = self.meta_path();
+        // SQLite WAL/SHM (present only if journal_mode != DELETE, but shred anyway)
+        let wal_path  = {
+            let mut p = db_path.clone();
+            let name = p.file_name()
+                .map(|n| format!("{}-wal", n.to_string_lossy()))
+                .unwrap_or_else(|| "vault.db-wal".into());
+            p.set_file_name(name);
+            p
+        };
+        let shm_path  = {
+            let mut p = db_path.clone();
+            let name = p.file_name()
+                .map(|n| format!("{}-shm", n.to_string_lossy()))
+                .unwrap_or_else(|| "vault.db-shm".into());
+            p.set_file_name(name);
+            p
+        };
+
+        // Shred the sidecar FIRST — destroying the Argon2 salt is the most
+        // important step: without it, even a correct password cannot rederive
+        // the KEK and thus cannot decrypt a recovered copy of the vault DB.
+        shred_path(&meta_path)?;
+
+        // Shred the main vault file
+        shred_path(db_path)?;
+
+        // Best-effort WAL/SHM — these may not exist
+        if wal_path.exists() { let _ = shred_path(&wal_path); }
+        if shm_path.exists() { let _ = shred_path(&shm_path); }
+
+        Ok(())
+    }
+
+    /// Run a closure with a reference to the 32-byte VMK.
+    ///
+    /// Temporarily opens the `PROT_READ` window on the mlock'd page for the
+    /// duration of the callback, then seals it back to `PROT_NONE`.
+    /// Returns `Err(Auth("vault is locked"))` if the vault is locked.
+    pub fn with_vmk<F, T>(&self, f: F) -> Result<T, VaultError>
+    where
+        F: FnOnce(&[u8; 32]) -> Result<T, VaultError>,
+    {
+        let guard = self.vmk.read().unwrap();
+        match guard.as_ref() {
+            None => Err(VaultError::Auth("vault is locked".into())),
+            Some(locked) => {
+                let guard = locked.as_bytes();
+                let key: &[u8; 32] = (&*guard)
+                    .try_into()
+                    .map_err(|_| VaultError::Crypto("VMK length mismatch".into()))?;
+                let result = f(key);
+                result
+            }
+        }
+    }
+}
+
+// ── Forensic helpers ──────────────────────────────────────────────────────────
+
+/// Constant-time byte-slice equality — prevents timing oracle on ticket comparison.
+fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() { return false; }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+/// Seven-pass secure file erase:
+///   pass 1: all 0x00
+///   pass 2: all 0xFF
+///   passes 3-7: CSPRNG random bytes
+/// After every pass the file descriptor is fsynced to disk.
+/// Finally the file is truncated to 0 bytes, fsynced again, and unlinked.
+///
+/// NOTE: On SSDs with wear-levelling or COW filesystems (btrfs, ZFS) the OS
+/// may remap writes to fresh sectors.  This implementation is the strongest
+/// guarantee achievable within the POSIX syscall surface without raw block
+/// device access.  Destroying the Argon2 salt (`.meta` file) before the DB
+/// provides cryptographic protection even if a physical sector can be recovered.
+fn shred_path(path: &std::path::Path) -> Result<(), VaultError> {
+    use std::io::{Seek, SeekFrom, Write};
+
+    if !path.exists() { return Ok(()); }
+
+    let file_len = std::fs::metadata(path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    if file_len == 0 {
+        std::fs::remove_file(path)?;
+        return Ok(());
+    }
+
+    let mut file = std::fs::OpenOptions::new().write(true).open(path)?;
+
+    const CHUNK: usize = 65_536; // 64 KiB write granularity
+    let mut buf = vec![0u8; CHUNK];
+
+    // 7 passes: zeros, ones, 5× random
+    for pass in 0u8..7 {
+        file.seek(SeekFrom::Start(0))?;
+        let mut remaining = file_len;
+        while remaining > 0 {
+            let chunk = (remaining as usize).min(CHUNK);
+            match pass {
+                0 => buf[..chunk].fill(0x00),
+                1 => buf[..chunk].fill(0xFF),
+                _ => OsRng.fill_bytes(&mut buf[..chunk]),
+            }
+            file.write_all(&buf[..chunk])?;
+            remaining -= chunk as u64;
+        }
+        file.sync_all()?;
+    }
+
+    // Truncate and sync before unlinking
+    file.set_len(0)?;
+    file.sync_all()?;
+    drop(file);
+    std::fs::remove_file(path)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn tmp_vault() -> (TempDir, DaemonState) {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("vault.db");
+        let state = DaemonState::new(path);
+        (dir, state)
+    }
+
+    #[test]
+    fn new_vault_starts_locked() {
+        let (_dir, state) = tmp_vault();
+        assert!(state.is_locked());
+    }
+
+    #[test]
+    fn unlock_creates_vault_and_returns_session() {
+        let (_dir, state) = tmp_vault();
+        let sess = state.unlock(b"correct-horse-battery-staple-!1A", None, 1000).unwrap();
+        assert!(!sess.token.is_empty());
+        assert!(!state.is_locked());
+    }
+
+    #[test]
+    fn unlock_twice_wrong_password_fails() {
+        let (_dir, state) = tmp_vault();
+        state.unlock(b"rightpassword!1A", None, 1000).unwrap();
+        state.lock();
+        let result = state.unlock(b"wrongpassword!1A", None, 1000);
+        assert!(result.is_err(), "wrong password must not unlock");
+    }
+
+    #[test]
+    fn lock_clears_vmk_and_sessions() {
+        let (_dir, state) = tmp_vault();
+        let sess = state.unlock(b"correct-horse-battery-staple-!1A", None, 1000).unwrap();
+        state.lock();
+        assert!(state.is_locked());
+        assert!(state.sessions.validate(&sess.token, 1000).is_err());
+    }
+
+    #[test]
+    fn reopen_existing_vault_with_correct_password() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("vault.db");
+
+        // Create
+        {
+            let state = DaemonState::new(path.clone());
+            state.unlock(b"correct-horse-battery-staple-!1A", None, 1000).unwrap();
+            state.lock();
+        }
+
+        // Reopen
+        let state2 = DaemonState::new(path);
+        let sess = state2.unlock(b"correct-horse-battery-staple-!1A", None, 1000).unwrap();
+        assert!(!sess.token.is_empty());
+        assert!(!state2.is_locked());
+    }
+
+    #[test]
+    fn reopen_with_wrong_password_fails() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("vault.db");
+        {
+            let s = DaemonState::new(path.clone());
+            s.unlock(b"correct-horse-battery-staple-!1A", None, 1000).unwrap();
+            s.lock();
+        }
+        let s2 = DaemonState::new(path);
+        assert!(s2.unlock(b"wrong", None, 1000).is_err());
+    }
+
+    #[test]
+    fn with_vmk_fails_when_locked() {
+        let (_dir, state) = tmp_vault();
+        let result = state.with_vmk(|_k| Ok(()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn with_vmk_succeeds_when_unlocked() {
+        let (_dir, state) = tmp_vault();
+        state.unlock(b"correct-horse-battery-staple-!1A", None, 1000).unwrap();
+        let result = state.with_vmk(|k| {
+            assert_eq!(k.len(), 32);
+            Ok(())
+        });
+        assert!(result.is_ok());
+    }
+
+    // ── D4 negative tests ─────────────────────────────────────────────────────
+
+    #[test]
+    fn brute_force_lockout_triggers_after_threshold() {
+        let (_dir, state) = tmp_vault();
+        // Create the vault first so we can attempt to reopen with wrong password.
+        state.unlock(b"correctpassword!1A", None, 1000).unwrap();
+        state.lock();
+
+        // Attempts 1-4: no lockout yet (LOCKOUT_SCHEDULE_SECS[1..4] == 0)
+        for _ in 0..4 {
+            let _ = state.unlock(b"wrongpassword!1A", None, 1000);
+        }
+        // After 4 failures the check_unlock_lockout clock is still clear
+        assert!(state.check_unlock_lockout().is_ok(), "no lockout after 4 failures");
+
+        // 5th failure → 30 s lockout
+        let _ = state.unlock(b"wrongpassword!1A", None, 1000);
+        let err = state.unlock(b"wrongpassword!1A", None, 1000).unwrap_err();
+        assert!(
+            matches!(err, VaultError::Auth(_)),
+            "expected Auth error during lockout, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn idle_secs_increases_over_time() {
+        let (_dir, state) = tmp_vault();
+        // Set last_activity to 60 seconds ago
+        state.last_activity.store(now_secs() - 60, Ordering::Relaxed);
+        assert!(state.idle_secs() >= 60);
+    }
+
+    #[test]
+    fn touch_resets_idle_timer() {
+        let (_dir, state) = tmp_vault();
+        state.last_activity.store(now_secs() - 600, Ordering::Relaxed);
+        state.touch();
+        assert!(state.idle_secs() < 5);
+    }
+}

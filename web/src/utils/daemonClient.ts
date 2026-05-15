@@ -25,12 +25,61 @@ interface CredentialMeta {
 // Default per-RPC timeout. A hung daemon would otherwise freeze the UI.
 // Callers that hit slow paths (HIBP filter load, profile picture upload) pass
 // a larger value via the optional `timeoutMs` argument to request().
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
-/** Timeout override for HIBP breach lookups — the daemon mmaps an 8 GB file. */
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+/** Timeout override for HIBP breach lookups - the daemon mmaps an 8 GB file. */
 export const HIBP_REQUEST_TIMEOUT_MS = 120_000;
 
 /** Obfuscated localStorage key for the forensic wipe ticket. */
 export const WIPE_TICKET_KEY = '_sys_vk_tkv';
+
+// ── UUID wire helpers ────────────────────────────────────────────────────────
+//
+// The daemon's protocol enums use Rust `Uuid`, which `rmp_serde` deserializes
+// from a 16-byte array (msgpack bin or fixarray of u8). The JSON responses we
+// get back from list-style commands carry UUIDs as RFC-4122 strings (because
+// `serde_json` picks the human-readable form). To bridge that mismatch, every
+// Uuid field crossing this boundary goes through `uuidStringToBytes` on the
+// way out and `uuidBytesToString` on the way in — keeping the React side a
+// pure-string world.
+
+/** Parse "1394a7ac-4891-45d1-81ed-f2b33c0af637" -> 16-byte Uint8Array. */
+function uuidStringToBytes(s: string): Uint8Array {
+  const hex = s.replace(/-/g, '');
+  if (hex.length !== 32 || !/^[0-9a-f]{32}$/i.test(hex)) {
+    throw new Error(`invalid uuid: ${s}`);
+  }
+  const out = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+/**
+ * Normalize whatever shape msgpack handed us back for a `Uuid` field
+ * (Uint8Array | number[] | byte-keyed object) to its canonical RFC-4122 string.
+ */
+function uuidBytesToString(b: Uint8Array | number[] | Record<string, number>): string {
+  const bytes = b instanceof Uint8Array
+    ? b
+    : Array.isArray(b)
+      ? new Uint8Array(b)
+      : new Uint8Array(Object.values(b));
+  if (bytes.length !== 16) throw new Error(`invalid uuid bytes: ${bytes.length}`);
+  const hex = Array.from(bytes, x => x.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Convert an outgoing string UUID (or empty/null sentinel) to the wire form. */
+function uuidOut(id: string): Uint8Array {
+  return uuidStringToBytes(id);
+}
+
+/** Same as `uuidOut` but tolerates null/empty as "no folder". */
+function uuidOutOptional(id: string | null | undefined): Uint8Array | null {
+  if (id === null || id === undefined || id === '') return null;
+  return uuidStringToBytes(id);
+}
 
 // ── DaemonClient ─────────────────────────────────────────────────────────────
 
@@ -46,15 +95,25 @@ export class DaemonClient {
   /** FIFO queue of pending promise callbacks, matched to responses in order. */
   #queue: Array<{ resolve: (r: unknown) => void; reject: (e: Error) => void }> = [];
   #connected = false;
+  /** Epoch ms before which we skip connect attempts (set after a failed connect). */
+  #unavailableUntil: number = 0;
+  #connectPromise: Promise<void> | null = null;
 
   // ── Connection ────────────────────────────────────────────────────────────
 
   /**
    * Open a WebSocket connection to the proxy.
    * Resolves when the socket is open, rejects if the connection fails within 5s.
+   * After a failure, fast-rejects for 30 s to avoid blocking callers on every attempt.
    */
   connect(url = `ws://${location.host}/ws`): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.#connected) return Promise.resolve();
+    if (this.#connectPromise) return this.#connectPromise;
+    if (Date.now() < this.#unavailableUntil) {
+      return Promise.reject(new Error('daemon not reachable'));
+    }
+    
+    this.#connectPromise = new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
       // Tracks whether the connect() promise has already settled so that
@@ -65,15 +124,22 @@ export class DaemonClient {
         if (!connectSettled) { connectSettled = true; clearTimeout(timer); fn(); }
       };
 
+      const rejectWithCooldown = (err: Error) => {
+        this.#unavailableUntil = Date.now() + 30_000;
+        settle(() => reject(err));
+      };
+
       const timer = setTimeout(() => {
-        settle(() => { ws.close(); reject(new Error('daemon connect timeout')); });
+        settle(() => { ws.close(); rejectWithCooldown(new Error('daemon connect timeout')); });
       }, 5000);
 
-      ws.onerror = () => settle(() => reject(new Error('daemon WebSocket error')));
+      ws.onerror = () => rejectWithCooldown(new Error('daemon WebSocket error'));
 
       ws.onclose = () => {
         this.#connected = false;
-        settle(() => reject(new Error('daemon not reachable')));
+        if (!connectSettled) {
+          rejectWithCooldown(new Error('daemon not reachable'));
+        }
         for (const pending of this.#queue) {
           pending.reject(new Error('daemon connection closed'));
         }
@@ -86,10 +152,13 @@ export class DaemonClient {
         try {
           const resp = decode(new Uint8Array(event.data)) as Record<string, unknown>;
           if (resp['status'] === 'Error') {
-            // MED-06: sanitize error messages — map internal codes to generic UI messages
+            // MED-06: sanitize error messages - map internal codes to generic UI messages
             // so internal state details are not leaked to the browser.
             const data = resp['data'] as Record<string, unknown> | undefined;
             const code = String(data?.['code'] ?? '');
+            const msg = String(data?.['message'] ?? '');
+            console.warn('[Daemon Error]', { code, msg });
+            
             const SAFE_MESSAGES: Record<string, string> = {
               'InvalidPassword': 'Authentication failed.',
               'VaultLocked':     'Vault is locked. Please unlock first.',
@@ -97,6 +166,7 @@ export class DaemonClient {
               'NotFound':        'Item not found.',
               'AlreadyExists':   'Item already exists.',
               'InvalidInput':    'Invalid input provided.',
+              '401':             'Session expired. Please unlock again.',
             };
             const safeMsg = SAFE_MESSAGES[code] ?? 'Operation failed. Please try again.';
             next.reject(new Error(safeMsg));
@@ -113,14 +183,20 @@ export class DaemonClient {
         this.#connected = true;
         // Send a Ping to confirm the daemon unix-socket is actually reachable.
         // If the proxy accepted the WS but the daemon binary isn't running,
-        // the socket error closes the WS before the pong arrives — onclose
+        // the socket error closes the WS before the pong arrives - onclose
         // fires, settle() rejects, and connect() throws just like a plain
         // connection failure, so callers fall through cleanly to localStorage.
         this.ping()
-          .then(() => settle(() => resolve()))
-          .catch(() => settle(() => reject(new Error('daemon not reachable'))));
+          .then(() => { this.#unavailableUntil = 0; settle(() => resolve()); })
+          .catch(() => rejectWithCooldown(new Error('daemon not reachable')));
       };
     });
+
+    this.#connectPromise.catch(() => {}).finally(() => {
+      this.#connectPromise = null;
+    });
+
+    return this.#connectPromise;
   }
 
   get isConnected(): boolean {
@@ -134,16 +210,24 @@ export class DaemonClient {
 
   // ── Low-level request/response ────────────────────────────────────────────
 
-  private request<T = unknown>(
+  private async request<T = unknown>(
     cmd: string,
-    payload?: unknown,
+    payload?: any,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
   ): Promise<T> {
     if (!this.#ws || !this.#connected) {
-      return Promise.reject(new Error('daemon not connected'));
+      if (keyStore.hasToken) {
+        try {
+          await this.connect();
+        } catch {
+          throw new Error('daemon not connected');
+        }
+      } else {
+        throw new Error('daemon not connected');
+      }
     }
     return new Promise<T>((resolve, reject) => {
-      // On timeout we cannot simply drop the queued entry — responses are
+      // On timeout we cannot simply drop the queued entry - responses are
       // matched FIFO by order, so removing one from the middle would misalign
       // every subsequent response. Instead we tear down the socket; the
       // onclose handler drains all pending with a generic rejection, and the
@@ -162,6 +246,19 @@ export class DaemonClient {
     });
   }
 
+  /** Extract the typed `.data` field from a daemon response. */
+  private async rpc<T>(cmd: string, payload?: unknown, timeoutMs?: number): Promise<T> {
+    const resp = await this.request<{ status: string; data: T }>(cmd, payload, timeoutMs);
+    return (resp as { status: string; data: T }).data;
+  }
+
+  /** Like rpc(), but the daemon response `.data` is a UTF-8 JSON byte array. */
+  private async rpcJson<T>(cmd: string, payload?: unknown): Promise<T> {
+    const data = await this.rpc<Uint8Array | number[]>(cmd, payload);
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    return JSON.parse(new TextDecoder().decode(bytes)) as T;
+  }
+
   // ── Unauthenticated commands ──────────────────────────────────────────────
 
   async ping(): Promise<void> {
@@ -169,8 +266,41 @@ export class DaemonClient {
   }
 
   async getStatus(): Promise<{ locked: boolean }> {
-    const resp = await this.request<{ status: string; data: { locked: boolean } }>('GetStatus');
-    return (resp as any).data as { locked: boolean };
+    return this.rpc<{ locked: boolean }>('GetStatus');
+  }
+
+  async getLoginHints(): Promise<{
+    password_login_enabled: boolean;
+    totp_enabled: boolean;
+    email_otp_enabled: boolean;
+    fido2_ids: Uint8Array[];
+  }> {
+    type Raw = { password_login_enabled: boolean; totp_enabled: boolean; email_otp_enabled: boolean; fido2_ids: number[][] };
+    const d = await this.rpc<Raw>('GetLoginHints');
+    return {
+      password_login_enabled: d.password_login_enabled,
+      totp_enabled: d.totp_enabled,
+      email_otp_enabled: d.email_otp_enabled,
+      fido2_ids: d.fido2_ids.map((arr) => new Uint8Array(arr)),
+    };
+  }
+
+  async getPasskeyChallenge(): Promise<Uint8Array> {
+    return new Uint8Array(await this.rpc<number[]>('GetPasskeyChallenge'));
+  }
+
+  async unlockWithPasskey(credentialId: Uint8Array, authData: Uint8Array, signature: Uint8Array): Promise<void> {
+    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    const data = await this.rpc<UnlockData>('UnlockWithPasskey', {
+      credential_id: Array.from(credentialId),
+      auth_data: Array.from(authData),
+      signature: Array.from(signature),
+    });
+    if (!data?.session_token) throw new Error('no session token in unlock response');
+    if (data.wipe_ticket?.length) {
+      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    }
+    keyStore.store(data.session_token);
   }
 
   /**
@@ -178,22 +308,44 @@ export class DaemonClient {
    * Stores the returned session token in the SecureKeyStore.
    */
   async unlock(password: string, yubiKeyResponse?: Uint8Array): Promise<void> {
-    const passwordBytes = Array.from(new TextEncoder().encode(password));
-    const resp = await this.request<{ status: string; data: { session_token: string; wipe_ticket?: number[] } }>(
-      'Unlock',
-      {
-        password: passwordBytes,
-        yubikey_response: yubiKeyResponse ? Array.from(yubiKeyResponse) : null,
-      },
-    );
-    const data = (resp as any).data as { session_token: string; wipe_ticket?: number[] };
+    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    const data = await this.rpc<UnlockData>('Unlock', {
+      password: Array.from(new TextEncoder().encode(password)),
+      yubikey_response: yubiKeyResponse ? Array.from(yubiKeyResponse) : null,
+    });
     if (!data?.session_token) throw new Error('no session token in unlock response');
-    // Persist wipe ticket for forensic wipe (even when vault later re-locks)
     if (data.wipe_ticket?.length) {
-      const hex = Array.from(data.wipe_ticket, b => (b as number).toString(16).padStart(2, '0')).join('');
-      localStorage.setItem(WIPE_TICKET_KEY, hex);
+      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
     }
     keyStore.store(data.session_token);
+  }
+
+  // ── Quick Unlock ──────────────────────────────────────────────────────────
+
+  async quickUnlockEnroll(password: string, dbk: Uint8Array): Promise<void> {
+    await this.request('QuickUnlockEnroll', {
+      session_token: this.token,
+      password: Array.from(new TextEncoder().encode(password)),
+      dbk: Array.from(dbk),
+    });
+  }
+
+  async quickUnlock(dbk: Uint8Array): Promise<void> {
+    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    const data = await this.rpc<UnlockData>('QuickUnlock', {
+      dbk: Array.from(dbk),
+    });
+    if (!data?.session_token) throw new Error('no session token in unlock response');
+    if (data.wipe_ticket?.length) {
+      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    }
+    keyStore.store(data.session_token);
+  }
+
+  async quickUnlockRevoke(): Promise<void> {
+    await this.request('QuickUnlockRevoke', {
+      session_token: this.token,
+    });
   }
 
   /**
@@ -210,7 +362,7 @@ export class DaemonClient {
         10_000,
       );
     } catch {
-      // Daemon may close the connection before sending a response — that is
+      // Daemon may close the connection before sending a response - that is
       // expected behaviour when the process exits during the wipe.
     }
   }
@@ -228,34 +380,54 @@ export class DaemonClient {
     keyStore.clear();
   }
 
+  // ── FIDO2 / Passkey management ────────────────────────────────────────────
+
+  async listFido2Keys(): Promise<Record<string, unknown>[]> {
+    return this.rpcJson<Record<string, unknown>[]>('ListFido2Keys', { session_token: this.token });
+  }
+
+  async registerFido2(devicePath: string, name?: string, residentKey: boolean = false): Promise<string> {
+    const data = await this.rpc<{ id: string }>('RegisterFido2', {
+      session_token: this.token,
+      device_path: devicePath,
+      name: name ?? null,
+      resident_key: residentKey,
+    });
+    return data.id;
+  }
+
+  async removeFido2(id: string): Promise<void> {
+    await this.request('RemoveFido2', {
+      session_token: this.token,
+      id,
+    });
+  }
+
+  async listFido2Devices(): Promise<string[]> {
+    return this.rpc<string[]>('ListFido2Devices');
+  }
+
   // ── Folders ───────────────────────────────────────────────────────────────
 
   async listFolders(): Promise<FolderRow[]> {
-    const resp = await this.request<{ status: string; data: Uint8Array }>(
-      'ListFolders',
-      { session_token: this.token },
-    );
-    const bytes = (resp as any).data as Uint8Array;
-    return JSON.parse(new TextDecoder().decode(bytes)) as FolderRow[];
+    return this.rpcJson<FolderRow[]>('ListFolders', { session_token: this.token });
   }
 
   async addFolder(name: string, description?: string, iconSvg?: string): Promise<string> {
-    const resp = await this.request<{ status: string; data: { id: string } }>(
-      'AddFolder',
-      {
-        session_token: this.token,
-        name,
-        description: description ?? null,
-        icon_svg: iconSvg ?? null,
-      },
-    );
-    return (resp as any).data.id as string;
+    // Response::Created.id is a raw 16-byte Uuid in msgpack — normalize back to string.
+    const data = await this.rpc<{ id: Uint8Array | number[] | Record<string, number> }>('AddFolder', {
+      session_token: this.token,
+      name,
+      description: description ?? null,
+      icon_svg: iconSvg ?? null,
+    });
+    return uuidBytesToString(data.id);
   }
 
   async updateFolder(id: string, name: string, description?: string, iconSvg?: string): Promise<void> {
     await this.request('UpdateFolder', {
       session_token: this.token,
-      id,
+      id: uuidOut(id),
       name,
       description: description ?? null,
       icon_svg: iconSvg ?? null,
@@ -265,57 +437,49 @@ export class DaemonClient {
   async deleteFolder(id: string, moveCredentialsTo?: string): Promise<void> {
     await this.request('DeleteFolder', {
       session_token: this.token,
-      id,
-      move_credentials_to: moveCredentialsTo ?? null,
+      id: uuidOut(id),
+      move_credentials_to: uuidOutOptional(moveCredentialsTo),
     });
   }
 
   async reorderFolders(orderedIds: string[]): Promise<void> {
     await this.request('ReorderFolders', {
       session_token: this.token,
-      ordered_ids: orderedIds,
+      ordered_ids: orderedIds.map(uuidOut),
     });
   }
 
   // ── Credentials ───────────────────────────────────────────────────────────
 
   async listCredentials(folderId?: string): Promise<CredentialMeta[]> {
-    const resp = await this.request<{ status: string; data: Uint8Array }>(
-      'ListCredentials',
-      { session_token: this.token, folder_id: folderId ?? null },
-    );
-    const bytes = (resp as any).data as Uint8Array;
-    return JSON.parse(new TextDecoder().decode(bytes)) as CredentialMeta[];
+    return this.rpcJson<CredentialMeta[]>('ListCredentials', {
+      session_token: this.token,
+      folder_id: uuidOutOptional(folderId),
+    });
   }
 
   async getCredential(id: string): Promise<Credential> {
-    const resp = await this.request<{ status: string; data: Uint8Array }>(
-      'GetCredential',
-      { session_token: this.token, id },
-    );
-    const bytes = (resp as any).data as Uint8Array;
-    return JSON.parse(new TextDecoder().decode(bytes)) as Credential;
+    return this.rpcJson<Credential>('GetCredential', {
+      session_token: this.token,
+      id: uuidOut(id),
+    });
   }
 
   async addCredential(folderId: string | null, credential: Omit<Credential, 'id' | 'folderId'>): Promise<string> {
-    const blob = new TextEncoder().encode(JSON.stringify(credential));
-    const resp = await this.request<{ status: string; data: { id: string } }>(
-      'AddCredential',
-      {
-        session_token: this.token,
-        folder_id: folderId,
-        blob: Array.from(blob),
-      },
-    );
-    return (resp as any).data.id as string;
+    const data = await this.rpc<{ id: Uint8Array | number[] | Record<string, number> }>('AddCredential', {
+      session_token: this.token,
+      folder_id: uuidOutOptional(folderId),
+      blob: Array.from(new TextEncoder().encode(JSON.stringify(credential))),
+    });
+    return uuidBytesToString(data.id);
   }
 
   async updateCredential(id: string, folderId: string | null, credential: Partial<Credential>): Promise<void> {
     const blob = new TextEncoder().encode(JSON.stringify(credential));
     await this.request('UpdateCredential', {
       session_token: this.token,
-      id,
-      folder_id: folderId,
+      id: uuidOut(id),
+      folder_id: uuidOutOptional(folderId),
       blob: Array.from(blob),
     });
   }
@@ -323,19 +487,14 @@ export class DaemonClient {
   async deleteCredential(id: string): Promise<void> {
     await this.request('DeleteCredential', {
       session_token: this.token,
-      id,
+      id: uuidOut(id),
     });
   }
 
   // ── Asset Holder ──────────────────────────────────────────────────────────
 
   async getAssetHolder(): Promise<AssetHolder> {
-    const resp = await this.request<{ status: string; data: Uint8Array }>(
-      'GetAssetHolder',
-      { session_token: this.token },
-    );
-    const bytes = (resp as any).data as Uint8Array;
-    return JSON.parse(new TextDecoder().decode(bytes)) as AssetHolder;
+    return this.rpcJson<AssetHolder>('GetAssetHolder', { session_token: this.token });
   }
 
   async updateAssetHolder(assetHolder: AssetHolder): Promise<void> {
@@ -349,11 +508,10 @@ export class DaemonClient {
   // ── OTP ───────────────────────────────────────────────────────────────────
 
   async getOtpCode(credentialId: string): Promise<string> {
-    const resp = await this.request<{ status: string; data: string }>(
-      'GetOtpCode',
-      { session_token: this.token, credential_id: credentialId },
-    );
-    return (resp as any).data as string;
+    return this.rpc<string>('GetOtpCode', {
+      session_token: this.token,
+      credential_id: uuidOut(credentialId),
+    });
   }
 
   // ── User profile ──────────────────────────────────────────────────────────
@@ -370,7 +528,16 @@ export class DaemonClient {
   ): Promise<void> {
     if (!this.#connected) await this.connect();
     await this.unlock(password);
-    await this.updateProfile(firstName, lastName, email);
+    // unlock() created the vault (if missing) and stored the session token.
+    // Write the profile fields so they survive a future relogin — without this
+    // call, UserContext.reloadProfile() sees empty strings forever.
+    try {
+      await this.updateProfile(firstName, lastName, email);
+    } catch (e) {
+      // Non-fatal: registration's primary goal (vault creation + unlock) is
+      // already done. The user can still set their profile from Settings.
+      console.warn('[daemon.register] profile write failed:', e);
+    }
   }
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
@@ -399,12 +566,17 @@ export class DaemonClient {
     }
   }
 
+  async updateLoginPolicy(passwordEnabled: boolean, totpEnabled: boolean, emailOtpEnabled: boolean): Promise<void> {
+    await this.request('UpdateLoginPolicy', {
+      session_token: this.token,
+      password_login_enabled: passwordEnabled,
+      totp_enabled: totpEnabled,
+      email_otp_enabled: emailOtpEnabled,
+    });
+  }
+
   async getProfile(): Promise<{ firstName: string; lastName: string; email: string; profilePic?: Uint8Array; passwordChangedAt?: number }> {
-    const resp = await this.request<{ status: string; data: Record<string, unknown> }>(
-      'GetProfile',
-      { session_token: this.token },
-    );
-    const d = (resp as any).data as Record<string, unknown>;
+    const d = await this.rpc<Record<string, unknown>>('GetProfile', { session_token: this.token });
     return {
       firstName: d.first_name as string,
       lastName: d.last_name as string,
@@ -430,31 +602,34 @@ export class DaemonClient {
     });
   }
 
+  async removeProfilePicture(): Promise<void> {
+    await this.request('RemoveProfilePicture', { session_token: this.token });
+  }
+
   // ── HIBP breach check ─────────────────────────────────────────────────────
 
   /**
    * Check a password against the local HIBP Cuckoo filter (architecture §4).
-   * The plaintext never leaves this machine — the daemon hashes it with SHA-1
+   * The plaintext never leaves this machine - the daemon hashes it with SHA-1
    * and queries the filter in-memory. We scrub the typed array before return.
    *
    * `filter_available: false` means the daemon has no filter file registered
-   * (fresh install, no `hibp/build-filter.sh` run) — treat as "unknown", not
+   * (fresh install, no `hibp/build-filter.sh` run) - treat as "unknown", not
    * as a clean bill of health.
    */
   async checkPasswordBreached(password: string): Promise<{ pwned: boolean; filter_available: boolean }> {
     const enc = new TextEncoder().encode(password);
     try {
-      const resp = await this.request<{ status: string; data: { pwned: boolean; filter_available: boolean } }>(
+      return await this.rpc<{ pwned: boolean; filter_available: boolean }>(
         'CheckPasswordBreached',
         { session_token: this.token, password_bytes: Array.from(enc) },
         HIBP_REQUEST_TIMEOUT_MS,
       );
-      return (resp as any).data as { pwned: boolean; filter_available: boolean };
     } finally {
       enc.fill(0);
     }
   }
 }
 
-/** Singleton daemon client — one per browser tab. */
+/** Singleton daemon client - one per browser tab. */
 export const daemon = new DaemonClient();
