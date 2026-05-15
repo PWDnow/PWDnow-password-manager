@@ -9,32 +9,52 @@ Type=notify
 User=vault
 Group=vault
 ExecStart=/usr/local/bin/vault-daemon --socket /run/vault-daemon/vault.sock
-RuntimeDirectory=vault-daemon
-RuntimeDirectoryMode=0700
-MemorySwapMax=0
-NoNewPrivileges=true
-PrivateTmp=true
+
 ProtectSystem=strict
-ProtectHome=read-only
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateUsers=true
+ProtectProc=invisible
+ProcSubset=pid
+ReadWritePaths=/var/lib/vault-daemon /run/vault-daemon
+NoExecPaths=/var /home /tmp /root
+UMask=0077
+
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
 RestrictNamespaces=true
-SystemCallFilter=@system-service @memlock
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
+MemoryDenyWriteExecute=true
+MemorySwapMax=0
+MemoryMax=2G
+TasksMax=64
+
+NoNewPrivileges=true
 CapabilityBoundingSet=CAP_IPC_LOCK
 AmbientCapabilities=CAP_IPC_LOCK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @reboot @swap @raw-io @cpu-emulation @keyring @clock @debug
 
-# Restart policy: always restart so the watchdog can trigger a restart too
-Restart=always
-RestartSec=5s
-# Exit code 42 is reserved for "fatal, do restart immediately"
-RestartForceExitStatus=42
-
-# Watchdog: systemd kills and restarts the daemon if it goes 30 s without a
-# heartbeat.  The daemon reads WATCHDOG_USEC and pings every WatchdogSec/3.
+RuntimeDirectory=vault-daemon
+RuntimeDirectoryMode=0700
 WatchdogSec=30s
+Restart=on-failure
+RestartSec=5s
+RestartForceExitStatus=42
+LimitCORE=0
+LimitNOFILE=4096
 
-# Graceful shutdown: give the daemon up to 10 s to flush state before SIGKILL.
 TimeoutStopSec=10s
-
-# Route logs to the journal
 StandardOutput=journal
 StandardError=journal
 

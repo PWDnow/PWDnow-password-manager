@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES } from '../i18n';
 
 interface LanguageModalProps {
   isOpen: boolean;
@@ -11,15 +12,12 @@ interface LanguageModalProps {
 export default function LanguageModal({ isOpen, onClose }: LanguageModalProps) {
   const { t, i18n } = useTranslation();
 
-  const languages = [
-    { code: 'en', name: 'English', nativeName: 'English' },
-    { code: 'fr', name: 'French', nativeName: 'Français' },
-  ];
-
   const handleSelect = (code: string) => {
     i18n.changeLanguage(code);
     onClose();
   };
+
+  const activeLang = i18n.resolvedLanguage ?? i18n.language;
 
   return (
     <AnimatePresence>
@@ -46,7 +44,7 @@ export default function LanguageModal({ isOpen, onClose }: LanguageModalProps) {
                   </div>
                   <h2 className="text-xl font-headline font-black tracking-tight">{t('language.title', 'Select Language')}</h2>
                 </div>
-                <button 
+                <button
                   onClick={onClose}
                   className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
                 >
@@ -54,20 +52,20 @@ export default function LanguageModal({ isOpen, onClose }: LanguageModalProps) {
                 </button>
               </div>
 
-              <div className="p-6 space-y-2">
-                {languages.map((lang) => (
+              <div className="p-6 space-y-2 max-h-[60vh] overflow-y-auto">
+                {SUPPORTED_LANGUAGES.map((lang) => (
                   <button
                     key={lang.code}
                     onClick={() => handleSelect(lang.code)}
                     className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
-                      i18n.language === lang.code 
-                        ? 'bg-black dark:bg-white text-white dark:text-black' 
+                      activeLang === lang.code
+                        ? 'bg-black dark:bg-white text-white dark:text-black'
                         : 'bg-surface-container-low hover:bg-surface-container-high text-black dark:text-white'
                     }`}
                   >
                     <span className="font-bold">{lang.nativeName}</span>
                     <span className={`text-xs uppercase tracking-widest font-black ${
-                      i18n.language === lang.code ? 'text-white/70 dark:text-black/70' : 'text-on-surface-variant'
+                      activeLang === lang.code ? 'text-white/70 dark:text-black/70' : 'text-on-surface-variant'
                     }`}>
                       {lang.name}
                     </span>

@@ -53,7 +53,20 @@ When adding a new IPC command between the web and daemon layers, you MUST update
 - **Features:** The codebase supports optional features like `--features pq` (ML-KEM-768 hybrid KEM) and `--features mock-fido2`.
 - **IPC Auth:** Every authenticated daemon request must include a `session_token`. Validate UID + token using the `auth_then!` macro before accessing the database.
 
+## Obsidian & RuFlo Integration
+- **Vault:** The project root is an Obsidian vault.
+- **Dashboard:** `Dashboard.md` is the primary entry point for project status.
+- **Memory Sync:** Utilize the `obsidian-integration` skill to sync RuFlo's neural memory with Markdown notes in `Memories/`.
+- **Daily Logs:** Use `Daily/` for session tracking.
+- **AppImage:** Obsidian AppImage is available in the root for local execution.
+
+## Ruflo Multi-Agent Orchestration
+- This project uses **Ruflo** for advanced agent orchestration, persistent memory, and automated workflows.
+- **Activation:** Ruflo is initialized and runs background daemons for memory and swarm coordination.
+- **Usage:** Use `ruflo` commands for complex tasks, security audits, and architectural analysis.
+- **Guidance:** Follow the swarm guidance and operational rules defined in `CLAUDE.md`.
+
 ## Graphify Knowledge Graph
 - The project maintains an AST-based knowledge graph in `web/graphify-out/`.
 - Before answering complex architecture or codebase questions, read `web/graphify-out/GRAPH_REPORT.md` for context on god nodes and community structures.
-- **Post-Modification:** After modifying code files, run `graphify update .` to keep the graph current.
+- **Post-Modification:** After modifying code files, run `graphify update .` and `ruflo analyze` to keep the graph and memory current.

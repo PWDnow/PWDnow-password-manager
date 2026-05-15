@@ -1,13 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Wallet, Verified, Key, ChevronRight, Copy, MoreVertical, PlusCircle, TrendingUp, ShieldCheck, ArrowLeft, Check, Trash2, Pencil, AlertTriangle, X, Search, Globe, ImageOff, Shield, Clock, Timer } from 'lucide-react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Wallet, Verified, Key, ChevronRight, Copy, MoreVertical, PlusCircle, TrendingUp, ShieldCheck, ArrowLeft, Check, Trash2, Pencil, AlertTriangle, X, Search, Globe, ImageOff, Shield, Clock, Timer, Share2, FileText, CreditCard } from 'lucide-react';
+import { secureClipboard, ClipboardGuardHandle } from '../utils/clipboardGuard';
 import { motion, AnimatePresence } from 'motion/react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { TOTP } from 'totp-generator';
 import AddCredential from './AddCredential';
 import SEO from '../components/SEO';
 import { Folder, Credential } from '../types';
 import { useVault } from '../context/VaultContext';
+import { useUser } from '../context/UserContext';
+import { useNotification } from '../context/NotificationContext';
+import { readDecryptedLocal } from '../utils/localCrypto';
+const ShareModal = lazy(() => import('../components/ShareModal'));
 
 const SecurityBadge = ({ status, statusColor }: { status: string, statusColor: string }) => {
   const [showText, setShowText] = useState(false);
@@ -94,7 +99,7 @@ const getServiceStyle = (service: string) => {
 };
 
 // HIGH-07 fix: removed Google favicon service (leaked full service list to Google).
-// Now renders a letter avatar using the service name — zero external requests.
+// Now renders a letter avatar using the service name - zero external requests.
 const FaviconImage = ({ service, className }: { url: string; service: string; className?: string }) => {
   const style = getServiceStyle(service);
   const letter = (service || '?').trim().charAt(0).toUpperCase();
@@ -106,12 +111,28 @@ const FaviconImage = ({ service, className }: { url: string; service: string; cl
   );
 };
 
+function computeExpiryDate(value: number, unit: 'days' | 'months' | 'years', from: number): number {
+  const d = new Date(from);
+  if (unit === 'days')   d.setDate(d.getDate() + value);
+  if (unit === 'months') d.setMonth(d.getMonth() + value);
+  if (unit === 'years')  d.setFullYear(d.getFullYear() + value);
+  return d.getTime();
+}
+
+function isExpired(c: Credential): boolean {
+  if (!c.expiryEnabled || !c.expirySetAt || !c.expiryValue || !c.expiryUnit) return false;
+  return Date.now() > computeExpiryDate(c.expiryValue, c.expiryUnit, c.expirySetAt);
+}
+
 export default function Vault() {
   const { folderId } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const activeTab = folderId || 'vault';
-  const { folders, credentials, addCredential, updateCredential, deleteCredential } = useVault();
+  const { folders, credentials, credentialsLoading, addCredential, updateCredential, deleteCredential } = useVault();
+  const { profile } = useUser();
+  const { notifications, addNotification } = useNotification();
+  const location = useLocation();
   
   const [isAdding, setIsAdding] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<Credential | null>(null);
@@ -121,9 +142,11 @@ export default function Vault() {
   const [itemToDelete, setItemToDelete] = useState<Credential | null>(null);
   const [deleteInput, setDeleteInput] = useState('');
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [clipboardCountdown, setClipboardCountdown] = useState<number | null>(null);
+  const [clipboardLabel, setClipboardLabel] = useState('');
+
+  const [shareItem, setShareItem] = useState<Credential | null>(null);
   const [otpSetupItem, setOtpSetupItem] = useState<Credential | null>(null);
   const [otpRemoveItem, setOtpRemoveItem] = useState<Credential | null>(null);
   const [otpShowItem, setOtpShowItem] = useState<Credential | null>(null);
@@ -131,8 +154,17 @@ export default function Vault() {
   const [otpCode, setOtpCode] = useState('');
   const [otpProgress, setOtpProgress] = useState(100);
 
-  const clipboardTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clipboardGuardRef = useRef<ClipboardGuardHandle | null>(null);
+  const isMountedRef = useRef(true);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      clipboardGuardRef.current?.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -175,63 +207,110 @@ export default function Vault() {
     };
   }, [otpShowItem]);
 
-  const clearClipboardLater = () => {
-    if (clipboardTimeoutRef.current) {
-      clearTimeout(clipboardTimeoutRef.current);
-    }
-    clipboardTimeoutRef.current = setTimeout(() => {
-      copyToClipboard('');
-    }, 30000);
-  };
+  // Check for expired credentials on vault load; send email notifications if SMTP configured.
+  useEffect(() => {
+    if (credentials.length === 0) return;
+    const expired = credentials.filter(c => c.expiryEnabled && c.expiryNotifyEmail && isExpired(c));
+    if (expired.length === 0) return;
+    (async () => {
+      const raw = await readDecryptedLocal('email_server_config');
+      if (!raw) return;
+      let smtp: unknown;
+      try { smtp = JSON.parse(raw); } catch { return; }
+      const csrfToken = document.cookie.match(/_pwd_csrf=([^;]+)/)?.[1] ?? '';
+      fetch('/api/send-expiry-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({
+          smtp,
+          credentials: expired.map(c => ({ service: c.service, unit: c.expiryUnit, value: c.expiryValue })),
+          toEmail: profile.email,
+        }),
+      }).catch(() => {});
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credentials]);
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
+  // Bell notifications for credentials expiring within 30 days.
+  // Only fires once per credential - skips if an unread notification already exists.
+  const EXPIRY_WARN_DAYS = 30;
+  useEffect(() => {
+    if (credentials.length === 0) return;
+    credentials.forEach(c => {
+      if (!c.expiryEnabled || !c.expirySetAt || !c.expiryValue || !c.expiryUnit) return;
+      const expiryMs = computeExpiryDate(c.expiryValue, c.expiryUnit, c.expirySetAt);
+      const daysLeft = Math.ceil((expiryMs - Date.now()) / 86_400_000);
+      if (daysLeft > EXPIRY_WARN_DAYS) return;
+      const alreadyNotified = notifications.some(
+        n => n.type === 'credential_expiring' && n.data?.credentialId === c.id && !n.read
+      );
+      if (alreadyNotified) return;
+      const folder = folders.find(f => f.id === c.folderId);
+      const location_ = folder ? `${folder.label} / ${c.service}` : c.service;
+      if (daysLeft <= 0) {
+        addNotification({
+          type: 'credential_expiring',
+          title: t('notifications.expiredTitle', 'Password expired'),
+          message: t(
+            'notifications.expiredMessage',
+            '{{location}} password has expired. Update it now.',
+            { location: location_ }
+          ),
+          data: { credentialId: c.id, folderId: c.folderId },
+        });
       } else {
-        throw new Error('Clipboard API not available');
+        addNotification({
+          type: 'credential_expiring',
+          title: t('notifications.expiryTitle', 'Password expiring soon'),
+          message: t(
+            'notifications.expiryMessage',
+            '{{location}} will expire in {{days}} day(s). Update your password now.',
+            { location: location_, days: daysLeft }
+          ),
+          data: { credentialId: c.id, folderId: c.folderId },
+        });
       }
-    } catch (err) {
-      // Fallback for iframes or when document is not focused
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      
-      // Avoid scrolling to bottom
-      textArea.style.top = "0";
-      textArea.style.left = "0";
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      
-      try {
-        document.execCommand('copy');
-      } catch (e) {
-        console.error('Fallback: Oops, unable to copy', e);
-      }
-      
-      document.body.removeChild(textArea);
-    }
-  };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credentials, folders]);
+
+  // Open edit form when navigated here with editCredentialId in router state
+  // (e.g. from the "Update" button in the notification dropdown).
+  useEffect(() => {
+    const editId = (location.state as { editCredentialId?: string | number } | null)?.editCredentialId;
+    if (!editId || credentials.length === 0) return;
+    const cred = credentials.find(c => String(c.id) === String(editId));
+    if (!cred) return;
+    setItemToEdit(cred);
+    setIsAdding(false);
+    // Clear the state so refreshing the page doesn't re-open the form.
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, credentials]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopyUsername = async (username: string, id: number | string) => {
     if (!username || username === 'No username') return;
-    await copyToClipboard(username);
+    clipboardGuardRef.current?.cancel();
+    setClipboardLabel(t('vault.username', 'Username'));
+    clipboardGuardRef.current = await secureClipboard(
+      username,
+      (s) => { if (isMountedRef.current) setClipboardCountdown(s); },
+      () => { if (isMountedRef.current) setClipboardCountdown(null); }
+    );
     setCopiedId(id);
-    setToastMessage(t('generator.copied', 'Username copied !'));
     setTimeout(() => setCopiedId(null), 2000);
-    setTimeout(() => setToastMessage(null), 3000);
-    clearClipboardLater();
   };
 
   const handleCopyPassword = async (password: string | undefined, id: number | string) => {
     if (!password) return;
-    await copyToClipboard(password);
+    clipboardGuardRef.current?.cancel();
+    setClipboardLabel(t('vault.password', 'Password'));
+    clipboardGuardRef.current = await secureClipboard(
+      password,
+      (s) => { if (isMountedRef.current) setClipboardCountdown(s); },
+      () => { if (isMountedRef.current) setClipboardCountdown(null); }
+    );
     setCopiedPwdId(id);
     setTimeout(() => setCopiedPwdId(null), 2000);
-    clearClipboardLater();
   };
 
   const formatUsername = (username: string) => {
@@ -329,17 +408,42 @@ export default function Vault() {
         description={t('vault.description', 'Securely manage your passwords, secure notes, and digital assets.')}
       />
       <AnimatePresence>
-        {toastMessage && (
+        {clipboardCountdown !== null && (
           <motion.div
+            key="clipboard-countdown"
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            className="fixed top-6 right-6 z-[200] bg-white/80 backdrop-blur-xl border border-outline-variant/20 shadow-lg rounded-2xl px-6 py-4 flex items-center gap-3"
+            className="fixed top-6 right-6 z-[200] bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-orange-200/60 dark:border-orange-800/40 shadow-xl rounded-2xl px-5 py-3 flex items-center gap-3"
           >
-            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-              <Check size={16} className="text-green-600" />
+            <div className="relative w-9 h-9 shrink-0" aria-hidden="true">
+              <svg viewBox="0 0 36 36" className="-rotate-90 w-9 h-9">
+                <circle cx="18" cy="18" r="14" fill="none" strokeWidth="3"
+                  className="stroke-orange-100 dark:stroke-orange-900" />
+                <circle cx="18" cy="18" r="14" fill="none" strokeWidth="3"
+                  stroke="currentColor" className="text-orange-500"
+                  strokeDasharray={`${2 * Math.PI * 14}`}
+                  strokeDashoffset={`${2 * Math.PI * 14 * (1 - clipboardCountdown / 10)}`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-orange-500 select-none">
+                {clipboardCountdown}
+              </span>
             </div>
-            <span className="font-medium text-black dark:text-white">{toastMessage}</span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{clipboardLabel}</span>
+              <span className="text-sm font-semibold text-black dark:text-white whitespace-nowrap">
+                {t('vault.clipboardClears', 'Clears in {{s}}s', { s: clipboardCountdown })}
+              </span>
+            </div>
+            <button
+              onClick={() => clipboardGuardRef.current?.cancel()}
+              className="ml-1 text-xs font-semibold text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors whitespace-nowrap"
+              aria-label={t('vault.clearNow', 'Clear clipboard now')}
+            >
+              {t('vault.clearNow', 'Clear now')}
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -486,7 +590,20 @@ export default function Vault() {
 
             {/* Credentials List */}
             <div className="space-y-4">
-              {isEmptyFolder ? (
+              {credentialsLoading && credentials.length === 0 ? (
+                <div className="space-y-4" aria-label="Loading credentials" aria-busy="true">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="bg-white/40 dark:bg-black/10 backdrop-blur-xl rounded-3xl p-6 flex items-center gap-4 border border-outline-variant/10 animate-pulse">
+                      <div className="w-12 h-12 bg-surface-container-high/60 rounded-2xl flex-shrink-0" />
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <div className="h-4 bg-surface-container-high/60 rounded-lg w-1/3" />
+                        <div className="h-3 bg-surface-container-high/40 rounded-lg w-1/2" />
+                      </div>
+                      <div className="h-8 w-24 bg-surface-container-high/60 rounded-xl flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              ) : isEmptyFolder ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -541,27 +658,48 @@ export default function Vault() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05, ease: [0.16, 1, 0.3, 1], duration: 0.6 }}
-                        className={`group bg-white dark:bg-surface-container-low hover:bg-white dark:hover:bg-surface-container-high transition-all duration-500 rounded-2xl p-4 md:p-0 md:px-6 md:h-20 flex flex-col md:grid md:grid-cols-12 items-center gap-4 cursor-default border border-outline-variant/10 hover:border-black/10 dark:hover:border-white/10 shadow-sm hover:shadow-lg hover:-translate-y-1 relative ${activeDropdown === item.id ? 'z-[100]' : 'z-0'}`}
+                        className={`group bg-white dark:bg-surface-container-low hover:bg-white dark:hover:bg-surface-container-high transition-all duration-500 rounded-2xl p-4 md:p-0 md:px-6 md:h-20 flex flex-col md:grid md:grid-cols-12 items-center gap-4 cursor-pointer border border-outline-variant/10 hover:border-black/10 dark:hover:border-white/10 shadow-sm hover:shadow-lg hover:-translate-y-1 relative ${activeDropdown === item.id ? 'z-[100]' : 'z-0'}`}
+                        onClick={() => { setItemToEdit(item); setIsAdding(false); }}
+                        title={t('vault.clickToEdit', 'Click to edit')}
                       >
                         <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-surface-container-low/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                         
                         <div className="col-span-4 flex items-center gap-4 w-full relative z-10">
                           <div className="w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center shadow-md border border-white/50 overflow-hidden group-hover:scale-105 transition-all duration-500">
-                            <FaviconImage url={item.url} service={item.service} className="w-full h-full" />
+                            {item.credentialType === 'passkey'
+                              ? <div className="w-full h-full bg-blue-600 flex items-center justify-center"><Shield size={22} className="text-white" /></div>
+                              : item.credentialType === 'secure_note'
+                              ? <div className="w-full h-full bg-purple-600 flex items-center justify-center"><FileText size={22} className="text-white" /></div>
+                              : item.credentialType === 'payment_card'
+                              ? <div className="w-full h-full bg-emerald-700 flex items-center justify-center"><CreditCard size={22} className="text-white" /></div>
+                              : <FaviconImage url={item.url} service={item.service} className="w-full h-full" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-black text-base text-black dark:text-white leading-tight tracking-tight truncate">{item.service}</div>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <div className="text-[10px] text-on-surface-variant font-black opacity-40 group-hover:opacity-100 group-hover:text-black transition-all uppercase tracking-widest truncate max-w-[120px] sm:max-w-none">{item.url.replace(/^https?:\/\//, '')}</div>
-                              {item.tags && item.tags.length > 0 && (
-                                <div className="flex gap-1 flex-wrap">
-                                  {Array.from(new Set(item.tags)).map(tag => (
-                                    <span key={tag} className="text-[8px] font-black px-1.5 py-0.5 bg-black/5 text-on-surface-variant rounded uppercase tracking-tighter border border-black/5 group-hover:bg-black group-hover:text-white transition-all">
-                                      {tag}
-                                    </span>
-                                  ))}
+                              {item.credentialType === 'passkey' && (
+                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">{item.rpId || item.authenticatorName || 'Passkey'}</div>
+                              )}
+                              {item.credentialType === 'secure_note' && (
+                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">Secure Note</div>
+                              )}
+                              {item.credentialType === 'payment_card' && (
+                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">
+                                  {item.cardType ? item.cardType.toUpperCase() : 'Card'}{item.cardNumber ? ` ···· ${item.cardNumber.slice(-4)}` : ''}
                                 </div>
                               )}
+                              {(!item.credentialType || item.credentialType === 'login') && <>
+                                <div className="text-[10px] text-on-surface-variant font-black opacity-40 group-hover:opacity-100 group-hover:text-black transition-all uppercase tracking-widest truncate max-w-[120px] sm:max-w-none">{item.url.replace(/^https?:\/\//, '')}</div>
+                                {item.tags && item.tags.length > 0 && (
+                                  <div className="flex gap-1 flex-wrap">
+                                    {Array.from(new Set(item.tags)).map(tag => (
+                                      <span key={tag} className="text-[8px] font-black px-1.5 py-0.5 bg-black/5 text-on-surface-variant rounded uppercase tracking-tighter border border-black/5 group-hover:bg-black group-hover:text-white transition-all">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </>}
                             </div>
                           </div>
                         </div>
@@ -569,9 +707,21 @@ export default function Vault() {
                         <div className="col-span-3 w-full relative z-10 flex md:block justify-between items-center">
                           <span className="md:hidden text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('vault.username', 'Username')}</span>
                           <div className="flex items-center gap-2 group/field">
-                            {formatUsername(item.username) ? (
-                              <span 
-                                onClick={() => handleCopyUsername(item.username, item.id)}
+                            {item.credentialType === 'passkey' ? (
+                              <span className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl truncate max-w-[150px] sm:max-w-none">
+                                {item.authenticatorName || item.rpName || '-'}
+                              </span>
+                            ) : item.credentialType === 'payment_card' ? (
+                              <span className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl truncate max-w-[150px] sm:max-w-none">
+                                {item.cardholderName || '-'}
+                              </span>
+                            ) : item.credentialType === 'secure_note' ? (
+                              <span className="text-[11px] font-black text-on-surface-variant/60 px-3 md:px-4 py-1.5 md:py-2 truncate max-w-[200px]">
+                                {item.noteContent ? item.noteContent.slice(0, 60) + (item.noteContent.length > 60 ? '…' : '') : '-'}
+                              </span>
+                            ) : formatUsername(item.username) ? (
+                              <span
+                                onClick={(e) => { e.stopPropagation(); handleCopyUsername(item.username, item.id); }}
                                 className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all flex items-center gap-2 group-hover:shadow-md active:scale-95 truncate max-w-[150px] sm:max-w-[200px] md:max-w-none"
                                 title={t('vault.copyUsername', 'Click to copy username')}
                               >
@@ -586,17 +736,35 @@ export default function Vault() {
 
                         <div className="col-span-3 w-full relative z-10 flex md:block justify-between items-center">
                           <span className="md:hidden text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('vault.password', 'Password')}</span>
-                          <div className="flex items-center gap-2">
-                            <span 
-                              onClick={() => handleCopyPassword(item.password, item.id)}
-                              className="text-[11px] font-mono font-black text-on-surface-variant tracking-[0.3em] bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all group-hover:shadow-md active:scale-95"
-                              title={t('vault.copyPassword', 'Click to copy password')}
-                            >
-                              ••••••••
-                            </span>
-                            <div className="hidden sm:block">
-                              <SecurityBadge status={item.status} statusColor={item.statusColor} />
-                            </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {(!item.credentialType || item.credentialType === 'login') && <>
+                              <span
+                                onClick={(e) => { e.stopPropagation(); handleCopyPassword(item.password, item.id); }}
+                                className="text-[11px] font-mono font-black text-on-surface-variant tracking-[0.3em] bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all group-hover:shadow-md active:scale-95"
+                                title={t('vault.copyPassword', 'Click to copy password')}
+                              >
+                                ••••••••
+                              </span>
+                              {isExpired(item) && (
+                                <span className="text-[9px] font-black uppercase tracking-widest text-red-500 flex items-center gap-0.5 px-2 py-1 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-900/50">
+                                  <AlertTriangle size={9} aria-hidden="true" /> {t('vault.passwordExpired', 'Expired')}
+                                </span>
+                              )}
+                              <div className="hidden sm:block">
+                                <SecurityBadge status={item.status} statusColor={item.statusColor} />
+                              </div>
+                            </>}
+                            {item.credentialType === 'passkey' && (
+                              <span className="text-[10px] px-3 py-1.5 bg-blue-500/10 text-blue-600 rounded-lg font-bold uppercase tracking-widest">
+                                {item.backedUp ? 'Synced' : 'Device-bound'}
+                              </span>
+                            )}
+                            {item.credentialType === 'secure_note' && (
+                              <span className="text-[10px] px-3 py-1.5 bg-purple-500/10 text-purple-600 rounded-lg font-bold uppercase tracking-widest">Note</span>
+                            )}
+                            {item.credentialType === 'payment_card' && (
+                              <span className="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg font-bold uppercase tracking-widest">{item.cardExpiry || 'Card'}</span>
+                            )}
                           </div>
                         </div>
 
@@ -605,17 +773,19 @@ export default function Vault() {
                             <SecurityBadge status={item.status} statusColor={item.statusColor} />
                           </div>
                           <div className="flex items-center gap-2 ml-auto">
-                            <button 
-                              onClick={() => handleCopyPassword(item.password, item.id)}
-                              aria-label={`Copy password for ${item.service}`}
-                              className="p-2 md:p-3 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-lg active:scale-90"
-                            >
-                              {copiedPwdId === item.id ? <Check size={16} className="text-green-400" aria-hidden="true" /> : <Key size={16} aria-hidden="true" />}
-                            </button>
+                            {(!item.credentialType || item.credentialType === 'login') && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleCopyPassword(item.password, item.id); }}
+                                aria-label={`Copy password for ${item.service}`}
+                                className="p-2 md:p-3 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-lg active:scale-90"
+                              >
+                                {copiedPwdId === item.id ? <Check size={16} className="text-green-400" aria-hidden="true" /> : <Key size={16} aria-hidden="true" />}
+                              </button>
+                            )}
                             
                             <div className="relative" ref={activeDropdown === item.id ? dropdownRef : null}>
-                              <button 
-                                onClick={() => setActiveDropdown(activeDropdown === item.id ? null : item.id)}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === item.id ? null : item.id); }}
                                 aria-label={`More options for ${item.service}`}
                                 className="p-2 md:p-3 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-lg active:scale-90"
                               >
@@ -631,7 +801,7 @@ export default function Vault() {
                                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                                   className="absolute right-0 top-full mt-4 w-56 bg-white dark:bg-surface-container-high rounded-2xl shadow-2xl border border-outline-variant/10 z-[110] overflow-hidden p-2 ring-1 ring-black/5"
                                 >
-                                  <button 
+                                  <button
                                     className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
                                     onClick={() => {
                                       setActiveDropdown(null);
@@ -643,7 +813,20 @@ export default function Vault() {
                                     </div>
                                     {t('vault.editItem', 'Edit Item')}
                                   </button>
-                                  
+
+                                  <button
+                                    className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
+                                    onClick={() => {
+                                      setActiveDropdown(null);
+                                      setShareItem(item);
+                                    }}
+                                  >
+                                    <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center shadow-inner">
+                                      <Share2 size={14} />
+                                    </div>
+                                    {t('vault.shareItem', 'Share Item')}
+                                  </button>
+
                                   {!item.otpSecret ? (
                                     <button 
                                       className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
@@ -748,7 +931,7 @@ export default function Vault() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#000000]/40"
               onClick={() => setItemToDelete(null)}
             />
             <motion.div 
@@ -845,7 +1028,7 @@ export default function Vault() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#000000]/40"
               onClick={() => {
                 setOtpSetupItem(null);
                 setOtpSecretInput('');
@@ -925,7 +1108,7 @@ export default function Vault() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#000000]/40"
               onClick={() => setOtpRemoveItem(null)}
             />
             <motion.div 
@@ -981,7 +1164,7 @@ export default function Vault() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#000000]/40"
               onClick={() => setOtpShowItem(null)}
             />
             <motion.div 
@@ -1016,11 +1199,15 @@ export default function Vault() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button 
-                    onClick={() => {
-                      copyToClipboard(otpCode);
-                      setToastMessage(t('vault.otpCopied', 'OTP code copied!'));
-                      setTimeout(() => setToastMessage(null), 3000);
+                  <button
+                    onClick={async () => {
+                      clipboardGuardRef.current?.cancel();
+                      setClipboardLabel(t('vault.otpCopied', 'OTP code'));
+                      clipboardGuardRef.current = await secureClipboard(
+                        otpCode,
+                        (s) => { if (isMountedRef.current) setClipboardCountdown(s); },
+                        () => { if (isMountedRef.current) setClipboardCountdown(null); }
+                      );
                     }}
                     className="flex-1 px-4 py-3 rounded-xl font-bold text-sm text-black dark:text-white bg-surface-container-low hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2"
                   >
@@ -1043,6 +1230,15 @@ export default function Vault() {
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Share Modal ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {shareItem && (
+          <Suspense fallback={null}>
+            <ShareModal credential={shareItem} onClose={() => setShareItem(null)} />
+          </Suspense>
         )}
       </AnimatePresence>
     </div>

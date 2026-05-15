@@ -1,0 +1,82 @@
+# PWDnow Monitoring Environment — Default Configuration
+# Installed to: /etc/pwdnow-monitor.toml
+# Reload with: systemctl restart pwdnow-monitor
+
+# How often to poll all metrics (seconds)
+poll_interval_secs = 10
+
+[paths]
+# Unix socket used by vault-daemon
+vault_socket    = "/run/vault-daemon/vault.sock"
+# vault DB file (monitored for existence, not content)
+vault_db        = "/var/lib/vault-daemon/vault.db"
+# Directory that holds vault-related log files
+vault_log_dir   = "/var/log"
+# PM2 home directory (for log pruning)
+pm2_home        = "/home/pwd-vm/.pm2"
+# Port the web server listens on
+web_port        = 1234
+# Path for the HTTP health check
+health_endpoint = "/health"
+
+[thresholds]
+# Disk usage % at which a WARNING alert fires
+disk_warn_pct     = 85.0
+# Disk usage % at which a CRITICAL alert fires and auto-pruning triggers
+disk_crit_pct     = 92.0
+
+# Available RAM in MiB at which WARNING fires
+# NOTE: This system has ~856 MiB available — 400 MiB is a safe warning threshold
+ram_warn_mib      = 400.0
+# Available RAM in MiB at which CRITICAL fires (triggers PM2 worker scale-down)
+ram_crit_mib      = 150.0
+
+# CPU load average (1-min) ratio to nproc — WARNING at 80% saturation
+cpu_warn_ratio    = 0.80
+# CPU load average (1-min) ratio to nproc — CRITICAL at 120% saturation
+cpu_crit_ratio    = 1.20
+
+# PM2 restart threshold for crash-loop detection
+crash_loop_count  = 3
+# Rolling window (seconds) for crash-loop counting
+crash_loop_window = 300
+
+# Vault socket connect timeout (ms)
+socket_timeout_ms = 500
+# HTTP /health connect + response timeout (ms)
+http_timeout_ms   = 2000
+
+[healing]
+# Auto-restart vault-daemon if it goes down
+restart_daemon       = true
+# Auto-restart pwdnow (PM2) if it goes down
+restart_web          = true
+# Auto-restart nginx if it goes down
+restart_nginx        = true
+# Maximum consecutive restart attempts before giving up (and alerting)
+max_restarts         = 5
+# Initial backoff in seconds — doubles each attempt (5, 10, 20, 40, 80s)
+backoff_initial_secs = 5
+# Automatically delete old log files when disk is critical
+auto_prune_logs      = true
+# Minimum age (hours) of log files to consider for pruning
+prune_log_age_hours  = 24
+
+[log]
+# Path for the structured JSON monitoring log
+path         = "/var/log/pwdnow-monitor.log"
+# Max log file size before rotation (MiB)
+max_size_mib = 50
+# Number of rotated log files to keep
+keep_rotated = 3
+
+[notify]
+# Send desktop notifications via notify-send (requires a display / dbus session)
+desktop       = true
+# Optional webhook URL for Slack/Discord/custom alerts (leave empty to disable)
+# webhook_url = "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+webhook_url   = ""
+# Minimum severity to send notifications: "warn" or "critical"
+min_severity  = "critical"
+# Minimum seconds between repeated alerts for the same component+severity
+cooldown_secs = 300

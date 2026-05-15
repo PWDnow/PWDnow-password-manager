@@ -100,22 +100,32 @@ export default function ManageFolders() {
     setEditingId(null);
   };
 
-  const handleAddNew = () => {
+  const handleAddNew = async () => {
     if (!newLabel.trim()) return;
     const id = generateUUID();
-    onAddFolder({
-      id,
-      label: newLabel,
-      iconName: newCustomSvg ? undefined : newIcon,
-      customSvg: newCustomSvg || undefined,
-      description: newDescription || `Manage sensitive ${newLabel.toLowerCase()} credentials with high-precision security protocols.`
-    });
-    
+    let resolvedId = id;
+    try {
+      // VaultContext.addFolder may substitute its own UUID (collision) or the
+      // daemon-assigned id. Capture the resolved id so the move-target stays
+      // correct.
+      resolvedId = await onAddFolder({
+        id,
+        label: newLabel,
+        iconName: newCustomSvg ? undefined : newIcon,
+        customSvg: newCustomSvg || undefined,
+        description: newDescription || `Manage sensitive ${newLabel.toLowerCase()} credentials with high-precision security protocols.`
+      }) ?? id;
+    } catch {
+      // Notification was already pushed by VaultContext; keep the inline
+      // dialog open so the user can retry without losing their inputs.
+      return;
+    }
+
     // If we are in the middle of deleting a folder, select the new one as target
     if (folderToDelete) {
-      setTargetFolderId(id);
+      setTargetFolderId(resolvedId);
     }
-    
+
     setNewLabel('');
     setNewDescription('');
     setNewCustomSvg('');
@@ -294,7 +304,7 @@ export default function ManageFolders() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#000000]/40"
               onClick={() => setIsAdding(false)}
             />
             <motion.div 
@@ -400,7 +410,7 @@ export default function ManageFolders() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#000000]/40"
               onClick={() => setFolderToDelete(null)}
             />
             <motion.div 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { daemon } from '../utils/daemonClient';
+import { keyStore } from '../crypto/keystore';
 
 interface UserProfile {
   firstName: string;
@@ -9,6 +10,7 @@ interface UserProfile {
   country: string;
   photoUrl: string;
   passwordChangedAt?: number;
+  recoveryKeyGeneratedAt?: number;
 }
 
 interface UserContextType {
@@ -28,15 +30,37 @@ const defaultProfile: UserProfile = {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+/**
+ * Daemon stores the profile picture as raw PNG bytes (re-encoded server-side
+ * by `upload_picture` in user_profile.rs). The CSP (`img-src 'self' blob:`,
+ * MED-09) disallows `data:` URLs as an exfil-vector mitigation, so we wrap
+ * the bytes in a Blob and hand the UI a `blob:` URL instead. The caller is
+ * responsible for revoking the URL when the photo changes — see the
+ * useEffect cleanup in UserProvider below.
+ */
+function pngBytesToBlobUrl(bytes: Uint8Array): string {
+  return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(defaultProfile);
 
   const reloadProfile = async () => {
     try {
-      const { firstName, lastName, email, passwordChangedAt } = await daemon.getProfile();
-      setProfile(prev => ({ ...prev, firstName, lastName, email, passwordChangedAt }));
-    } catch {
-      // Daemon unavailable — fetch from offline API fallback
+      const { firstName, lastName, email, profilePic, passwordChangedAt } = await daemon.getProfile();
+      const photoUrl = profilePic && profilePic.length > 0 ? pngBytesToBlobUrl(profilePic) : '';
+      setProfile(prev => {
+        // Free the previous blob URL so we don't leak object URLs on every reload.
+        if (prev.photoUrl && prev.photoUrl.startsWith('blob:')) URL.revokeObjectURL(prev.photoUrl);
+        return { ...prev, firstName, lastName, email, photoUrl, passwordChangedAt };
+      });
+    } catch (err: any) {
+      if (err?.message?.includes('Session expired')) {
+        keyStore.clear();
+        window.dispatchEvent(new CustomEvent('sessionInvalid'));
+        return;
+      }
+      // Daemon unavailable - fetch from offline API fallback
       try {
         const res = await fetch('/api/auth/me');
         if (res.ok) {
@@ -47,9 +71,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
               firstName: data.user.firstName || '', 
               lastName: data.user.lastName || '', 
               email: data.user.email || '',
-              passwordChangedAt: data.user.passwordChangedAt
+              passwordChangedAt: data.user.passwordChangedAt,
+              recoveryKeyGeneratedAt: data.user.recoveryKeyGeneratedAt
             }));
+          } else {
+            keyStore.clear();
+            window.dispatchEvent(new CustomEvent('sessionInvalid'));
           }
+        } else if (res.status === 401 || res.status === 403) {
+          keyStore.clear();
+          window.dispatchEvent(new CustomEvent('sessionInvalid'));
         }
       } catch {
         // Keep current profile

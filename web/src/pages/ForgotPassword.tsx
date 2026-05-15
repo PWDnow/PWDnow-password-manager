@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { keyStore } from '../crypto/keystore';
 import { Shield, ArrowRight, CheckCircle2, Loader2, MailCheck } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';
 import SEO from '../components/SEO';
 
 export default function ForgotPassword() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [view, setView] = useState<'form' | 'success'>('form');
+
+  useEffect(() => {
+    const hasServerSession = document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+    if (keyStore.hasToken || hasServerSession) {
+      navigate('/vault', { replace: true });
+    }
+  }, [navigate]);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,7 +88,7 @@ export default function ForgotPassword() {
         </div>
 
         <div className="relative z-10 mt-12">
-          <p className="text-slate-500 text-sm font-medium">
+          <p className="text-slate-400 text-sm font-medium">
             © {new Date().getFullYear()} PWDnow. {t('forgotPassword.allRightsReserved', 'All rights reserved.')}
           </p>
         </div>

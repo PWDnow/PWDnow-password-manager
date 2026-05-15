@@ -1,0 +1,62 @@
+use argon2::{Algorithm, Argon2, Params, Version};
+use zeroize::Zeroize;
+use crate::error::VaultError;
+use super::secure_store::LockedKey;
+
+pub const ARGON2_M_COST: u32 = 256 * 1024; // kibibytes → 256 MB
+pub const ARGON2_T_COST: u32 = 3;
+pub const ARGON2_P_COST: u32 = 4;
+
+/// Returns 64-byte mlock()ed buffer: bytes [0..32] = KEK, [32..64] = AuthKey
+pub fn derive_kek(
+    password: &[u8],
+    yubikey_response: Option<&[u8; 20]>,
+    salt: &[u8; 32],
+    m_cost: u32,
+    t_cost: u32,
+    p_cost: u32,
+) -> Result<LockedKey, VaultError> {
+    let mut input = password.to_vec();
+    if let Some(yk) = yubikey_response { input.extend_from_slice(yk); }
+
+    let params = Params::new(m_cost, t_cost, p_cost, Some(64))
+        .map_err(|e| VaultError::Crypto(format!("argon2 params: {e}")))?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+    let mut key_buf = LockedKey::new(64)?;
+    argon2.hash_password_into(&input, salt, &mut *key_buf.as_bytes_mut())
+        .map_err(|e| VaultError::Crypto(format!("argon2: {e}")))?;
+
+    input.zeroize();
+    Ok(key_buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derive_is_deterministic() {
+        let salt = [0x42u8; 32];
+        let k1 = derive_kek(b"pw", None, &salt, ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST).unwrap();
+        let k2 = derive_kek(b"pw", None, &salt, ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST).unwrap();
+        let eq = *k1.as_bytes() == *k2.as_bytes();
+        assert!(eq);
+    }
+
+    #[test]
+    fn yubikey_changes_output() {
+        let salt = [0x42u8; 32];
+        let k_no = derive_kek(b"pw", None, &salt, ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST).unwrap();
+        let k_yk = derive_kek(b"pw", Some(&[0xABu8; 20]), &salt, ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST).unwrap();
+        let ne = *k_no.as_bytes() != *k_yk.as_bytes();
+        assert!(ne);
+    }
+
+    #[test]
+    fn output_is_64_bytes() {
+        let k = derive_kek(b"pw", None, &[0u8; 32], ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST).unwrap();
+        let len = k.as_bytes().len();
+        assert_eq!(len, 64);
+    }
+}

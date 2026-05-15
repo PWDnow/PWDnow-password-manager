@@ -4,13 +4,11 @@
   #include <abstractions/base>
   #include <abstractions/nameservice>
 
-  # Vault file read/write — C-06 fix: narrowed from /home/*/ wildcard to the
-  # service-owned directory only. Eliminates cross-user vault access.
+  # Vault file read/write
   /var/lib/vault-daemon/ rw,
   /var/lib/vault-daemon/** rw,
 
-  # HIBP Cuckoo filter (read-only at runtime). The builder emits hibp.cuckoo
-  # plus a hibp.cuckoo.sha256 sidecar for integrity verification.
+  # HIBP Cuckoo filter
   /var/lib/vault-daemon/*.cuckoo r,
   /var/lib/vault-daemon/*.cuckoo.sha256 r,
 
@@ -18,12 +16,11 @@
   /run/vault-daemon/ rw,
   /run/vault-daemon/vault.sock rw,
 
-  # System libraries — glob across architectures (aarch64, x86_64, etc.) so the
-  # profile is portable without install-time generation.
-  /usr/lib/*/libsodium.so* mr,
-  /usr/lib/*/libsqlcipher.so* mr,
-  /usr/lib/*/libfido2.so* mr,
-  /usr/local/lib/liboqs.so* mr,
+  # System libraries — specific filenames, glob only for arch suffix
+  /usr/lib/@{multiarch}/libsodium.so.* mr,
+  /usr/lib/@{multiarch}/libsqlcipher.so.* mr,
+  /usr/lib/@{multiarch}/libfido2.so.* mr,
+  /usr/local/lib/liboqs.so.* mr,
 
   # mlock() capability
   capability ipc_lock,
@@ -35,10 +32,11 @@
   /dev/log w,
 
   # Explicitly deny dangerous access
+  audit deny @{PROC}/sys/kernel/random/uuid r,
   deny /proc/*/mem rw,
   deny /proc/*/maps r,
   deny network,
   deny /etc/shadow r,
-  deny /etc/passwd r,  # M-10 fix: prevent user enumeration from within sandbox
+  deny /etc/passwd r,
   deny /root/** rw,
 }

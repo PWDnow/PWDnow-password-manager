@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Operational Rules
+
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies between the tool calls, make all of the independent tool calls in parallel. Prioritize calling tools simultaneously whenever the actions can be done in parallel rather than sequentially. For example, when reading 3 files, run 3 tool calls in parallel to read all 3 files into context at the same time. Maximize use of parallel tool calls where possible to increase speed and efficiency.
+However, if some tool calls depend on previous calls to inform dependent values like the parameters, do NOT call these tools in parallel and instead call them sequentially. Never use placeholders or guess missing parameters in tool calls.
+</use_parallel_tool_calls>
+
+<investigate_before_answering>
+Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
+</investigate_before_answering>
+
 ## Repository Layout
 
 ```
@@ -175,6 +186,96 @@ AppArmor profile (`deploy/apparmor.d/vault-daemon`) currently has library paths 
 
 ---
 
+## VaultHeader Sidecar (`.meta` file)
+
+`DaemonState` stores two files side-by-side: `vault.db` (SQLCipher) and `vault.db.meta` (plaintext JSON `VaultHeader`). The sidecar is the **only** file the daemon reads before the vault is unlocked, so it contains everything the login page needs:
+
+| Field | Purpose |
+|---|---|
+| `vault_uuid` / `argon2_salt` | Key derivation inputs |
+| `encrypted_vmk` / `vmk_nonce` | KEK-wrapped VMK (XChaCha20-Poly1305) |
+| `password_login_enabled` | `false` = hide password field at login |
+| `totp_enabled` / `email_otp_enabled` | Which MFA methods are required |
+| `passkey_credentials` | Per-passkey encrypted VMK copies (Option B passwordless) |
+| `wipe_ticket` | 32-byte hex capability token authorising `ForensicWipe` |
+
+The sidecar is written by `DaemonState::write_header()` in `daemon/src/vault/state.rs`. The unauthenticated `GetLoginHints` IPC command reads it and returns a `Response::LoginHints` — this is the **authoritative** source for the frontend login policy.
+
+Changing master password clears `passkey_credentials` (they wrapped the old VMK); users must re-register passkeys after a password change.
+
+---
+
+## MFA Config Architecture (frontend)
+
+`web/src/utils/mfa.ts` maintains two storage layers for the `MfaConfig` object:
+
+1. **In-memory cache** (`_mfaCache`) — the live working copy; synchronous reads via `getMfaConfig()`.
+2. **localStorage** — two keys written on every `saveMfaConfig()` call:
+   - `mfa_config` (AES-GCM encrypted when local key is in memory; plaintext otherwise)
+   - `mfa_config_plain` (plaintext backup — survives page refreshes after the in-memory key is cleared)
+
+`saveMfaConfig()` also calls `daemon.updateLoginPolicy()` to sync `password_login_enabled`, `totp_enabled`, `email_otp_enabled` to the sidecar. **The daemon sidecar is the source of truth at login time**; the localStorage cache is for the authenticated session UI only.
+
+Call `clearMfaCache()` on logout to prevent the next user on the same device from seeing a previous account's config.
+
+---
+
+## Passkey / Security Key Login Flow
+
+The correct end-to-end passwordless unlock sequence:
+
+1. `daemon.getLoginHints()` → `{ fido2_ids, password_login_enabled, ... }` (reads sidecar, no vault open needed)
+2. `daemon.getPasskeyChallenge()` → 32-byte random challenge (stored server-side, consumed once)
+3. `navigator.credentials.get(...)` with the returned challenge and `allowCredentials` from step 1
+4. `daemon.unlockWithPasskey(credentialId, authData, signature)` → derives VMK wrap key from `auth_data[0..33]` + `credential_id`, decrypts VMK copy from sidecar, opens DB, issues session token
+
+This flow is implemented in `authenticateWebAuthnForLogin()` in `mfa.ts`.
+
+---
+
+## Brute-Force Lockout (H-01)
+
+`DaemonState` applies exponential back-off after repeated failed unlock attempts. The schedule (`LOCKOUT_SCHEDULE_SECS` in `state.rs`) locks out for 30 s after the 5th failure, 60 s after the 6th, up to 600 s. The counter resets to zero on any successful unlock.
+
+---
+
+## DaemonClient Request Model
+
+Requests are serialised FIFO — only one in-flight at a time per `DaemonClient` instance. On **timeout**, the entire WebSocket is torn down (not just the pending request) because responses are matched by position; removing a mid-queue entry would misalign all subsequent responses. After a timeout the caller must reconnect before issuing new requests.
+
+Error responses from the daemon are sanitised in `daemonClient.ts` (`SAFE_MESSAGES` map) — internal codes like `InvalidPassword` become generic UI strings so implementation details are not leaked to the browser (MED-06).
+
+---
+
+## E2E Tests (Playwright)
+
+Playwright config is at `web/playwright.config.ts`; tests live in `web/e2e/`.
+
+```bash
+cd web && npx playwright test                                          # run all E2E tests
+cd web && npx playwright test e2e/comprehensive-platform.spec.ts      # Full platform regression test
+cd web && npx playwright test --headed                                 # run with browser visible
+```
+
+**`e2e/comprehensive-platform.spec.ts`** is the gold-standard regression gate. It walks through auth (success/failure), navigation, i18n, folder/asset CRUD, Duress Mode, and account destruction. Run it before shipping any frontend or auth-related change.
+
+---
+
+## Runtime Data Directory
+
+During development the daemon stores `vault.db` and `vault.db.meta` in `daemon_data/` at the project root. This directory is created automatically on first unlock. It is not committed; delete it to reset to a fresh vault state.
+
+---
+
 ## graphify
 
 The web project has a graphify knowledge graph at `web/graphify-out/`. Before answering architecture or codebase questions, check `web/graphify-out/GRAPH_REPORT.md` for god nodes and community structure. After modifying code files, run `graphify update .` from `web/` to keep the graph current.
+
+
+<default_to_action>
+By default, implement changes rather than only suggesting them. If the user's intent is unclear, infer the most useful likely action and proceed, using tools to discover any missing details instead of guessing. Try to infer the user's intent about whether a tool call (e.g., file edit or read) is intended or not, and act accordingly. 
+</default_to_action>
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies between the tool calls, make all of the independent tool calls in parallel. Prioritize calling tools simultaneously whenever the actions can be done in parallel rather than sequentially. For example, when reading 3 files, run 3 tool calls in parallel to read all 3 files into context at the same time. Maximize use of parallel tool calls where possible to increase speed and efficiency.
+However, if some tool calls depend on previous calls to inform dependent values like the parameters, do NOT call these tools in parallel and instead call them sequentially. Never use placeholders or guess missing parameters in tool calls. 
+</use_parallel_tool_calls>

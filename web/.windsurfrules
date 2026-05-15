@@ -1,0 +1,25 @@
+# PWDnow: Windsurf Rules
+
+You are assisting in the development of PWDnow, a high-security, local-first password manager. This project has strict architectural and security requirements. Do not use emojis in any generated code, documentation, or responses.
+
+## Core Security Rules
+- **Zero-Knowledge**: Never output code that logs, stores, or processes plaintext master keys, VMKs, or DEKs in the browser. All crypto must be isolated.
+- **Secure Key Storage**: Session tokens are held in `src/crypto/keystore.ts` via `#token` (a JS private field). Never put session tokens in localStorage, sessionStorage, React state, or IndexedDB.
+- **CSP / XSS Prevention**: The backend uses `require-trusted-types-for 'script'`. Never generate code with `'unsafe-inline'` scripts. All user SVG data (e.g., custom folder icons) MUST be passed through DOMPurify before rendering.
+
+## Architecture & Data Flow
+- The application has 3 modes: **Daemon Mode** (Rust backend via WebSocket proxy), **Server Mode** (Node Express fallback via REST), and **Unauthenticated**.
+- All vault data reads and writes must go through `VaultContext` (`src/context/VaultContext.tsx`), which transparently routes to either local encrypted storage or the REST API based on `hasServerSession()`.
+- To add a new vault operation, you must implement it in 3 places: `DaemonClient`, the REST API (`auth.js`), and `VaultContext`.
+
+## Tech Stack & Standards
+- **React 19 + TypeScript + Vite**.
+- **Tailwind CSS v4** is strictly enforced.
+- **React Router v7** for routing.
+- **React Context only** for global state. No Redux or Zustand.
+- **motion** (Framer Motion) for all animations.
+- **lucide-react** for all generic icons.
+- **i18next** (`useTranslation`) for all strings.
+
+## Contextual Knowledge
+Always consult `graphify-out/GRAPH_REPORT.md` before embarking on significant codebase changes, as it defines the "god nodes" and core architectural boundaries.

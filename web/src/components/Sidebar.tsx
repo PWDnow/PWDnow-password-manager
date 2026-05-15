@@ -2,15 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sanitizeSvg } from '../utils/sanitize';
 import {
-  Shield, 
-  Lock, 
-  Key, 
-  Settings, 
-  HelpCircle, 
-  LogOut, 
-  Plus, 
-  Wallet, 
-  Globe, 
+  Shield,
+  Lock,
+  Key,
+  Settings,
+  HelpCircle,
+  LogOut,
+  Plus,
+  Wallet,
+  Globe,
   Briefcase,
   LayoutGrid,
   Gamepad2,
@@ -18,7 +18,8 @@ import {
   Dices,
   Folder as FolderIcon,
   CreditCard,
-  Settings2
+  Settings2,
+  HeartPulse,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
@@ -76,8 +77,9 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, fold
   };
 
   const mainNav = [
-    { id: 'vault', label: t('sidebar.vault'), icon: Lock },
-    { id: 'security', label: t('sidebar.security'), icon: Shield },
+    { id: 'vault',       label: t('sidebar.vault'),                    icon: Lock },
+    { id: 'security',    label: t('sidebar.security'),                 icon: Shield },
+    { id: 'health',      label: t('sidebar.health', 'Vault Health'),   icon: HeartPulse },
     { id: 'assetHolder', label: t('sidebar.assetHolder', 'Asset holder'), icon: Key },
   ];
 
@@ -151,13 +153,23 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, fold
           <div className="mt-12">
             <div className={`flex items-center justify-between mb-4 ${isOpen ? 'px-4' : 'px-0 justify-center md:px-4 md:justify-between'}`}>
               <div className={`text-[10px] uppercase tracking-widest text-on-surface-variant font-bold ${isOpen ? 'block' : 'hidden md:block'}`}>{t('sidebar.folders', 'Folders')}</div>
-              <button 
-                onClick={onManageFolders}
-                className="text-on-surface-variant hover:text-black dark:hover:text-white transition-colors p-1"
-                aria-label={t('sidebar.manageFolders')}
-              >
-                <Settings2 size={14} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onCreateFolder}
+                  className="text-on-surface-variant hover:text-black dark:hover:text-white transition-colors p-1"
+                  aria-label={t('sidebar.newFolder', 'New Folder')}
+                  title={t('sidebar.newFolder', 'New Folder')}
+                >
+                  <Plus size={14} />
+                </button>
+                <button
+                  onClick={onManageFolders}
+                  className="text-on-surface-variant hover:text-black dark:hover:text-white transition-colors p-1"
+                  aria-label={t('sidebar.manageFolders')}
+                >
+                  <Settings2 size={14} />
+                </button>
+              </div>
             </div>
             <nav className="space-y-1">
               {folders.map((folder) => (

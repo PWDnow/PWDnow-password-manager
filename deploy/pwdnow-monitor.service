@@ -1,0 +1,52 @@
+[Unit]
+Description=PWDnow Monitoring & Watchdog Service (PWDnowMonitoringENV)
+Documentation=https://github.com/your-org/vault-manager
+# Start after the network is up and the vault daemon has had a chance to start
+After=network.target vault-daemon.service
+# We want the daemon but won't block if it's not installed
+Wants=vault-daemon.service
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/pwdnow-monitor --config /etc/pwdnow-monitor.toml
+
+# Always restart — if the monitor itself crashes, systemd brings it back
+Restart=always
+RestartSec=5s
+
+# Watchdog: systemd will SIGKILL the monitor if it stops sending heartbeats
+# The monitor sends heartbeats every WATCHDOG_USEC/3 microseconds from main.rs
+WatchdogSec=60s
+
+# Output to systemd journal (viewable with: journalctl -u pwdnow-monitor -f)
+StandardOutput=journal
+StandardError=journal
+
+# Minimal sandboxing — the monitor needs to run systemctl/pm2 and write logs
+# We can't use PrivateUsers or ProtectHome because pm2 user state may be in $HOME
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# The monitor reads /proc/** and /sys/**, writes to /var/log/, and exec's systemctl/pm2
+ReadWritePaths=/var/log
+# Allow exec of systemctl, pm2, notify-send, curl
+SystemCallArchitectures=native
+
+# Memory limits — the monitor itself is tiny (<20 MiB RSS)
+MemoryMax=128M
+TasksMax=32
+LimitNOFILE=1024
+
+TimeoutStopSec=10s
+
+[Install]
+# Start on every boot, after the multi-user target is reached
+WantedBy=multi-user.target

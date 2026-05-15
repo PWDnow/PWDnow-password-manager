@@ -3,6 +3,7 @@ import { X, Upload, Wallet, Globe, Briefcase, Gamepad2, Bitcoin, Dices, Folder a
 import { motion, AnimatePresence } from 'motion/react';
 import { Folder } from '../types';
 import { sanitizeSvg } from '../utils/sanitize';
+import { generateUUID } from '../utils/crypto';
 
 interface CreateFolderModalProps {
   isOpen: boolean;
@@ -25,13 +26,13 @@ const PREDEFINED_ICONS = [
 
 const TEMPLATES = [
   'Personal Finance',
-  'Banking',
-  'Social Media',
   'Gaming',
   'Cryptocurrency',
-  'Gambling',
-  'Work Assets',
-  'Streaming Services'
+  'Streaming Services',
+  'Emails',
+  'Shopping',
+  'Health',
+  'Travel',
 ];
 
 export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: CreateFolderModalProps) {
@@ -69,8 +70,11 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
     e.preventDefault();
     if (!title.trim()) return;
 
+    // Use a fresh UUID, not a slug. Two folders with the same name (or even
+    // an existing folder whose slug matches) would otherwise collide on `id`,
+    // causing React key duplication and an invisible folder in the sidebar.
     const newFolder: Folder = {
-      id: title.toLowerCase().replace(/\s+/g, '-'),
+      id: generateUUID(),
       label: title,
       description: description || `Manage sensitive ${title.toLowerCase()} credentials with high-precision security protocols.`,
       iconName: selectedIconName !== 'custom' ? selectedIconName : undefined,
@@ -95,7 +99,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="absolute inset-0 bg-[#000000]/40 backdrop-blur-sm"
+          className="absolute inset-0 bg-[#000000]/40"
         />
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -126,7 +130,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Social Media"
+                  placeholder="e.g. Gaming"
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
                   required
                 />
@@ -158,7 +162,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   id="folder-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Manage sensitive social media credentials with high-precision security protocols."
+                  placeholder="Manage sensitive credentials with high-precision security protocols."
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all resize-none h-24"
                 />
               </div>

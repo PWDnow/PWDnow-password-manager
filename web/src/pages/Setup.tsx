@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { keyStore } from '../crypto/keystore';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldCheck, ArrowRight, ArrowLeft, CheckCircle,
@@ -146,7 +147,7 @@ function ModalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000]/40">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -235,7 +236,7 @@ function UbuntuProModal({ onClose, onActivated }: { onClose: () => void; onActiv
         <div className="grid grid-cols-1 gap-2">
           {[
             { label: 'Expanded Security Maintenance (ESM)',  sub: '10 years of security patches for 30,000+ packages' },
-            { label: 'FIPS 140-2 certified modules',         sub: 'Certified OpenSSL, kernel crypto — enabled automatically on attach' },
+            { label: 'FIPS 140-2 certified modules',         sub: 'Certified OpenSSL, kernel crypto - enabled automatically on attach' },
             { label: 'Kernel Livepatch',                     sub: 'Apply kernel security patches without rebooting' },
             { label: 'USG / CIS hardening',                  sub: 'Automated compliance with DISA-STIG & CIS benchmarks' },
           ].map(({ label, sub }) => (
@@ -251,7 +252,7 @@ function UbuntuProModal({ onClose, onActivated }: { onClose: () => void; onActiv
         <a href="https://ubuntu.com/pro" target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-[#E95420] hover:underline">
           <ExternalLink size={12} />
-          ubuntu.com/pro — register for a free token (up to 5 machines)
+          ubuntu.com/pro - register for a free token (up to 5 machines)
         </a>
       </div>
 
@@ -305,13 +306,13 @@ function UbuntuProModal({ onClose, onActivated }: { onClose: () => void; onActiv
         disabled={!token.trim()}
         className="w-full py-3 rounded-xl bg-[#E95420] text-white font-black text-sm hover:bg-[#c94418] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Done — I've run the command
+        Done - I've run the command
       </button>
     </ModalShell>
   );
 }
 
-// ── FIPS enable modal (standalone — for already-Pro users) ─────────────────────
+// ── FIPS enable modal (standalone - for already-Pro users) ─────────────────────
 
 function FipsEnableModal({ onClose, onEnabled }: { onClose: () => void; onEnabled: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -329,6 +330,9 @@ function FipsEnableModal({ onClose, onEnabled }: { onClose: () => void; onEnable
       <div className="space-y-4">
         <p className="text-sm text-on-surface-variant leading-relaxed">
           This will install <strong className="text-black dark:text-white">FIPS 140-2 certified cryptographic modules</strong> (OpenSSL, kernel, libgcrypt) and replace the standard Ubuntu packages.
+        </p>
+        <p className="text-xs text-on-surface-variant/70 italic leading-relaxed">
+          Ubuntu Pro currently ships FIPS 140-2 validated modules; FIPS 140-3 module rollout is in progress upstream. PWDnow&apos;s vault daemon cryptography is FIPS 140-3-aligned — see Technical Reference §6.0.
         </p>
         <div className="space-y-2">
           {[
@@ -379,7 +383,7 @@ function FipsEnableModal({ onClose, onEnabled }: { onClose: () => void; onEnable
           </button>
           <button onClick={onEnabled}
             className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
-            Done — I've run it
+            Done - I've run it
           </button>
         </div>
       </div>
@@ -401,7 +405,7 @@ export default function Setup() {
   // Ubuntu Pro modal
   const [showProModal, setShowProModal] = useState(false);
 
-  // FIPS enable modal (standalone — for users already on Pro)
+  // FIPS enable modal (standalone - for users already on Pro)
   const [showFipsModal, setShowFipsModal] = useState(false);
 
   // Completion state
@@ -412,9 +416,12 @@ export default function Setup() {
     fetch('/api/setup-status')
       .then(r => r.json())
       .then(({ completed }: { completed: boolean }) => {
-        if (completed) navigate('/login', { replace: true });
+        if (completed) {
+          const hasServerSession = document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+          navigate(keyStore.hasToken || hasServerSession ? '/vault' : '/login', { replace: true });
+        }
       })
-      .catch(() => { /* server may not be up yet — stay on setup */ });
+      .catch(() => { /* server may not be up yet - stay on setup */ });
   }, [navigate]);
 
   // ── Fetch system info when step 1 mounts ──────────────────────────────────
@@ -460,7 +467,7 @@ export default function Setup() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6">
-      <SEO title="Setup — PWDnow" description="First-run setup wizard for PWDnow." />
+      <SEO title="Setup - PWDnow" description="First-run setup wizard for PWDnow." />
 
       <div className="w-full max-w-xl">
         {/* Logo bar */}
@@ -475,7 +482,7 @@ export default function Setup() {
         <div className="bg-white dark:bg-surface-container-low rounded-3xl shadow-2xl border border-outline-variant/10 overflow-hidden">
           <AnimatePresence mode="wait" custom={direction}>
             {/* ════════════════════════════════════════════════════
-                STEP 0 — Welcome
+                STEP 0 - Welcome
             ════════════════════════════════════════════════════ */}
             {step === 0 && (
               <motion.div
@@ -498,7 +505,7 @@ export default function Setup() {
                       Welcome to PWDnow
                     </h1>
                     <p className="text-on-surface-variant text-base leading-relaxed max-w-md">
-                      Your self-hosted, open-source password manager — built for security-conscious teams and individuals.
+                      Your self-hosted, open-source password manager - built for security-conscious teams and individuals.
                     </p>
                   </div>
                 </div>
@@ -525,7 +532,7 @@ export default function Setup() {
                 {/* About text */}
                 <div className="p-5 rounded-2xl bg-surface-container-low border border-outline-variant/10 space-y-3 text-sm text-on-surface-variant leading-relaxed">
                   <p>
-                    PWDnow stores all credentials locally — <strong className="text-black dark:text-white">no cloud, no telemetry, no vendor lock-in.</strong> You own your data.
+                    PWDnow stores all credentials locally - <strong className="text-black dark:text-white">no cloud, no telemetry, no vendor lock-in.</strong> You own your data.
                   </p>
                   <p>
                     Supports TOTP, WebAuthn hardware keys, and email OTP for multi-factor authentication. Full audit log. Recovery kit. Emergency access controls.
@@ -561,7 +568,7 @@ export default function Setup() {
             )}
 
             {/* ════════════════════════════════════════════════════
-                STEP 1 — System Scan
+                STEP 1 - System Scan
             ════════════════════════════════════════════════════ */}
             {step === 1 && (
               <motion.div
@@ -609,7 +616,7 @@ export default function Setup() {
                     <InfoCard
                       icon={Server}
                       label="Hostname"
-                      value={sysInfo.hostname || '—'}
+                      value={sysInfo.hostname || '-'}
                       status="neutral"
                     />
                     {/* Kernel + Arch */}
@@ -619,22 +626,22 @@ export default function Setup() {
                       value={`${sysInfo.kernel} · ${sysInfo.arch}`}
                       status="neutral"
                     />
-                    {/* Ubuntu Pro — only shown for Ubuntu */}
+                    {/* Ubuntu Pro - only shown for Ubuntu */}
                     {sysInfo.os === 'ubuntu' && (
                       <InfoCard
                         icon={Shield}
                         label="Ubuntu Pro"
-                        value={sysInfo.ubuntu_pro ? 'Active — expanded security patches' : 'Not active'}
+                        value={sysInfo.ubuntu_pro ? 'Active - expanded security patches' : 'Not active'}
                         status={sysInfo.ubuntu_pro ? 'ok' : 'neutral'}
                         action={!sysInfo.ubuntu_pro ? { label: 'Enable', onClick: () => setShowProModal(true) } : undefined}
                       />
                     )}
-                    {/* FIPS kernel — shown if ubuntu or if enabled */}
+                    {/* FIPS kernel - shown if ubuntu or if enabled */}
                     {(sysInfo.os === 'ubuntu' || sysInfo.fips_enabled) && (
                       <InfoCard
                         icon={Lock}
                         label="FIPS 140-2 Kernel"
-                        value={sysInfo.fips_enabled ? 'Enabled — approved crypto modules active' : 'Not enabled'}
+                        value={sysInfo.fips_enabled ? 'Enabled - approved crypto modules active' : 'Not enabled'}
                         status={sysInfo.fips_enabled ? 'ok' : 'neutral'}
                         action={
                           !sysInfo.fips_enabled && sysInfo.ubuntu_pro
@@ -677,7 +684,7 @@ export default function Setup() {
                       <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
                         <ShieldCheck size={18} className="text-blue-600 shrink-0" />
                         <p className="text-xs font-bold text-blue-800 dark:text-blue-300">
-                          CSfC dual-layer encryption detected — two independent encryption layers are active.
+                          CSfC dual-layer encryption detected - two independent encryption layers are active.
                         </p>
                       </div>
                     )}
@@ -686,7 +693,7 @@ export default function Setup() {
                       <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800">
                         <CheckCircle size={18} className="text-green-600 shrink-0" />
                         <p className="text-xs font-bold text-green-800 dark:text-green-300">
-                          FIPS 140 drive encryption — AES-XTS-512 with FIPS-validated kernel modules.
+                          FIPS 140 drive encryption - AES-XTS-512 with FIPS-validated kernel modules.
                         </p>
                       </div>
                     )}
@@ -695,7 +702,7 @@ export default function Setup() {
                       <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800">
                         <CheckCircle size={18} className="text-green-600 shrink-0" />
                         <p className="text-xs font-bold text-green-800 dark:text-green-300">
-                          FIPS 140-2 compliant — all kernel cryptographic operations use approved modules.
+                          FIPS 140-2 compliant - all kernel cryptographic operations use approved modules.
                         </p>
                       </div>
                     )}
@@ -722,7 +729,7 @@ export default function Setup() {
             )}
 
             {/* ════════════════════════════════════════════════════
-                STEP 2 — Complete
+                STEP 2 - Complete
             ════════════════════════════════════════════════════ */}
             {step === 2 && (
               <motion.div
