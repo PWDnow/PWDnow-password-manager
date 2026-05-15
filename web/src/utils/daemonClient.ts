@@ -289,12 +289,16 @@ export class DaemonClient {
     return new Uint8Array(await this.rpc<number[]>('GetPasskeyChallenge'));
   }
 
-  async unlockWithPasskey(credentialId: Uint8Array, authData: Uint8Array, signature: Uint8Array): Promise<void> {
+  async unlockWithPasskey(
+    credentialId: Uint8Array, authData: Uint8Array, signature: Uint8Array,
+    clientDataHash: Uint8Array,
+  ): Promise<void> {
     type UnlockData = { session_token: string; wipe_ticket?: number[] };
     const data = await this.rpc<UnlockData>('UnlockWithPasskey', {
       credential_id: Array.from(credentialId),
       auth_data: Array.from(authData),
       signature: Array.from(signature),
+      client_data_hash: Array.from(clientDataHash),
     });
     if (!data?.session_token) throw new Error('no session token in unlock response');
     if (data.wipe_ticket?.length) {

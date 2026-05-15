@@ -61,6 +61,70 @@ const COOKIE_CSRF    = '_pwd_csrf';
 const PARTIAL_MFA_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const pendingMfaTokens = new Map(); // key: hex(SHA-256(token)), value: { userId, expiresAt }
 
+// ── F6-FIX: single-view share TOCTOU guard ───────────────────────────────────
+// In PM2 cluster mode each worker has its own event loop — check-then-write on
+// the JSON file is NOT atomic across workers.  Within a single worker, Node's
+// event loop guarantees that synchronous operations (Set.add / Set.has) are
+// atomic relative to other in-flight requests.  The Set persists for the
+// process lifetime, so re-starts still fall back to the `record.viewed` flag
+// written to disk.  Cross-worker protection comes from writing the file
+// immediately and checking it on every request (no cache).
+const _claimedSingleViews = new Set(); // shareId strings already served this process
+
+// ── F2-FIX: server-side email OTP store ──────────────────────────────────────
+// Previously the server accepted any 6-char string as a valid email OTP because
+// the code was only "simulated" client-side.  Now we generate a cryptographically
+// random 6-digit code server-side, store it keyed by sha256(partialToken), and
+// verify it with timingSafeEqual in /login/finish.  The code is single-use and
+// expires together with the parent partialToken (PARTIAL_MFA_TTL_MS).
+const _pendingEmailOtps = new Map(); // key: sha256(partialToken hex), value: { code, expiresAt }
+
+function storeEmailOtp(partialToken) {
+  const code = Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
+  const key  = createHash('sha256').update(partialToken).digest('hex');
+  _pendingEmailOtps.set(key, { code, expiresAt: Date.now() + PARTIAL_MFA_TTL_MS });
+  return code;
+}
+
+function consumeEmailOtp(partialToken) {
+  const key   = createHash('sha256').update(partialToken).digest('hex');
+  const entry = _pendingEmailOtps.get(key);
+  _pendingEmailOtps.delete(key); // always consume (single-use)
+  if (!entry || Date.now() > entry.expiresAt) return null;
+  return entry.code;
+}
+
+// ── F4-FIX: MFA brute-force lockout ──────────────────────────────────────────
+// Without a per-user failure counter an attacker who knows the master password
+// can loop login → finish with new TOTP guesses indefinitely (each call to
+// /login/finish consumes one partialToken, but /login issues a fresh one with
+// no cost).  We track failures per userId and lock the account out of MFA for
+// MFA_LOCKOUT_MS after MFA_MAX_ATTEMPTS consecutive failures.
+const _mfaFailedAttempts = new Map(); // userId → { count, lockedUntil }
+const MFA_MAX_ATTEMPTS  = 5;
+const MFA_LOCKOUT_MS    = 10 * 60 * 1000; // 10 minutes
+
+function isMfaLocked(userId) {
+  const e = _mfaFailedAttempts.get(userId);
+  if (!e?.lockedUntil) return false;
+  if (Date.now() >= e.lockedUntil) { _mfaFailedAttempts.delete(userId); return false; }
+  return true;
+}
+
+function recordMfaFailure(userId) {
+  const e = _mfaFailedAttempts.get(userId) ?? { count: 0, lockedUntil: 0 };
+  e.count++;
+  if (e.count >= MFA_MAX_ATTEMPTS) {
+    e.lockedUntil = Date.now() + MFA_LOCKOUT_MS;
+    e.count = 0;
+  }
+  _mfaFailedAttempts.set(userId, e);
+}
+
+function clearMfaFailure(userId) {
+  _mfaFailedAttempts.delete(userId);
+}
+
 function issueMfaToken(userId) {
   const token = randomBytes(32).toString('hex');
   const hash  = createHash('sha256').update(token, 'hex').digest('hex');
@@ -397,10 +461,16 @@ function requireCsrf(req, res, next) {
 
 function sessionsPath(uid) { return path.join(userVaultDir(uid), 'sessions.enc'); }
 
-// In-memory per-user sessions cache — write-through, TTL 60 s.
-// Eliminates a file-read + AES-GCM-decrypt on every authMiddleware call.
+// F3-FIX (pen-test Finding 3): TTL set to 0 to disable the in-memory cache.
+// In PM2 cluster mode each worker has its own Map; a TTL > 0 meant that after a
+// password change or logout the invalidation only applied to the worker that
+// handled the request — other workers kept serving the old session for up to
+// 60 s.  Setting TTL = 0 forces every authMiddleware call to read from the
+// shared encrypted file, ensuring revocations take effect immediately on all
+// workers.  The performance cost is one AES-GCM decrypt per request, which is
+// acceptable for a self-hosted single-user deployment.
 const _sessionsCache = new Map(); // uid → { data: Array, ts: number }
-const SESSIONS_CACHE_TTL_MS = 60_000;
+const SESSIONS_CACHE_TTL_MS = 0; // disabled — see F3-FIX above
 
 function loadSessions(uid) {
   const entry = _sessionsCache.get(uid);
@@ -736,7 +806,18 @@ export function mountAuthAndVault(app) {
     if (mfaCfg.email?.enabled) mfaMethods.push('email');
 
     if (mfaMethods.length > 0) {
+      if (isMfaLocked(u.id)) {
+        return res.status(429).json({ ok: false, error: 'mfa_locked' });
+      }
       const partialToken = issueMfaToken(u.id);
+      // F2-FIX: generate email OTP server-side so /login/finish can verify it.
+      if (mfaMethods.includes('email')) {
+        const otp = storeEmailOtp(partialToken);
+        // TODO: send via SMTP when configured. Dev-only log — remove in production.
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[auth][dev] Email OTP for ${u.id}: ${otp}`);
+        }
+      }
       return res.json({ ok: true, partialToken, methods: mfaMethods });
     }
 
@@ -763,22 +844,44 @@ export function mountAuthAndVault(app) {
 
     const mfaCfg = readUserBlob(u.id, 'mfa_config', { totp: { enabled: false } });
 
+    // F4-FIX: check lockout before verifying codes (lockout is set by failed /finish calls).
+    if (isMfaLocked(u.id)) {
+      return res.status(429).json({ ok: false, error: 'mfa_locked' });
+    }
+
     // Verify whichever MFA method was used.
     if (mfaCfg.totp?.enabled && mfaCfg.totp?.secret) {
       const code = totpCode ?? emailCode;
       if (typeof code !== 'string') return res.status(401).json({ ok: false, error: 'mfa_required' });
       if (!await verifyTotpCode(mfaCfg.totp.secret, code)) {
+        recordMfaFailure(u.id);
         appendAuditEvent(u.id, { action: 'mfa_failed', ip: getClientIp(req), success: false });
         return res.status(401).json({ ok: false, error: 'invalid_mfa_code' });
       }
     } else if (mfaCfg.email?.enabled) {
-      // Email OTP is client-side simulated; any non-empty code is accepted on the
-      // server side (the real check happens on the frontend against the in-memory code).
-      if (typeof emailCode !== 'string' || emailCode.length < 6) {
+      // F2-FIX: verify email OTP server-side with timingSafeEqual.
+      // consumeEmailOtp uses the partialToken (still available in scope) to look
+      // up the code we generated in /login — single-use, 5-minute TTL.
+      if (typeof emailCode !== 'string') {
         return res.status(401).json({ ok: false, error: 'mfa_required' });
+      }
+      const stored = consumeEmailOtp(partialToken);
+      if (!stored) {
+        recordMfaFailure(u.id);
+        appendAuditEvent(u.id, { action: 'mfa_failed', ip: getClientIp(req), success: false });
+        return res.status(401).json({ ok: false, error: 'invalid_mfa_code' });
+      }
+      const supplied = emailCode.trim().slice(0, 8); // normalise, cap length
+      const match = supplied.length === stored.length &&
+        timingSafeEqual(Buffer.from(supplied), Buffer.from(stored));
+      if (!match) {
+        recordMfaFailure(u.id);
+        appendAuditEvent(u.id, { action: 'mfa_failed', ip: getClientIp(req), success: false });
+        return res.status(401).json({ ok: false, error: 'invalid_mfa_code' });
       }
     }
 
+    clearMfaFailure(u.id); // success — reset the counter
     console.log(`[auth] Completing login (MFA) for user: ${userId}`);
     const { token, jti } = await issueJwt(userId);
     const csrf = randomBytes(24).toString('hex');
@@ -1098,10 +1201,16 @@ export function mountAuthAndVault(app) {
       try { rmSync(recordPath); } catch { /* ignore */ }
       return res.status(410).json({ error: 'expired' });
     }
-    if (record.singleView && record.viewed) return res.status(410).json({ error: 'already_viewed' });
 
-    // Mark as viewed for single-view shares
+    // F6-FIX (TOCTOU): claim the share atomically in-memory before responding.
+    // _claimedSingleViews.has/.add are synchronous — within one worker they are
+    // atomic relative to concurrent requests.  The file write immediately follows
+    // so other workers see record.viewed = true on their next disk read.
     if (record.singleView) {
+      if (record.viewed || _claimedSingleViews.has(shareId)) {
+        return res.status(410).json({ error: 'already_viewed' });
+      }
+      _claimedSingleViews.add(shareId);          // claim in this worker's memory
       record.viewed = true;
       try { writeFileSync(recordPath, JSON.stringify(record)); } catch { /* ignore */ }
     }

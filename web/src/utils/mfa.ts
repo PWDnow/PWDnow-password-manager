@@ -814,10 +814,18 @@ export async function authenticateWebAuthnForLogin(): Promise<boolean> {
   if (!assertion) return false;
 
   const resp = assertion.response as AuthenticatorAssertionResponse;
+
+  // F1-FIX: compute SHA-256 of clientDataJSON and send it to the daemon so it
+  // can verify the assertion signature against the stored public key.
+  const clientDataHash = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', resp.clientDataJSON),
+  );
+
   await daemon.unlockWithPasskey(
     new Uint8Array(assertion.rawId),
     new Uint8Array(resp.authenticatorData),
     new Uint8Array(resp.signature),
+    clientDataHash,
   );
 
   return true;

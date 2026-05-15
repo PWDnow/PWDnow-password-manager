@@ -49,11 +49,11 @@ app.use((req, res, next) => {
 const SETUP_TOKEN_BYTES = randomBytes(32);
 const SETUP_TOKEN = SETUP_TOKEN_BYTES.toString('hex');
 
-// HIGH-09 fix: when behind Nginx the socket address is always 127.0.0.1 (the
-// proxy), so we must also inspect X-Real-IP (set by Nginx to the client's real
-// IP).  If the socket is NOT localhost we reject immediately.  If the socket IS
-// localhost but X-Real-IP is set and non-local, the request came through the
-// reverse proxy from a remote client — also reject.
+// F5-FIX (HIGH-09 / pen-test Finding 5): trust only the TCP socket address and
+// X-Real-IP (set by a trusted Nginx proxy to $remote_addr).  X-Forwarded-For is
+// NOT checked here because clients can prepend arbitrary values to that header
+// before Nginx appends the real remote IP — trusting it allows IP-spoofing bypass.
+// Nginx config must include: proxy_set_header X-Real-IP $remote_addr;
 function isLocalhost(req) {
   const socketAddr = req.socket.remoteAddress;
   const socketIsLocal =
@@ -63,20 +63,14 @@ function isLocalhost(req) {
 
   if (!socketIsLocal) return false;
 
-  // If Nginx set X-Real-IP, use that to check the real client address
+  // X-Real-IP is overwritten by Nginx to the real client address — safe to trust.
   const realIp = req.headers['x-real-ip'];
   if (realIp) {
     return realIp === '127.0.0.1' || realIp === '::1' || realIp === '::ffff:127.0.0.1';
   }
 
-  // Check X-Forwarded-For (first hop is the real client)
-  const xForwardedFor = req.headers['x-forwarded-for'];
-  if (xForwardedFor) {
-    const clientIp = xForwardedFor.split(',')[0].trim();
-    return clientIp === '127.0.0.1' || clientIp === '::1';
-  }
-
-  return true; // local socket, no proxy headers → direct local connection
+  // No proxy header present — must be a direct local connection.
+  return true;
 }
 
 function requireSetupToken(req, res, next) {
