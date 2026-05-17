@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { 
-  enableTravelMode, disableTravelMode, 
+import {
+  enableTravelMode, disableTravelMode,
   armDuressMode, checkIsDuressPassword,
-  getTravelModeConfig, getDuressModeConfig
+  getTravelModeConfigAsync, getDuressModeConfig, getDuressModeConfigFull
 } from './securityModes';
 import { keyStore, deriveLocalKeys } from '../crypto/keystore';
 
@@ -34,8 +34,8 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
       const folders = [{ id: 'f1' }, { id: 'f2' }];
 
       await enableTravelMode(travelPass, hiddenFolders, creds, folders);
-      
-      const cfg = getTravelModeConfig();
+
+      const cfg = await getTravelModeConfigAsync();
       expect(cfg.active).toBe(true);
       expect(cfg.kdf_version).toBe(2);
       
@@ -56,8 +56,8 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
       expect(result.ok).toBe(true);
       expect(result.credentials).toHaveLength(2);
       expect(result.folders).toHaveLength(2);
-      
-      const cfg = getTravelModeConfig();
+
+      const cfg = await getTravelModeConfigAsync();
       expect(cfg.active).toBe(false);
     }, 60000);
   });
@@ -66,10 +66,18 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
     it('should arm duress mode with Argon2id PHC hash', async () => {
       const duressPass = 'Duress123!';
       await armDuressMode(duressPass, 5);
-      
-      const cfg = getDuressModeConfig();
+
+      // Pre-login sentinel: armed=true but no hash exposed (CWE-312 fix).
+      const sentinel = getDuressModeConfig();
+      expect(sentinel.armed).toBe(true);
+      expect(sentinel.passwordHash).toBeNull();
+
+      // Full config (encrypted path in session, plaintext fallback in test env).
+      const cfg = await getDuressModeConfigFull();
       expect(cfg.armed).toBe(true);
       expect(cfg.passwordHash).toContain('$argon2id$');
+      // Verify upgraded params: m=262144 (256 MiB), t=3.
+      expect(cfg.passwordHash).toContain('m=262144,t=3');
     }, 60000);
 
     it('should verify duress password correctly', async () => {
