@@ -181,8 +181,11 @@ export default function Login() {
 
       const serverHintsPromise = (async () => {
         try {
-          const url = `/api/auth/login-hints?email=${encodeURIComponent(email)}`;
-          const res = await fetch(url);
+          const res = await fetch('/api/auth/login-hints', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
           if (res.ok) return await res.json();
         } catch (e) {
           console.debug('Server hints failed:', e);
@@ -578,18 +581,84 @@ export default function Login() {
           // Await v1 (likely already resolved — it ran during daemon connect + server fetch).
           // Bind v2 via cheap HKDF once the Argon2id master is ready (background).
           keyStore.store(serverModeToken);
-          const v1 = await v1Promise;
-          if (v1) {
-            keyStore.storeLocalKey(v1.encKey, 1);
-            keyStore.storeSigningKey(v1.sigKey, 1);
+
+          // The server stores the authoritative cryptoSalt (set on registration)
+          // and returns it via X-Vault-Salt on every login. THIS IS THE FIX for
+          // "folders disappear after clearing cache": without using the server
+          // salt, `getOrCreateLocalKeySalt()` generates a fresh random salt on
+          // a cleared browser, deriving a v1 key that does not match the one
+          // used to encrypt the data already on the server.
+          const serverSalt = res.headers.get('x-vault-salt');
+          const validServerSalt = serverSalt && /^[0-9a-f]{32}$/i.test(serverSalt);
+          let primaryV1: { encKey: CryptoKey; sigKey: CryptoKey } | null = null;
+          let secondaryV1Promise: Promise<{ encKey: CryptoKey; sigKey: CryptoKey } | null> | null = null;
+
+          if (validServerSalt && serverSalt !== salt) {
+            // Salt drift between the browser-local salt used by `v1Promise`
+            // and the canonical server cryptoSalt. The server salt is the
+            // recovery anchor — promote it to PRIMARY so future cache clears
+            // re-derive the same key. Preserve the old local salt as
+            // `_lk_salt_legacy` so decryptFromServer can still read data
+            // that was previously encrypted under it (for the current
+            // browser session — once the user re-saves, data is rewritten
+            // under the server salt).
+            const existingLegacy = localStorage.getItem('_lk_salt_legacy');
+            if (!existingLegacy && salt && salt !== serverSalt) {
+              localStorage.setItem('_lk_salt_legacy', salt);
+            }
+            localStorage.setItem('_pwd_lks', serverSalt!);
+            // (getOrCreateLocalKeySalt on the next call will overwrite
+            // `_lk_salt` to match `_pwd_lks` — that is fine because the
+            // legacy slot above keeps the old key recoverable.)
+            primaryV1 = await deriveV1Only(password, serverSalt!).catch(e => {
+              console.warn('[Login] v1 from server salt failed:', e);
+              return null;
+            });
+            // The old local-salt v1 was already kicked off as v1Promise;
+            // reuse it to populate the legacy slot for decrypting prior data.
+            secondaryV1Promise = v1Promise;
+          } else if (validServerSalt) {
+            // Local and server salts already match — just ensure _pwd_lks
+            // is set so cache clears don't lose the salt next time.
+            localStorage.setItem('_pwd_lks', serverSalt!);
+            primaryV1 = await v1Promise;
+          } else {
+            // Server hasn't sent a cryptoSalt (legacy server / first run).
+            // Use the local salt as primary; the publish step below will
+            // tell the server about it so it becomes the canonical salt.
+            primaryV1 = await v1Promise;
           }
 
+          if (primaryV1) {
+            keyStore.storeLocalKey(primaryV1.encKey, 1);
+            keyStore.storeSigningKey(primaryV1.sigKey, 1);
+          }
+          if (secondaryV1Promise) {
+            secondaryV1Promise
+              .then(k => { if (k) keyStore.storeLegacyKey(k.encKey); })
+              .catch(() => { /* non-fatal */ });
+          } else {
+            // No fresh secondary derive happened on this login — but a prior
+            // session may have stashed `_lk_salt_legacy`. Derive from it to
+            // unlock data still encrypted under the old salt.
+            const persistedLegacy = localStorage.getItem('_lk_salt_legacy');
+            if (persistedLegacy && persistedLegacy !== salt) {
+              deriveV1Only(password, persistedLegacy)
+                .then(k => { if (k) keyStore.storeLegacyKey(k.encKey); })
+                .catch(() => { /* non-fatal */ });
+            }
+          }
+          if (validServerSalt) setServerHasCryptoSalt(true);
+
+          // Choose the salt used for the v2 binding: prefer the server salt
+          // when available so v2 is also consistent across cache clears.
+          const v2Salt = validServerSalt ? serverSalt! : salt;
           keyStore.v2Pending = browserMasterPromise.then(async (master) => {
             if (master) {
-              const v2 = await hkdfV2Bind(master, salt, serverModeToken);
+              const v2 = await hkdfV2Bind(master, v2Salt, serverModeToken);
               keyStore.storeLocalKey(v2.encKey, 2);
               keyStore.storeSigningKey(v2.sigKey, 2);
-              const saltBytes = Uint8Array.from(salt.match(/../g)!.map(h => parseInt(h, 16)));
+              const saltBytes = Uint8Array.from(v2Salt.match(/../g)!.map(h => parseInt(h, 16)));
               keyStore.setV2Salt(saltBytes);
             }
           }).catch(e => console.warn('[Login] Background server-mode v2 failed:', e));
@@ -610,7 +679,7 @@ export default function Login() {
           }
           await Promise.all(tasks);
           setHasPasskeyHint(getPasskeyHint().length > 0);
-          if (v1) window.dispatchEvent(new CustomEvent('demoKeyAvailable'));
+          if (primaryV1) window.dispatchEvent(new CustomEvent('demoKeyAvailable'));
         } catch (e) {
           console.error('[Login] Key derivation failed:', e);
         }
@@ -636,15 +705,21 @@ export default function Login() {
       console.error('[Login] offline auth error:', err);
     }
 
-    // Both daemon and offline auth failed
-    const shouldWipe = recordFailedLoginAttempt();
+    // Both daemon and offline auth failed.
+    // IMPORTANT: `recordFailedLoginAttempt` is async (touches encrypted
+    // localStorage + server mirror). Without `await`, `shouldWipe` is a
+    // Promise — always truthy — so the wipe branch would fire on every wrong
+    // password, destroying localStorage and pre-empting `setError()`.
+    const shouldWipe = await recordFailedLoginAttempt();
     if (shouldWipe) {
       await wipeVaultData(daemon.isConnected ? daemon : undefined);
       window.location.replace('/login');
       return;
     }
     const cfg = getDuressModeConfig();
-    const remaining = cfg.armed ? ` (${cfg.attemptsRemaining} attempt${cfg.attemptsRemaining !== 1 ? 's' : ''} remaining)` : '';
+    const remaining = cfg.armed
+      ? ` (${cfg.attemptsRemaining} attempt${cfg.attemptsRemaining !== 1 ? 's' : ''} remaining)`
+      : '';
     setError(t('login.invalidCredentials', 'Invalid master password.') + remaining);
     setLoading(false);
     perf.markEnd('total');
