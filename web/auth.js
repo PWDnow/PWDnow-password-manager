@@ -117,6 +117,27 @@ function checkLoginRate(ip) {
   return updated.count <= LOGIN_MAX_PER_WINDOW;
 }
 
+// Email-step hints lookup is read-only (no Argon2id, no password verification)
+// so it can tolerate a much higher rate. Keeping it on the same 10/5-min
+// counter as `/api/auth/login` was making users hit 429 after a handful of
+// retried email entries — and pre-empting the wrong-password UX feedback.
+const _hintsRateLimiter        = new Map();
+const HINTS_MAX_PER_WINDOW     = 60;
+const HINTS_WINDOW_MS          = 5 * 60 * 1000;
+
+function checkHintsRate(ip) {
+  const now = Date.now();
+  let e = _hintsRateLimiter.get(ip);
+  if (!e || now > e.resetAt) {
+    e = { count: 0, resetAt: now + HINTS_WINDOW_MS };
+    _hintsRateLimiter.set(ip, e);
+    enforceMapCap(_hintsRateLimiter);
+  }
+  const updated = { ...e, count: e.count + 1 };
+  _hintsRateLimiter.set(ip, updated);
+  return updated.count <= HINTS_MAX_PER_WINDOW;
+}
+
 // Per-account lockout — mirrors daemon's LOCKOUT_SCHEDULE_SECS.
 // Blocks distributed attacks (many IPs → one account) regardless of IP diversity.
 const _accountLockout = new Map(); // emailHash → { count, lockedUntil }
@@ -187,7 +208,7 @@ function checkEmergencyRate(ip) {
 // Periodic cleanup of expired rate-limiter entries.
 setInterval(() => {
   const now = Date.now();
-  for (const map of [_loginRateLimiter, _registerRateLimiter, _emergencyRateLimiter]) {
+  for (const map of [_loginRateLimiter, _registerRateLimiter, _emergencyRateLimiter, _hintsRateLimiter]) {
     for (const [k, v] of map) { if (now > v.resetAt) map.delete(k); }
   }
 }, 5 * 60 * 1000);
@@ -1019,7 +1040,10 @@ export function mountAuthAndVault(app) {
     }
 
     // #4-FIX: rate-limit the unauthenticated lookup path (CWE-307).
-    if (!checkLoginRate(getClientIp(req))) {
+    // Use the dedicated hints limiter (60/5min) — the destructive login
+    // limiter (10/5min) was draining after a handful of email re-entries,
+    // surfacing as a 429 spinner in the DOM during normal retry flows.
+    if (!checkHintsRate(getClientIp(req))) {
       return res.status(429).json({ error: 'too_many_requests' });
     }
 
@@ -1410,6 +1434,68 @@ export function mountAuthAndVault(app) {
   app.put('/api/vault/asset-holder', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
     await writeUserBlobAsync(req.user.id, 'asset_holder', req.body);
+    res.json({ ok: true });
+  });
+
+  // Travel Mode hidden-vault mirror. The body is opaque ciphertext from the
+  // client (AES-GCM encrypted with the user's travel password — the server
+  // cannot read it). We store/return it as a generic blob so the hidden data
+  // survives browser-storage clears.
+  app.get('/api/vault/travel-vault', authMiddleware, requireAuth, async (req, res) => {
+    res.json(await readUserBlobAsync(req.user.id, 'travel_vault', { data: null }));
+  });
+  app.put('/api/vault/travel-vault', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (req.body.data.length > 5 * 1024 * 1024) return res.status(413).json({ error: 'payload_too_large' });
+    await writeUserBlobAsync(req.user.id, 'travel_vault', req.body);
+    res.json({ ok: true });
+  });
+  app.delete('/api/vault/travel-vault', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    try { await writeUserBlobAsync(req.user.id, 'travel_vault', { data: null }); } catch {}
+    res.json({ ok: true });
+  });
+
+  // Travel Mode config (active flag, passwordHash, hiddenFolderIds, salt,
+  // ivHex, kdf_version). The hash is PBKDF2-SHA512 / 1M iterations so server
+  // visibility of it does not weaken the travel password. Stored as a generic
+  // blob alongside travel-vault so the entire Travel Mode state lives on the
+  // server in server-session mode — surviving "Clear site data" / new-device
+  // logins. Without this mirror, clearing localStorage strands the hidden
+  // ciphertext on the server with no UI to disable & recover.
+  app.get('/api/vault/travel-config', authMiddleware, requireAuth, async (req, res) => {
+    res.json(await readUserBlobAsync(req.user.id, 'travel_config', { data: null }));
+  });
+  app.put('/api/vault/travel-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (req.body.data.length > 64 * 1024) return res.status(413).json({ error: 'payload_too_large' });
+    await writeUserBlobAsync(req.user.id, 'travel_config', req.body);
+    res.json({ ok: true });
+  });
+  app.delete('/api/vault/travel-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    try { await writeUserBlobAsync(req.user.id, 'travel_config', { data: null }); } catch {}
+    res.json({ ok: true });
+  });
+
+  // Duress Mode config mirror. Stored as a generic blob so the entire Duress
+  // Mode state lives on the server in server-session mode — surviving logout,
+  // "Clear site data", and new-device logins. The body is a plaintext JSON
+  // string of DuressModeConfig: { armed, passwordHash, maxAttempts,
+  // attemptsRemaining, salt }. The passwordHash is Argon2id PHC (m=262144,
+  // t=3) — server visibility does not enable practical offline cracking, and
+  // even if cracked the duress password only triggers a local wipe (cannot
+  // unlock the real vault). The mirror is what makes Duress Mode persistent
+  // across sessions — without it, every logout reverts the UI to "Disarmed".
+  app.get('/api/vault/duress-config', authMiddleware, requireAuth, async (req, res) => {
+    res.json(await readUserBlobAsync(req.user.id, 'duress_config', { data: null }));
+  });
+  app.put('/api/vault/duress-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (req.body.data.length > 64 * 1024) return res.status(413).json({ error: 'payload_too_large' });
+    await writeUserBlobAsync(req.user.id, 'duress_config', req.body);
+    res.json({ ok: true });
+  });
+  app.delete('/api/vault/duress-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    try { await writeUserBlobAsync(req.user.id, 'duress_config', { data: null }); } catch {}
     res.json({ ok: true });
   });
 
