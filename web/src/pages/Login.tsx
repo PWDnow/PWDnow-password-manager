@@ -16,7 +16,7 @@ import {
   loadMfaConfigFromServer,
   type LoginHints,
 } from '../utils/mfa';
-import { checkIsDuressPassword, recordFailedLoginAttempt, wipeVaultData, getDuressModeConfig } from '../utils/securityModes';
+import { checkIsDuressPassword, recordFailedLoginAttempt, resetLoginAttempts, wipeVaultData, getDuressModeConfig } from '../utils/securityModes';
 import { generateUUID } from '../utils/crypto';
 import { hasLocalQuickUnlock, getQuickUnlockDbk } from '../utils/quickUnlock';
 import { LoginPerfTracker } from '../utils/perf';
@@ -338,6 +338,9 @@ export default function Login() {
   // ── Complete login after successful password (and optional TOTP) ──────────
   // daemon.unlock() already stored the real session token; do not overwrite it.
   const completeDaemonLogin = async () => {
+    // Successful unlock - clear any accumulated failed-attempt counter so
+    // the duress + lockout budgets are fresh for the next session.
+    try { await resetLoginAttempts(); } catch { /* non-fatal */ }
     try { await recordSession(); } catch { /* non-fatal */ }
     publishCryptoSaltIfNeeded(); // fire-and-forget, non-blocking
     window.dispatchEvent(new CustomEvent('daemonUnlocked'));
@@ -345,6 +348,9 @@ export default function Login() {
   };
 
   const completeServerLogin = async () => {
+    // Successful unlock - clear any accumulated failed-attempt counter so
+    // the duress + lockout budgets are fresh for the next session.
+    try { await resetLoginAttempts(); } catch { /* non-fatal */ }
     // Note: session token was already stored in keyStore during handleLogin/server-path
     await publishCryptoSaltIfNeeded(); // MUST await here — salt must be published
     // before demoKeyAvailable triggers vault reload, to prevent a race where the
