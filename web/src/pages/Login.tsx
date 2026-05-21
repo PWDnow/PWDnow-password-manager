@@ -561,6 +561,25 @@ export default function Login() {
 
       const data = await res.json().catch(() => ({ ok: false }));
 
+      // A 429 means the server refused to evaluate the password at all
+      // (per-IP rate limit, per-account lockout, or MFA lockout). Treating
+      // it as a bad-password attempt would (a) lie to the user about why
+      // login failed and (b) decrement the duress counter on a request
+      // that never even reached password verification - letting anyone
+      // who can hit the rate limit drive the counter to zero.
+      if (res.status === 429) {
+        const code = (data && typeof data.error === 'string') ? data.error : 'too_many_requests';
+        const msg =
+          code === 'account_locked' ? t('login.accountLocked', 'This account is temporarily locked after repeated failed attempts. Please wait a few minutes and try again.') :
+          code === 'mfa_locked'     ? t('login.mfaLocked',     'Too many wrong verification codes. Please wait 10 minutes and try again.') :
+                                      t('login.rateLimited',   'Too many login attempts from this network. Please wait 5 minutes and try again.');
+        setError(msg);
+        setLoading(false);
+        perf.markEnd('total');
+        perf.log();
+        return;
+      }
+
       if (res.ok && data.ok !== false) {
         // D.1 / S-01: server returned a partial token - MFA required server-side.
         if (data.partialToken) {
