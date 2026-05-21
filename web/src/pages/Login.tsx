@@ -556,6 +556,12 @@ export default function Login() {
     // No new derivations are started here; only a token is generated.
     const serverModeToken = generateUUID();
 
+    // Server-authoritative duress signals (set inside the try below, read in
+    // the failure path after the try). The server is the source of truth for
+    // the duress counter because localStorage can be wiped by the user.
+    let serverDuressWipe = false;
+    let serverDuressRemaining: number | null = null;
+
     try {
       const browser = await (async () => {
         try {
@@ -572,14 +578,16 @@ export default function Login() {
 
       const data = await res.json().catch(() => ({ ok: false }));
 
-      // A 429 means the server refused to evaluate the password at all
-      // (per-IP rate limit, per-account lockout, or MFA lockout). Treating
-      // it as a bad-password attempt would (a) lie to the user about why
-      // login failed and (b) decrement the duress counter on a request
-      // that never even reached password verification - letting anyone
-      // who can hit the rate limit drive the counter to zero.
-      if (res.status === 429) {
-        const code = (data && typeof data.error === 'string') ? data.error : 'too_many_requests';
+      // Rate-limit / lockout response. The server returns these as HTTP 200
+      // with an error code (rather than HTTP 429) so the browser does not
+      // log a network error to the DevTools console. We still tolerate the
+      // legacy HTTP 429 for backwards-compat with older server builds.
+      const RATE_LIMIT_CODES = new Set(['account_locked', 'mfa_locked', 'too_many_requests']);
+      const errCode = (data && typeof (data as Record<string, unknown>).error === 'string')
+        ? (data as { error: string }).error
+        : null;
+      if (res.status === 429 || (errCode && RATE_LIMIT_CODES.has(errCode))) {
+        const code = errCode ?? 'too_many_requests';
         const msg =
           code === 'account_locked' ? t('login.accountLocked', 'This account is temporarily locked after repeated failed attempts. Please wait a few minutes and try again.') :
           code === 'mfa_locked'     ? t('login.mfaLocked',     'Too many wrong verification codes. Please wait 10 minutes and try again.') :
@@ -589,6 +597,17 @@ export default function Login() {
         perf.markEnd('total');
         perf.log();
         return;
+      }
+
+      // Server-authoritative duress signals. The server has decided whether
+      // the failed-attempt counter (which lives on the server and survives
+      // client-side cache clears) has hit the user's configured threshold.
+      // Capture them here; the wipe / display logic runs in the failure path
+      // after the try.
+      if (data && (data as Record<string, unknown>).duressWipe === true) {
+        serverDuressWipe = true;
+      } else if (data && typeof (data as Record<string, unknown>).duressRemaining === 'number') {
+        serverDuressRemaining = (data as { duressRemaining: number }).duressRemaining;
       }
 
       if (res.ok && data.ok !== false) {
@@ -736,6 +755,16 @@ export default function Login() {
     }
 
     // Both daemon and offline auth failed.
+    // Server-authoritative wipe trigger takes precedence. The server has
+    // already deleted its side of the vault; we wipe local + daemon side
+    // and redirect. This is the path that fires the duress wipe even when
+    // the user has cleared their browser cache between attempts.
+    if (serverDuressWipe) {
+      await wipeVaultData(daemon.isConnected ? daemon : undefined);
+      window.location.replace('/login');
+      return;
+    }
+
     // IMPORTANT: `recordFailedLoginAttempt` is async (touches encrypted
     // localStorage + server mirror). Without `await`, `shouldWipe` is a
     // Promise — always truthy — so the wipe branch would fire on every wrong
@@ -747,9 +776,13 @@ export default function Login() {
       return;
     }
     const cfg = getDuressModeConfig();
-    const remaining = cfg.armed
-      ? ` (${cfg.attemptsRemaining} attempt${cfg.attemptsRemaining !== 1 ? 's' : ''} remaining)`
-      : '';
+    // Prefer the server's count (survives cache clears); fall back to the
+    // localStorage sentinel for daemon-mode users without a server.
+    const remaining = serverDuressRemaining !== null
+      ? ` (${serverDuressRemaining} attempt${serverDuressRemaining !== 1 ? 's' : ''} remaining)`
+      : cfg.armed
+        ? ` (${cfg.attemptsRemaining} attempt${cfg.attemptsRemaining !== 1 ? 's' : ''} remaining)`
+        : '';
     setError(t('login.invalidCredentials', 'Invalid master password.') + remaining);
     setLoading(false);
     perf.markEnd('total');

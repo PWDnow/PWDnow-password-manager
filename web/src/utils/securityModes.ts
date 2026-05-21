@@ -343,6 +343,26 @@ export async function wipeVaultData(daemonInstance?: ForensicWipeable, serverPas
 
 // ── Duress mode ───────────────────────────────────────────────────────────────
 
+// Push the server-side plaintext "armed" flag so the server can enforce the
+// duress counter during /api/auth/login (when the client is unauthenticated
+// and localStorage may have been wiped). Separate from the encrypted full
+// config at /api/vault/duress-config which the server cannot read.
+async function syncDuressEnforce(armed: boolean, maxAttempts: number): Promise<void> {
+  if (!hasServerSessionCookie()) return;
+  const csrf = getCsrf();
+  if (!csrf) return;
+  try {
+    await fetch('/api/vault/duress-enforce', {
+      method: armed ? 'PUT' : 'DELETE',
+      credentials: 'same-origin',
+      headers: armed
+        ? { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }
+        : { 'X-CSRF-Token': csrf },
+      body: armed ? JSON.stringify({ armed: true, maxAttempts }) : undefined,
+    });
+  } catch { /* non-fatal - local enforcement still applies */ }
+}
+
 export async function armDuressMode(duressPassword: string, maxAttempts: number): Promise<void> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const { argon2idAsync } = await import('@noble/hashes/argon2.js');
@@ -355,6 +375,7 @@ export async function armDuressMode(duressPassword: string, maxAttempts: number)
   const cfg: DuressModeConfig = { armed: true, passwordHash: phc, maxAttempts, attemptsRemaining: maxAttempts, salt: saltHex };
 
   await saveDuressModeConfig(cfg);
+  await syncDuressEnforce(true, maxAttempts);
 }
 
 export async function disarmDuressMode(): Promise<void> {
@@ -381,6 +402,7 @@ export async function disarmDuressMode(): Promise<void> {
       } catch { /* non-fatal */ }
     }
   }
+  await syncDuressEnforce(false, 0);
 }
 
 // Timing-safe comparison for hex strings
