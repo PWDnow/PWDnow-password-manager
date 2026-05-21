@@ -1098,12 +1098,15 @@ export function mountAuthAndVault(app) {
     const emailHash = hashEmail(email);
 
     // Per-account lockout checked before IP rate limit to preserve consistent timing.
+    // Return HTTP 200 (not 429) so the browser does not log a network error to the
+    // DevTools console - the SPA reads `data.error` to distinguish rate-limit
+    // responses from successful auth.
     if (!checkAccountRate(emailHash)) {
-      return res.status(429).json({ ok: false, error: 'account_locked' });
+      return res.status(200).json({ ok: false, error: 'account_locked' });
     }
 
     if (!checkLoginRate(getClientIp(req))) {
-      return res.status(429).json({ ok: false, error: 'too_many_requests' });
+      return res.status(200).json({ ok: false, error: 'too_many_requests' });
     }
 
     const users = loadUsers();
@@ -1142,10 +1145,48 @@ export function mountAuthAndVault(app) {
     }
     if (!authenticated) {
       recordAccountFailure(emailHash);
-      if (u) appendAuditEvent(u.id, { action: 'login_failed', ip: getClientIp(req), ipInfo: compactIpInfo(req.ipRecord), userAgent: req.headers['user-agent'] || '', success: false, riskFlags: req.ipRecord?.riskFlags ?? [] });
-      return res.status(200).json({ ok: false, error: 'invalid_credentials' });
+
+      // Server-authoritative duress enforcement. Survives client-side cache
+      // clears because state lives on the server, not in localStorage. When
+      // the user has armed duress on their account and the failure counter
+      // crosses the configured threshold, the server performs its own wipe
+      // (deletes vault data + user record) and signals the client to wipe
+      // the local + daemon side via `duressWipe: true` in the response.
+      let duressRemaining = null;
+      let duressWipe = false;
+      if (u && u.duressEnforce && u.duressEnforce.armed) {
+        const max = Math.max(1, Math.min(20, Number(u.duressEnforce.maxAttempts) || 3));
+        const prev = Number(u.duressFailureCount) || 0;
+        const next = prev + 1;
+        if (next >= max) {
+          duressWipe = true;
+          appendAuditEvent(u.id, { action: 'duress_wipe_triggered', ip: getClientIp(req), success: true });
+          try { performServerWipe(u.id); } catch { /* best-effort - client still wipes its side */ }
+        } else {
+          duressRemaining = max - next;
+          const uIdx = users.findIndex(x => x.id === u.id);
+          if (uIdx !== -1) {
+            users[uIdx].duressFailureCount = next;
+            saveUsers(users);
+          }
+        }
+      }
+
+      if (u && !duressWipe) appendAuditEvent(u.id, { action: 'login_failed', ip: getClientIp(req), ipInfo: compactIpInfo(req.ipRecord), userAgent: req.headers['user-agent'] || '', success: false, riskFlags: req.ipRecord?.riskFlags ?? [] });
+      const body = { ok: false, error: 'invalid_credentials' };
+      if (duressWipe) body.duressWipe = true;
+      else if (duressRemaining !== null) body.duressRemaining = duressRemaining;
+      return res.status(200).json(body);
     }
     resetAccountFailures(emailHash);
+    // Reset server-side duress failure count on a successful password check.
+    if (u && (u.duressFailureCount || 0) > 0) {
+      const uIdx = users.findIndex(x => x.id === u.id);
+      if (uIdx !== -1) {
+        users[uIdx].duressFailureCount = 0;
+        saveUsers(users);
+      }
+    }
 
     // Enforce MFA using server-authoritative plaintext flags written by PUT /api/vault/mfa.
     // The encrypted mfa_config blob is intentionally unreadable by the server (client-side key);
@@ -1496,6 +1537,35 @@ export function mountAuthAndVault(app) {
   });
   app.delete('/api/vault/duress-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     try { await writeUserBlobAsync(req.user.id, 'duress_config', { data: null }); } catch {}
+    res.json({ ok: true });
+  });
+
+  // Server-authoritative duress enforcement. The encrypted /api/vault/duress-config
+  // above is the full client-side config (including the password hash) - the server
+  // cannot read it. This endpoint stores a separate PLAINTEXT flag so the server
+  // can enforce the duress counter during /api/auth/login (before authentication,
+  // when the client's localStorage may have been wiped). Mirrors how `mfaEnforce`
+  // works for MFA methods.
+  app.put('/api/vault/duress-enforce', authMiddleware, requireAuth, requireCsrf, (req, res) => {
+    const { armed, maxAttempts } = req.body || {};
+    if (typeof armed !== 'boolean') return res.status(400).json({ error: 'invalid_input' });
+    const max = Math.max(1, Math.min(20, Number(maxAttempts) || 3));
+    const users = loadUsers();
+    const idx = users.findIndex(x => x.id === req.user.id);
+    if (idx === -1) return res.status(401).json({ error: 'user_not_found' });
+    users[idx].duressEnforce = armed ? { armed: true, maxAttempts: max } : null;
+    // Reset the counter whenever arm/disarm changes so a fresh budget is granted.
+    users[idx].duressFailureCount = 0;
+    saveUsers(users);
+    res.json({ ok: true });
+  });
+  app.delete('/api/vault/duress-enforce', authMiddleware, requireAuth, requireCsrf, (req, res) => {
+    const users = loadUsers();
+    const idx = users.findIndex(x => x.id === req.user.id);
+    if (idx === -1) return res.status(401).json({ error: 'user_not_found' });
+    users[idx].duressEnforce = null;
+    users[idx].duressFailureCount = 0;
+    saveUsers(users);
     res.json({ ok: true });
   });
 
@@ -1853,6 +1923,20 @@ export function mountAuthAndVault(app) {
     }
   }
 
+  // Shared server-side wipe helper. Called by the authenticated /api/vault/wipe
+  // endpoint AND by the duress-enforce path in /api/auth/login (where the user
+  // is NOT authenticated but the server has just decided to wipe based on the
+  // failed-attempt counter). Synchronous - callers handle response shaping.
+  function performServerWipe(userId) {
+    const dir = userVaultDir(userId);
+    if (existsSync(dir)) {
+      secureOverwriteDir(dir);
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const remaining = loadUsers().filter(x => x.id !== userId);
+    saveUsers(remaining);
+  }
+
   app.post('/api/vault/wipe', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     // #1-FIX: require password re-verification before destructive wipe (CWE-306).
     const { password } = req.body ?? {};
@@ -1868,13 +1952,7 @@ export function mountAuthAndVault(app) {
     }
     clearMfaFailure(u.id);
 
-    const dir = userVaultDir(req.user.id);
-    if (existsSync(dir)) {
-      secureOverwriteDir(dir);
-      rmSync(dir, { recursive: true, force: true });
-    }
-    const remaining = loadUsers().filter(x => x.id !== req.user.id);
-    saveUsers(remaining);
+    performServerWipe(req.user.id);
     clearSessionCookies(req, res);
     res.json({ ok: true });
   });
