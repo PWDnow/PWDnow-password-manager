@@ -375,5 +375,31 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
       expect(await recordFailedLoginAttempt()).toBe(true);
       expect(getDuressModeConfig().attemptsRemaining).toBe(0);
     }, 120000);
+
+    // Regression for the writeEncryptedLocal/DURESS_KEY clobber bug.
+    // armDuressMode writes plaintext to DURESS_KEY then writeEncryptedLocal
+    // overwrites the same key with the encrypted v2 token. Pre-login the
+    // session key isn't in memory, so getDuressModeConfigFull's plaintext
+    // fallback can't read its own encrypted output and falls to defaults.
+    // Result: recordFailedLoginAttempt returns false on every call - wipe
+    // never fires. Simulate the pre-login state by clearing the keyStore
+    // AFTER arming (the same thing that happens at the login page).
+    it('recordFailedLoginAttempt decrements even with no session key in memory', async () => {
+      const { recordFailedLoginAttempt } = await import('./securityModes');
+      await armDuressMode('Duress123!', 3);
+
+      // Simulate a fresh login page: keys cleared, localStorage retained.
+      keyStore.clear();
+
+      // Attempts 1 and 2 must not trigger wipe but MUST decrement.
+      expect(await recordFailedLoginAttempt()).toBe(false);
+      expect(getDuressModeConfig().attemptsRemaining).toBe(2);
+      expect(await recordFailedLoginAttempt()).toBe(false);
+      expect(getDuressModeConfig().attemptsRemaining).toBe(1);
+
+      // Third attempt exhausts the budget and signals wipe.
+      expect(await recordFailedLoginAttempt()).toBe(true);
+      expect(getDuressModeConfig().attemptsRemaining).toBe(0);
+    }, 180000);
   });
 });
