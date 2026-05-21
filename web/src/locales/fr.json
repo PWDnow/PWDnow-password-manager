@@ -627,7 +627,7 @@
     "passwordLabel": "Mot de passe",
     "forgotPassword": "Mot de passe oublié ?",
     "submit": "Se connecter",
-    "submitting": "Connexion en cours…",
+    "submitting": "Vérification des identifiants (peut prendre 10 à 15 secondes)…",
     "noAccount": "Vous n'avez pas de compte ?",
     "createAccount": "En créer un",
     "errorInvalid": "Adresse e-mail ou mot de passe invalide. Veuillez réessayer.",
