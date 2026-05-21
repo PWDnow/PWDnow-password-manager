@@ -593,6 +593,7 @@ export default function Login() {
           code === 'mfa_locked'     ? t('login.mfaLocked',     'Too many wrong verification codes. Please wait 10 minutes and try again.') :
                                       t('login.rateLimited',   'Too many login attempts from this network. Please wait 5 minutes and try again.');
         setError(msg);
+        setPassword('');
         setLoading(false);
         perf.markEnd('total');
         perf.log();
@@ -783,7 +784,11 @@ export default function Login() {
       : cfg.armed
         ? ` (${cfg.attemptsRemaining} attempt${cfg.attemptsRemaining !== 1 ? 's' : ''} remaining)`
         : '';
-    setError(t('login.invalidCredentials', 'Invalid master password.') + remaining);
+    setError(t('login.invalidCredentials', 'Your email and/or password is not correct.') + remaining);
+    // Clear the password field so the user types fresh instead of editing
+    // the previous wrong attempt. Prevents accidental resubmits of the
+    // exact same wrong value.
+    setPassword('');
     setLoading(false);
     perf.markEnd('total');
     perf.log();
