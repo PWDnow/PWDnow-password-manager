@@ -446,6 +446,11 @@ export default function Login() {
   // ── Password sign-in ──────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The submit button is disabled while `loading`, but pressing Enter
+    // in the password input still fires this handler. Guard explicitly
+    // so a second submission cannot pile a second daemon.unlock onto the
+    // FIFO queue (which would tear down the WebSocket on timeout).
+    if (loading) return;
     setError('');
     setLoading(true);
 

@@ -627,7 +627,7 @@
     "passwordLabel": "Password",
     "forgotPassword": "Forgot password or use recovery key?",
     "submit": "Sign In",
-    "submitting": "Signing in…",
+    "submitting": "Verifying credentials (this can take 10–15 seconds)…",
     "noAccount": "Don't have an account?",
     "createAccount": "Create one",
     "errorInvalid": "Invalid email or password. Please try again.",
