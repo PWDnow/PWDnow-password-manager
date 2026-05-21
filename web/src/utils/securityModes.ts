@@ -347,12 +347,24 @@ export async function wipeVaultData(daemonInstance?: ForensicWipeable, serverPas
 // duress counter during /api/auth/login (when the client is unauthenticated
 // and localStorage may have been wiped). Separate from the encrypted full
 // config at /api/vault/duress-config which the server cannot read.
+//
+// Throws on a sync failure so the caller can warn the user - without the
+// server flag the duress wipe is local-only and would NOT survive a cache
+// clear. A bad network or an older server build (404 on the endpoint) must
+// not silently degrade the security posture.
+export class DuressSyncError extends Error {
+  constructor(message: string, public readonly status: number | null) {
+    super(message);
+    this.name = 'DuressSyncError';
+  }
+}
 async function syncDuressEnforce(armed: boolean, maxAttempts: number): Promise<void> {
-  if (!hasServerSessionCookie()) return;
+  if (!hasServerSessionCookie()) return; // daemon/offline mode - nothing to sync
   const csrf = getCsrf();
-  if (!csrf) return;
+  if (!csrf) throw new DuressSyncError('Missing CSRF cookie; cannot sync duress state to server.', null);
+  let res: Response;
   try {
-    await fetch('/api/vault/duress-enforce', {
+    res = await fetch('/api/vault/duress-enforce', {
       method: armed ? 'PUT' : 'DELETE',
       credentials: 'same-origin',
       headers: armed
@@ -360,7 +372,15 @@ async function syncDuressEnforce(armed: boolean, maxAttempts: number): Promise<v
         : { 'X-CSRF-Token': csrf },
       body: armed ? JSON.stringify({ armed: true, maxAttempts }) : undefined,
     });
-  } catch { /* non-fatal - local enforcement still applies */ }
+  } catch (e) {
+    throw new DuressSyncError(`Network error syncing duress state: ${(e as Error).message}`, null);
+  }
+  if (!res.ok) {
+    throw new DuressSyncError(
+      `Server returned ${res.status} when ${armed ? 'arming' : 'disarming'} duress on the server. The local sentinel is in place but will NOT survive a cache clear.`,
+      res.status,
+    );
+  }
 }
 
 export async function armDuressMode(duressPassword: string, maxAttempts: number): Promise<void> {
@@ -375,6 +395,9 @@ export async function armDuressMode(duressPassword: string, maxAttempts: number)
   const cfg: DuressModeConfig = { armed: true, passwordHash: phc, maxAttempts, attemptsRemaining: maxAttempts, salt: saltHex };
 
   await saveDuressModeConfig(cfg);
+  // Propagate sync failures so the UI can warn the user. Local sentinel is
+  // already in place; without server sync the wipe will not survive a cache
+  // clear. The caller decides whether to surface the warning or auto-retry.
   await syncDuressEnforce(true, maxAttempts);
 }
 
@@ -402,7 +425,17 @@ export async function disarmDuressMode(): Promise<void> {
       } catch { /* non-fatal */ }
     }
   }
-  await syncDuressEnforce(false, 0);
+  // Disarm sync failure is non-fatal (local config is already wiped); log
+  // and swallow so the Settings UI does not show an error after a successful
+  // local disarm. The server-side flag stays armed until the next time the
+  // user logs in successfully (the duress wipe still fires if they were the
+  // attacker - the user being the legitimate caller here just means it's
+  // dormant; they will overwrite it on next arm/disarm).
+  try {
+    await syncDuressEnforce(false, 0);
+  } catch (e) {
+    console.warn('[duress] disarm sync to server failed (local disarm completed):', e);
+  }
 }
 
 // Timing-safe comparison for hex strings

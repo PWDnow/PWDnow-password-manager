@@ -588,6 +588,7 @@
     "duressTriggerWipe": "Déclencher l'effacement",
     "duressDisarm": "Désarmer",
     "duressArm": "Armer le mode de contrainte",
+    "duressServerSyncFailed": "Impossible d'enregistrer la configuration de duress sur le serveur. Le mode est armé localement, mais la purge ne survivra PAS à un effacement des données du navigateur. Veuillez réessayer.",
     "duressArmedTitle": "Mode sous contrainte armé",
     "duressArmedConfirmDesc": "La saisie du mot de passe de contrainte à la connexion déclenchera un effacement forensique immédiat. Effacement automatique après {{count}} tentative(s) échouée(s).",
     "duressSetupTitle": "Armer le mode de contrainte",

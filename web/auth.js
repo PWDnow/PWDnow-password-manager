@@ -1097,20 +1097,29 @@ export function mountAuthAndVault(app) {
     }
     const emailHash = hashEmail(email);
 
-    // Per-account lockout checked before IP rate limit to preserve consistent timing.
-    // Return HTTP 200 (not 429) so the browser does not log a network error to the
-    // DevTools console - the SPA reads `data.error` to distinguish rate-limit
-    // responses from successful auth.
-    if (!checkAccountRate(emailHash)) {
-      return res.status(200).json({ ok: false, error: 'account_locked' });
-    }
-
-    if (!checkLoginRate(getClientIp(req))) {
-      return res.status(200).json({ ok: false, error: 'too_many_requests' });
-    }
-
+    // Load the user FIRST so we can decide whether to apply rate limits.
+    // For duress-armed accounts, the duress wipe IS the user's intended cap
+    // and takes precedence over the brute-force lockout - otherwise an
+    // already-locked account (from earlier testing or a different attack)
+    // would prevent the wipe from ever firing.
     const users = loadUsers();
     const u = users.find(x => x.emailHash === emailHash);
+    const duressArmed = !!(u && u.duressEnforce && u.duressEnforce.armed);
+
+    // Rate-limit checks are skipped for duress-armed accounts. The wipe is
+    // bounded by `maxAttempts` (3-20) so the DoS surface is naturally small:
+    // each account can absorb at most maxAttempts Argon2id evaluations
+    // before the account is wiped and no more verifyPassword calls run.
+    // Return HTTP 200 (not 429) so the browser does not log a network error
+    // to the DevTools console - the SPA reads `data.error` to distinguish.
+    if (!duressArmed) {
+      if (!checkAccountRate(emailHash)) {
+        return res.status(200).json({ ok: false, error: 'account_locked' });
+      }
+      if (!checkLoginRate(getClientIp(req))) {
+        return res.status(200).json({ ok: false, error: 'too_many_requests' });
+      }
+    }
 
     // Always run verifyPassword even when user is not found — prevents timing-based user enumeration.
     let authenticated = await verifyPassword(u?.passwordHash, password, u?.salt);
@@ -1144,7 +1153,12 @@ export function mountAuthAndVault(app) {
       saveUsers(users);
     }
     if (!authenticated) {
-      recordAccountFailure(emailHash);
+      // Only record an account-lockout failure for non-duress accounts.
+      // For duress-armed accounts the duress counter IS the cap; piling
+      // brute-force lockout on top would mean a partial-failure run could
+      // strand the account in 'locked' state instead of completing the
+      // intended wipe sequence.
+      if (!duressArmed) recordAccountFailure(emailHash);
 
       // Server-authoritative duress enforcement. Survives client-side cache
       // clears because state lives on the server, not in localStorage. When
@@ -1154,7 +1168,7 @@ export function mountAuthAndVault(app) {
       // the local + daemon side via `duressWipe: true` in the response.
       let duressRemaining = null;
       let duressWipe = false;
-      if (u && u.duressEnforce && u.duressEnforce.armed) {
+      if (duressArmed) {
         const max = Math.max(1, Math.min(20, Number(u.duressEnforce.maxAttempts) || 3));
         const prev = Number(u.duressFailureCount) || 0;
         const next = prev + 1;
@@ -1557,6 +1571,12 @@ export function mountAuthAndVault(app) {
     // Reset the counter whenever arm/disarm changes so a fresh budget is granted.
     users[idx].duressFailureCount = 0;
     saveUsers(users);
+    // Also clear the in-memory account-lockout counter for this account so any
+    // failures accumulated before arming don't strand the wipe path behind a
+    // 'account_locked' response (the user explicitly intends the duress
+    // threshold to be the only cap from now on). The user record stores
+    // emailHash directly - no need to re-hash.
+    if (users[idx].emailHash) resetAccountFailures(users[idx].emailHash);
     res.json({ ok: true });
   });
   app.delete('/api/vault/duress-enforce', authMiddleware, requireAuth, requireCsrf, (req, res) => {

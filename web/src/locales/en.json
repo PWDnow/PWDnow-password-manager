@@ -588,6 +588,7 @@
     "duressTriggerWipe": "Trigger Wipe Now",
     "duressDisarm": "Disarm",
     "duressArm": "Arm Duress Mode",
+    "duressServerSyncFailed": "Could not save the duress setting on the server. Duress is armed locally, but the wipe will NOT survive clearing browser data. Please try again.",
     "duressArmedTitle": "Duress Mode Armed",
     "duressArmedConfirmDesc": "Entering the duress password at login will trigger an immediate forensic wipe. Auto-wipe activates after {{count}} failed attempt(s).",
     "duressSetupTitle": "Arm Duress Mode",
