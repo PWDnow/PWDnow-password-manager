@@ -614,7 +614,7 @@
     "title": "Welcome Back",
     "subtitle": "Sign in to access your secure vault.",
     "continue": "Continue",
-    "invalidCredentials": "Invalid master password.",
+    "invalidCredentials": "Your email and/or password is not correct.",
     "accountLocked": "This account is temporarily locked after repeated failed attempts. Please wait a few minutes and try again.",
     "mfaLocked": "Too many wrong verification codes. Please wait 10 minutes and try again.",
     "rateLimited": "Too many login attempts from this network. Please wait 5 minutes and try again.",

@@ -614,7 +614,7 @@
     "title": "Bon retour",
     "subtitle": "Connectez-vous pour accéder à votre coffre sécurisé.",
     "continue": "Continuer",
-    "invalidCredentials": "Mot de passe principal invalide.",
+    "invalidCredentials": "Votre adresse e-mail et/ou mot de passe est incorrect.",
     "accountLocked": "Ce compte est temporairement verrouillé après plusieurs tentatives infructueuses. Veuillez patienter quelques minutes.",
     "mfaLocked": "Trop de codes de vérification incorrects. Veuillez patienter 10 minutes.",
     "rateLimited": "Trop de tentatives de connexion depuis ce réseau. Veuillez patienter 5 minutes.",
