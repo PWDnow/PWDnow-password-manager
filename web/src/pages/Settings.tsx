@@ -1,13 +1,14 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 const EmergencyAccessModal = lazy(() => import('../components/EmergencyAccessModal'));
-import { User, History, ShieldAlert, Smartphone, Key, Mail, Monitor, CheckCircle, LogOut, Edit3, RefreshCw, X, ShieldCheck, Check, Eye, EyeOff, Camera, ChevronDown, Copy, AlertTriangle, Trash2, Timer, Server, Loader2, Download, Upload, Plane, Skull, Flame, FileJson, FileText, FileUp, Fingerprint, KeyRound, ToggleLeft, ToggleRight, Shield, Share2, Globe, Lock } from 'lucide-react';
+import { User, History, ShieldAlert, Smartphone, Key, Mail, Monitor, Sun, Moon, CheckCircle, LogOut, Edit3, RefreshCw, X, ShieldCheck, Check, Eye, EyeOff, Camera, ChevronDown, Copy, AlertTriangle, Trash2, Timer, Server, Loader2, Download, Upload, Plane, Skull, Flame, FileJson, FileText, FileUp, Fingerprint, KeyRound, ToggleLeft, ToggleRight, Shield, Share2, Globe, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import { useUser } from '../context/UserContext';
 import { useVault } from '../context/VaultContext';
 import {
-  getDuressModeConfig, getTravelModeConfig,
+  getDuressModeConfig, getDuressModeConfigFull,
+  getTravelModeConfig, getTravelModeConfigAsync,
   armDuressMode, disarmDuressMode,
   enableTravelMode, disableTravelMode,
   wipeVaultData,
@@ -790,6 +791,33 @@ export default function Settings() {
   const [duressConfig, setDuressConfig] = useState<DuressModeConfig>(getDuressModeConfig);
   const [travelConfig, setTravelConfig] = useState<TravelModeConfig>(getTravelModeConfig);
 
+  // Hydrate Travel Mode config asynchronously on mount. The sync getter reads
+  // the plaintext sentinel, which is correct for new state. The async getter
+  // additionally migrates legacy encrypted-only configs written by earlier
+  // builds (whose v2-bound ciphertext is now undecryptable post-logout).
+  useEffect(() => {
+    let cancelled = false;
+    getTravelModeConfigAsync().then(cfg => {
+      if (!cancelled) setTravelConfig(cfg);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Hydrate Duress Mode config asynchronously on mount. The sync getter reads
+  // the plaintext sentinel (armed + maxAttempts), but in server-session mode
+  // the authoritative copy lives on the server (so the config survives logout
+  // / clear-site-data / new-device login). The async getter pulls from the
+  // server mirror and refreshes the local cache.
+  useEffect(() => {
+    let cancelled = false;
+    getDuressModeConfigFull().then(cfg => {
+      if (cancelled) return;
+      setDuressConfig(cfg);
+      if (cfg.armed) setDuressMaxAttempts(cfg.maxAttempts);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // Duress mode modal
   const [isDuressModalOpen, setIsDuressModalOpen] = useState(false);
   const [duressStep, setDuressStep] = useState<1 | 2 | 3>(1);
@@ -806,14 +834,30 @@ export default function Settings() {
     if (duressPassword.length < 8) { setDuressError(t('settings.duressPasswordMinError', 'Duress password must be at least 8 characters.')); return; }
     if (duressPassword !== confirmDuressPassword) { setDuressError(t('settings.duressPasswordMismatch', 'Passwords do not match.')); return; }
     setIsArmingDuress(true);
-    await armDuressMode(duressPassword, duressMaxAttempts);
-    setDuressConfig(getDuressModeConfig());
+    try {
+      await armDuressMode(duressPassword, duressMaxAttempts);
+    } catch (e) {
+      // Server-side sync failed. The local sentinel is in place but the
+      // server does not know duress is armed, so a cache clear would let
+      // an attacker bypass the wipe. Tell the user; they can retry.
+      setIsArmingDuress(false);
+      setDuressError(
+        t('settings.duressServerSyncFailed',
+          'Could not save the duress setting on the server. Duress is armed locally, but the wipe will NOT survive clearing browser data. Please try again.')
+        + ` (${e instanceof Error ? e.message : String(e)})`
+      );
+      return;
+    }
+    // Read back via the async getter so the UI reflects the server-mirrored
+    // state (and so maxAttempts is sourced from the persisted config rather
+    // than the sentinel's hardcoded fallback).
+    setDuressConfig(await getDuressModeConfigFull());
     setIsArmingDuress(false);
     setDuressStep(3);
   };
 
-  const handleDisarmDuress = () => {
-    disarmDuressMode();
+  const handleDisarmDuress = async () => {
+    await disarmDuressMode();
     setDuressConfig(getDuressModeConfig());
     setIsDuressModalOpen(false);
   };
@@ -1409,8 +1453,8 @@ export default function Settings() {
                 onClick={() => setTheme('light')}
                 className={`p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-4 ${theme === 'light' ? 'border-black dark:border-white bg-white dark:bg-white/10 shadow-lg' : 'border-outline-variant/20 bg-surface hover:border-outline-variant/50'}`}
               >
-                <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center">
-                  <Monitor size={24} className={theme === 'light' ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${theme === 'light' ? 'bg-amber-100 dark:bg-amber-900/40' : 'bg-surface-container-low'}`}>
+                  <Sun size={24} className={theme === 'light' ? 'text-amber-500' : 'text-on-surface-variant'} />
                 </div>
                 <span className={`font-bold ${theme === 'light' ? 'text-black dark:text-white' : 'text-on-surface-variant'}`}>{t('settings.themeLight', 'Light')}</span>
               </button>
@@ -1419,8 +1463,8 @@ export default function Settings() {
                 onClick={() => setTheme('dark')}
                 className={`p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-4 ${theme === 'dark' ? 'border-black dark:border-white bg-white dark:bg-white/10 shadow-lg' : 'border-outline-variant/20 bg-surface hover:border-outline-variant/50'}`}
               >
-                <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center">
-                  <Monitor size={24} className={theme === 'dark' ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-indigo-100 dark:bg-indigo-900/40' : 'bg-surface-container-low'}`}>
+                  <Moon size={24} className={theme === 'dark' ? 'text-indigo-500' : 'text-on-surface-variant'} />
                 </div>
                 <span className={`font-bold ${theme === 'dark' ? 'text-black dark:text-white' : 'text-on-surface-variant'}`}>{t('settings.themeDark', 'Dark')}</span>
               </button>
@@ -1429,8 +1473,8 @@ export default function Settings() {
                 onClick={() => setTheme('system')}
                 className={`p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-4 ${theme === 'system' ? 'border-black dark:border-white bg-white dark:bg-white/10 shadow-lg' : 'border-outline-variant/20 bg-surface hover:border-outline-variant/50'}`}
               >
-                <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center">
-                  <Monitor size={24} className={theme === 'system' ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${theme === 'system' ? 'bg-teal-100 dark:bg-teal-900/40' : 'bg-surface-container-low'}`}>
+                  <Monitor size={24} className={theme === 'system' ? 'text-teal-500' : 'text-on-surface-variant'} />
                 </div>
                 <span className={`font-bold ${theme === 'system' ? 'text-black dark:text-white' : 'text-on-surface-variant'}`}>{t('settings.themeSystem', 'System')}</span>
               </button>
