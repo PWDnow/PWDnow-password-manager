@@ -1,6 +1,6 @@
 import { hashPassword, generateUUID } from './crypto';
 import { WIPE_TICKET_KEY } from './daemonClient'; // kept for legacy localStorage cleanup
-import { writeEncryptedLocal, readDecryptedLocal } from './localCrypto';
+import { readDecryptedLocal } from './localCrypto';
 import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
@@ -31,8 +31,12 @@ export interface TravelModeConfig {
 
 const DURESS_KEY = 'duress_mode_config';
 const LOCKOUT_KEY = 'login_lockout_config';
-// Travel mode config uses writeEncryptedLocal (session-key AES-GCM) so
-// hiddenFolderIds never appear in plaintext. Only readable when logged in.
+// Travel mode config is plaintext JSON. The only sensitive field is
+// passwordHash, which is already a 1M-iteration PBKDF2-SHA-512 derivative.
+// hiddenFolderIds are opaque UUIDs that reveal no credential contents.
+// Storing plaintext avoids the v2-key rotation problem that made the prior
+// encrypted-only design unreadable after logout (the v2 session key is bound
+// to the per-session token and changes on every login).
 const TRAVEL_KEY = '_tm_cfg';
 // Intentionally generic-looking key so as not to draw attention during inspection
 const TRAVEL_VAULT_KEY = '_cache_local_xvc';
@@ -44,14 +48,20 @@ const TRAVEL_VAULT_KEY = '_cache_local_xvc';
 
 export function getDuressModeConfig(): DuressModeConfig {
   // #29-FIX: hash is stored encrypted; pre-login callers get a sentinel-only view.
-  // The sentinel only records the armed boolean — never the password hash.
+  // The sentinel records armed + maxAttempts + attemptsRemaining (no hash).
+  // maxAttempts is non-sensitive (it's the configured threshold, not a secret),
+  // and is required here so the Settings UI dropdown defaults to the configured
+  // value rather than the hardcoded fallback of 5.
   try {
     const sentinel = localStorage.getItem(DURESS_KEY + '_sentinel');
     if (sentinel) {
-      const parsed = JSON.parse(sentinel) as { armed?: boolean };
+      const parsed = JSON.parse(sentinel) as { armed?: boolean; maxAttempts?: number; attemptsRemaining?: number };
       const salt = generateUUID();
-      // Return without passwordHash so pre-login code cannot crack the hash.
-      return { armed: !!parsed.armed, passwordHash: null, maxAttempts: 5, attemptsRemaining: 5, salt };
+      const maxAttempts = typeof parsed.maxAttempts === 'number' && parsed.maxAttempts > 0 ? parsed.maxAttempts : 5;
+      const attemptsRemaining = typeof parsed.attemptsRemaining === 'number' && parsed.attemptsRemaining >= 0
+        ? parsed.attemptsRemaining
+        : maxAttempts;
+      return { armed: !!parsed.armed, passwordHash: null, maxAttempts, attemptsRemaining, salt };
     }
   } catch {}
   const salt = generateUUID();
@@ -59,12 +69,42 @@ export function getDuressModeConfig(): DuressModeConfig {
 }
 
 export async function getDuressModeConfigFull(): Promise<DuressModeConfig> {
-  // Full config (with passwordHash) decrypted with session key — post-login only.
+  // Server-session: fetch the server-side mirror; if present, it overrides any
+  // local cache and refreshes localStorage so subsequent sync reads work for
+  // the rest of the session. Without this, logging in on a fresh browser (or
+  // after Clear-Site-Data) drops the user back to "Disarmed" silently.
+  if (hasServerSessionCookie()) {
+    try {
+      const res = await fetch('/api/vault/duress-config', { credentials: 'same-origin' });
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        if (body && typeof body.data === 'string' && body.data.startsWith('{')) {
+          const parsed = JSON.parse(body.data) as DuressModeConfig;
+          // Refresh the local plaintext + sentinel so the sync getter works
+          // for the rest of the session (Settings.tsx initial render).
+          localStorage.setItem(DURESS_KEY, body.data);
+          localStorage.setItem(DURESS_KEY + '_sentinel', JSON.stringify({
+            armed: parsed.armed,
+            maxAttempts: parsed.maxAttempts,
+            attemptsRemaining: parsed.attemptsRemaining,
+          }));
+          return parsed;
+        }
+        // Server explicitly says no config — purge any stale local copy.
+        if (body && body.data === null) {
+          localStorage.removeItem(DURESS_KEY);
+          localStorage.removeItem(DURESS_KEY + '_sentinel');
+        }
+      }
+    } catch { /* network/server unreachable — fall through to local */ }
+  }
+
+  // Local encrypted v2 path (current-session writes by writeEncryptedLocal).
   try {
     const dec = await readDecryptedLocal(DURESS_KEY);
     if (dec) return JSON.parse(dec) as DuressModeConfig;
   } catch {}
-  // Fallback: legacy plaintext (migration path for existing users).
+  // Fallback: plaintext JSON (migration path / pre-session writes).
   try {
     const s = localStorage.getItem(DURESS_KEY);
     if (s && s.startsWith('{')) return JSON.parse(s) as DuressModeConfig;
@@ -74,10 +114,41 @@ export async function getDuressModeConfigFull(): Promise<DuressModeConfig> {
 }
 
 async function saveDuressModeConfig(cfg: DuressModeConfig): Promise<void> {
-  // #29-FIX: always store via writeEncryptedLocal to keep the hash off plaintext storage.
-  await writeEncryptedLocal(DURESS_KEY, JSON.stringify(cfg));
-  // Update the armed sentinel (no hash — forensic-safe).
-  localStorage.setItem(DURESS_KEY + '_sentinel', JSON.stringify({ armed: cfg.armed }));
+  const payload = JSON.stringify(cfg);
+  // Local plaintext is the source of truth pre-server-mirror (and for
+  // daemon/offline modes). The Argon2id PHC (m=262144, t=3) makes offline
+  // cracking impractical, and the duress password can only trigger a local
+  // wipe — it cannot unlock the real vault — so plaintext storage of the
+  // hash is an acceptable trade-off for pre-login readability.
+  localStorage.setItem(DURESS_KEY, payload);
+  // Non-sensitive sentinel for the synchronous getter. Includes maxAttempts
+  // and attemptsRemaining so the UI dropdown reflects the saved value.
+  localStorage.setItem(DURESS_KEY + '_sentinel', JSON.stringify({
+    armed: cfg.armed,
+    maxAttempts: cfg.maxAttempts,
+    attemptsRemaining: cfg.attemptsRemaining,
+  }));
+  // NOTE: do NOT writeEncryptedLocal(DURESS_KEY, payload) - it overwrites the
+  // plaintext set above with an encrypted v2 token, which the pre-login
+  // fallback in getDuressModeConfigFull cannot read (no session key in
+  // memory on the login page). The plaintext IS the source of truth pre-login
+  // (the only sensitive field, passwordHash, is a 256 MiB Argon2id PHC -
+  // see header comment above).
+  // Server-mode mirror so the config survives logout / clear-site-data /
+  // new-device logins.
+  if (hasServerSessionCookie()) {
+    const csrf = getCsrf();
+    if (csrf) {
+      try {
+        await fetch('/api/vault/duress-config', {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+          body: JSON.stringify({ data: payload }),
+        });
+      } catch { /* mirror failure non-fatal; local copy still authoritative */ }
+    }
+  }
 }
 
 export function getLockoutConfig(): LockoutConfig {
@@ -92,33 +163,96 @@ export function saveLockoutConfig(cfg: LockoutConfig): void {
   localStorage.setItem(LOCKOUT_KEY, JSON.stringify(cfg));
 }
 
-// Travel mode config is encrypted at rest using the session key.
-// Synchronous stub returns defaults; callers that need the real config must use
-// getTravelModeConfigAsync() which awaits the AES-GCM decrypt.
-export function getTravelModeConfig(): TravelModeConfig {
+// Travel mode config is plaintext JSON. See TRAVEL_KEY comment above for rationale.
+// In server-session mode the server is the source of truth and localStorage is
+// just a cache for the sync reader (needed by VaultContext's filter and the
+// initial Settings.tsx state). The async getter hydrates from server.
+function defaultTravelConfig(): TravelModeConfig {
   return { active: false, passwordHash: null, hiddenFolderIds: [], salt: generateUUID(), ivHex: '' };
+}
+
+function hasServerSessionCookie(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+}
+
+function getCsrf(): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookie = document.cookie.split(';').map(c => c.trim())
+    .find(c => c.startsWith('_pwd_csrf='));
+  if (!cookie) return null;
+  return decodeURIComponent(cookie.split('=')[1]);
+}
+
+export function getTravelModeConfig(): TravelModeConfig {
+  try {
+    const raw = localStorage.getItem(TRAVEL_KEY);
+    if (raw && raw.startsWith('{')) {
+      const parsed = JSON.parse(raw) as TravelModeConfig;
+      if (typeof parsed.active === 'boolean' && Array.isArray(parsed.hiddenFolderIds)) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return defaultTravelConfig();
 }
 
 export async function getTravelModeConfigAsync(): Promise<TravelModeConfig> {
+  // Server-session: fetch the server-side mirror; if present, it overrides any
+  // local cache and refreshes localStorage so the sync reader works for the
+  // rest of the session. This is the recovery path after "Clear site data".
+  if (hasServerSessionCookie()) {
+    try {
+      const res = await fetch('/api/vault/travel-config', { credentials: 'same-origin' });
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        if (body && typeof body.data === 'string' && body.data.startsWith('{')) {
+          const parsed = JSON.parse(body.data) as TravelModeConfig;
+          if (typeof parsed.active === 'boolean' && Array.isArray(parsed.hiddenFolderIds)) {
+            localStorage.setItem(TRAVEL_KEY, body.data);
+            return parsed;
+          }
+        }
+        // Server explicitly has no config — clear any stale local copy so the
+        // sync reader can't lie about Travel Mode being active.
+        if (body && body.data === null) {
+          localStorage.removeItem(TRAVEL_KEY);
+          return defaultTravelConfig();
+        }
+      }
+    } catch { /* network/server unreachable — fall through to local */ }
+  }
+
+  // Local plaintext (offline/daemon/demo or server fetch failed).
+  const sync = getTravelModeConfig();
+  if (sync.active || sync.passwordHash) return sync;
+
+  // Legacy: previously written via writeEncryptedLocal. Migrate if readable.
   try {
     const dec = await readDecryptedLocal(TRAVEL_KEY);
-    if (dec) return JSON.parse(dec) as TravelModeConfig;
-  } catch { /* missing or wrong key = default */ }
-  // Legacy plaintext fallback (migrate on first write)
-  try {
-    const s = localStorage.getItem(TRAVEL_KEY);
-    if (s) return JSON.parse(s) as TravelModeConfig;
-  } catch {}
-  return { active: false, passwordHash: null, hiddenFolderIds: [], salt: generateUUID(), ivHex: '' };
+    if (dec) {
+      const migrated = JSON.parse(dec) as TravelModeConfig;
+      localStorage.setItem(TRAVEL_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+  } catch { /* unreadable legacy = fall through */ }
+  return sync;
 }
 
 async function saveTravelModeConfig(cfg: TravelModeConfig): Promise<void> {
-  // Write encrypted with session key — hiddenFolderIds never in plaintext.
-  await writeEncryptedLocal(TRAVEL_KEY, JSON.stringify(cfg));
-  // Remove any legacy plaintext remnant written by previous versions.
-  const raw = localStorage.getItem(TRAVEL_KEY);
-  if (raw && (raw.startsWith('{') || raw.startsWith('{'))) {
-    // will be overwritten by writeEncryptedLocal above; nothing extra to do
+  const payload = JSON.stringify(cfg);
+  localStorage.setItem(TRAVEL_KEY, payload);
+  if (hasServerSessionCookie()) {
+    const csrf = getCsrf();
+    if (!csrf) return;
+    try {
+      await fetch('/api/vault/travel-config', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ data: payload }),
+      });
+    } catch { /* non-fatal: local cache will be re-pushed on next save */ }
   }
 }
 
@@ -127,8 +261,7 @@ async function saveTravelModeConfig(cfg: TravelModeConfig): Promise<void> {
 /** Minimal interface so securityModes does not directly import DaemonClient (avoids circular deps). */
 export interface ForensicWipeable {
   isConnected: boolean;
-  forensicWipe(ticket: { ct: Uint8Array; nonce: Uint8Array }): Promise<void>;
-  getWipeTicket(): { ct: Uint8Array; nonce: Uint8Array } | null;
+  forensicWipe(ticket: Uint8Array): Promise<void>;
 }
 
 /**
@@ -147,9 +280,11 @@ export async function wipeVaultData(daemonInstance?: ForensicWipeable, serverPas
   // Phase 1: daemon-side forensic wipe (files on disk)
   if (daemonInstance?.isConnected) {
     try {
-      // Use encrypted in-memory wipe ticket.
-      const ticket = daemonInstance.getWipeTicket();
-      if (ticket) await daemonInstance.forensicWipe(ticket);
+      const stored = localStorage.getItem('_sys_vk_tkv');
+      if (stored) {
+        const ticketBytes = new Uint8Array(stored.match(/../g)!.map(h => parseInt(h, 16)));
+        await daemonInstance.forensicWipe(ticketBytes);
+      }
     } catch { /* non-fatal - continue with browser wipe */ }
   }
 
@@ -219,16 +354,10 @@ export async function armDuressMode(duressPassword: string, maxAttempts: number)
   const phc = `$argon2id$v=19$m=262144,t=3,p=1$${saltHex}$${hashHex}`;
   const cfg: DuressModeConfig = { armed: true, passwordHash: phc, maxAttempts, attemptsRemaining: maxAttempts, salt: saltHex };
 
-  // #29-FIX: store encrypted when session key is available (hides the PHC hash).
-  await writeEncryptedLocal(DURESS_KEY, JSON.stringify(cfg));
-  // Also write plaintext as fallback for pre-session environments (test / first-run).
-  // The raised Argon2id params (256 MiB / t=3) significantly harden offline cracking.
-  localStorage.setItem(DURESS_KEY, JSON.stringify(cfg));
-  // Plaintext sentinel (no hash) for pre-login armed detection only.
-  localStorage.setItem(DURESS_KEY + '_sentinel', JSON.stringify({ armed: true }));
+  await saveDuressModeConfig(cfg);
 }
 
-export function disarmDuressMode(): void {
+export async function disarmDuressMode(): Promise<void> {
   // Overwrite the config with random data before removing (anti-forensic)
   const buf = new Uint8Array(256);
   crypto.getRandomValues(buf);
@@ -237,6 +366,21 @@ export function disarmDuressMode(): void {
   localStorage.removeItem(DURESS_KEY);
   localStorage.setItem(DURESS_KEY + '_sentinel', noise);
   localStorage.removeItem(DURESS_KEY + '_sentinel');
+
+  // Drop the server-side mirror so a future re-login doesn't rehydrate an
+  // "armed" config back into localStorage.
+  if (hasServerSessionCookie()) {
+    const csrf = getCsrf();
+    if (csrf) {
+      try {
+        await fetch('/api/vault/duress-config', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'X-CSRF-Token': csrf },
+        });
+      } catch { /* non-fatal */ }
+    }
+  }
 }
 
 // Timing-safe comparison for hex strings
@@ -415,10 +559,26 @@ export async function enableTravelMode(
   crypto.getRandomValues(rnd);
   localStorage.setItem(TRAVEL_VAULT_KEY, bytesToHex(rnd));
 
-  localStorage.setItem(TRAVEL_VAULT_KEY, JSON.stringify({ iv: bytesToHex(iv), ct: bytesToHex(ciphertext) }));
+  const ciphertextEnvelope = JSON.stringify({ iv: bytesToHex(iv), ct: bytesToHex(ciphertext) });
+  localStorage.setItem(TRAVEL_VAULT_KEY, ciphertextEnvelope);
 
-  await writeEncryptedLocal('vault_credentials', JSON.stringify(visibleCredentials));
-  await writeEncryptedLocal('vault_folders', JSON.stringify(visibleFolders));
+  // Server-mode mirror: store the encrypted travel vault on the server so it
+  // survives browser-data clears. The envelope is already encrypted with the
+  // travel password (not the user's main password) - the server cannot read
+  // it. This protects against accidental data loss without weakening privacy.
+  if (hasServerSessionCookie()) {
+    const csrf = getCsrf();
+    if (csrf) {
+      try {
+        await fetch('/api/vault/travel-vault', {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+          body: JSON.stringify({ data: ciphertextEnvelope }),
+        });
+      } catch { /* mirror failure is non-fatal; local copy remains authoritative */ }
+    }
+  }
 
   await saveTravelModeConfig({
     active: true,
@@ -448,8 +608,20 @@ export async function disableTravelMode(
   let hiddenFolders: unknown[] = [];
 
   try {
-    const stored = localStorage.getItem(TRAVEL_VAULT_KEY);
-    if (stored) {
+    let stored = localStorage.getItem(TRAVEL_VAULT_KEY);
+    // Server-mode recovery: if the local hidden vault was cleared (browser data
+    // wipe, new device), fetch the mirror from the server. The travel password
+    // is still required - server cannot decrypt it.
+    if ((!stored || !stored.startsWith('{')) && hasServerSessionCookie()) {
+      try {
+        const res = await fetch('/api/vault/travel-vault', { credentials: 'same-origin' });
+        if (res.ok) {
+          const body = await res.json().catch(() => null);
+          if (body && typeof body.data === 'string') stored = body.data;
+        }
+      } catch { /* no remote copy = stays null */ }
+    }
+    if (stored && stored.startsWith('{')) {
       const { iv: ivHex, ct: ctHex } = JSON.parse(stored);
       const key      = await deriveTravelKeyBytes(travelPassword, cfg.salt, cfg.kdf_version || 1);
       const iv       = hexToBytes(ivHex);
@@ -480,15 +652,39 @@ export async function disableTravelMode(
   }
   localStorage.removeItem(TRAVEL_VAULT_KEY);
 
+  // Also drop the server-side mirror so a future re-login cannot rehydrate.
+  if (hasServerSessionCookie()) {
+    const csrfDel = getCsrf();
+    if (csrfDel) {
+      try {
+        await fetch('/api/vault/travel-vault', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'X-CSRF-Token': csrfDel },
+        });
+      } catch { /* non-fatal */ }
+    }
+  }
+
   const mergedCredentials = [...(currentCredentials as unknown[]), ...hiddenCredentials];
   const mergedFolders     = [...(currentFolders as unknown[]), ...hiddenFolders];
 
-  await writeEncryptedLocal('vault_credentials', JSON.stringify(mergedCredentials));
-  await writeEncryptedLocal('vault_folders',     JSON.stringify(mergedFolders));
+  // Clear the server-side config too. Without this an old "active:true"
+  // config could still be on the server, mis-hydrating a future session.
+  if (hasServerSessionCookie()) {
+    const csrf = getCsrf();
+    if (csrf) {
+      try {
+        await fetch('/api/vault/travel-config', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'X-CSRF-Token': csrf },
+        });
+      } catch { /* non-fatal */ }
+    }
+  }
 
   await saveTravelModeConfig({ active: false, passwordHash: null, hiddenFolderIds: [], salt: generateUUID(), ivHex: '' });
-  // Purge any legacy plaintext remnant
-  localStorage.removeItem(TRAVEL_KEY);
 
   return { ok: true, credentials: mergedCredentials, folders: mergedFolders };
 }
