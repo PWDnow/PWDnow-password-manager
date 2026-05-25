@@ -50,6 +50,11 @@ export interface Credential {
   cardCvv?: string;
   cardBillingAddress?: string;
   cardType?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  customFields?: { id: string; label: string; value: string; isSecret: boolean }[];
+  phone?: string;
+  phoneCountry?: string;
 }
 
 export interface AssetHolder {
@@ -60,10 +65,41 @@ export interface AssetHolder {
 
 export interface Notification {
   id: string;
-  type: 'folder_created' | 'credential_added' | 'credential_deleted' | 'credential_expiring' | 'persistence_failed';
+  type: 'folder_created' | 'credential_added' | 'credential_deleted' | 'credential_expiring' | 'persistence_failed' | 'info' | 'success' | 'error';
   title: string;
   message: string;
   timestamp: number;
   read: boolean;
   data?: Record<string, unknown>;
+}
+
+export interface AuditEvent {
+  id: string;
+  action: string;
+  success: boolean;
+  ip: string;
+  publicIp: string;
+  ipInfo?: { city?: string; region?: string; country?: string; countryCode?: string; countryFlag?: string; org?: string };
+  ts: number;
+  riskFlags?: string[];
+  resourceLabel?: string;
+}
+
+export interface ShareLink {
+  id: string;
+  label: string;
+  createdAt: number;
+  expiresAt: number;
+  viewCount: number;
+  singleView?: boolean;
+  viewed?: boolean;
+}
+
+export interface EmailServerConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  secure?: boolean;
+  protocol?: 'none' | 'ssl_tls' | 'starttls';
 }

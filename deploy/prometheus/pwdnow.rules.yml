@@ -1,0 +1,123 @@
+# SLA G12: Prometheus recording + alerting rules for PWDnow.
+#
+# Place at: /etc/prometheus/rules.d/pwdnow.rules.yml
+# Reload:   curl -X POST http://prometheus:9090/-/reload   (or  systemctl reload prometheus)
+#
+# Targets a 99.9% monthly SLO (single-host realistic). For a 99.99% target,
+# you also need an HA topology — these rules only catch app-tier regressions,
+# not topology-level failures.
+#
+# Burn-rate-alert recipe follows the SRE Workbook §5:
+#   - Fast burn:  > 14.4x  budget over 1h   ⇒ page (would exhaust budget in 2d)
+#   - Slow burn:  > 6x     budget over 6h   ⇒ ticket (would exhaust budget in 5d)
+# We use a single SLI (HTTP availability on the front door) here; add latency
+# and IPC-success SLIs in a follow-up PR (S1).
+
+groups:
+  - name: pwdnow.recording
+    interval: 30s
+    rules:
+      # ── SLI: fraction of successful HTTP requests over a 5-minute window. ───
+      # "Success" = status code < 500. 4xx counts as success because user-error
+      # is not an availability incident.
+      - record: pwdnow:http_requests:total_5m
+        expr: |
+          sum without(status, route, method) (
+            rate(pwdnow_http_request_duration_seconds_count[5m])
+          )
+
+      - record: pwdnow:http_requests:errors_5m
+        expr: |
+          sum without(status, route, method) (
+            rate(pwdnow_http_request_duration_seconds_count{status=~"5.."}[5m])
+          )
+
+      - record: pwdnow:availability:ratio_5m
+        expr: |
+          1 - (
+            pwdnow:http_requests:errors_5m
+            /
+            (pwdnow:http_requests:total_5m > 0)
+          )
+
+      # ── Burn-rate windows (1h and 6h) for SRE Workbook §5 alerting. ────────
+      - record: pwdnow:availability:error_ratio_1h
+        expr: |
+          sum_over_time(pwdnow:http_requests:errors_5m[1h])
+          /
+          (sum_over_time(pwdnow:http_requests:total_5m[1h]) > 0)
+
+      - record: pwdnow:availability:error_ratio_6h
+        expr: |
+          sum_over_time(pwdnow:http_requests:errors_5m[6h])
+          /
+          (sum_over_time(pwdnow:http_requests:total_5m[6h]) > 0)
+
+  - name: pwdnow.alerts
+    rules:
+      # ── Hard down ───────────────────────────────────────────────────────────
+      - alert: PWDnowWebDown
+        expr: up{job="pwdnow-web"} == 0
+        for: 1m
+        labels: { severity: critical, service: pwdnow }
+        annotations:
+          summary: "pwdnow-web has been down for 1m on {{ $labels.instance }}"
+          runbook: "docs/runbook.md#web-tier-down"
+
+      - alert: PWDnowDaemonUnreachable
+        expr: pwdnow_ws_connections_active == 0 and on() (time() - process_start_time_seconds{job="pwdnow-web"}) > 60
+        for: 2m
+        labels: { severity: critical, service: pwdnow }
+        annotations:
+          summary: "web has been up >1m with zero WS connections — daemon unreachable?"
+          runbook: "docs/runbook.md#daemon-unreachable"
+
+      # ── Burn-rate (SRE Workbook §5) ─────────────────────────────────────────
+      # 99.9% SLO → 0.1% error budget. Multi-window/multi-burn alerts.
+      - alert: PWDnowErrorBudgetBurnFast
+        expr: |
+          (
+            pwdnow:availability:error_ratio_1h > (14.4 * 0.001)
+          )
+        for: 5m
+        labels: { severity: page, service: pwdnow }
+        annotations:
+          summary: "fast burn: error budget would be exhausted in <2d at current rate"
+          runbook: "docs/runbook.md#error-budget-burn"
+
+      - alert: PWDnowErrorBudgetBurnSlow
+        expr: |
+          (
+            pwdnow:availability:error_ratio_6h > (6 * 0.001)
+          )
+        for: 30m
+        labels: { severity: ticket, service: pwdnow }
+        annotations:
+          summary: "slow burn: error budget would be exhausted in <5d at current rate"
+          runbook: "docs/runbook.md#error-budget-burn"
+
+      # ── Auth lockout storms ─────────────────────────────────────────────────
+      - alert: PWDnowAuthFailureSpike
+        expr: rate(pwdnow_auth_attempts_total{result="fail"}[5m]) > 0.5
+        for: 5m
+        labels: { severity: warning, service: pwdnow }
+        annotations:
+          summary: "sustained auth failure rate > 30/min — possible brute-force"
+          runbook: "docs/runbook.md#auth-brute-force"
+
+      # ── Resource pressure (pre-emptive) ─────────────────────────────────────
+      - alert: PWDnowMemoryHigh
+        expr: process_resident_memory_bytes{job="pwdnow-web"} > 800 * 1024 * 1024
+        for: 10m
+        labels: { severity: warning, service: pwdnow }
+        annotations:
+          summary: "pwdnow-web RSS > 800 MiB for 10m — memory leak suspect"
+          runbook: "docs/runbook.md#memory-pressure"
+
+      - alert: PWDnowEventLoopLag
+        expr: nodejs_eventloop_lag_p99_seconds{job="pwdnow-web"} > 0.25
+        for: 5m
+        labels: { severity: warning, service: pwdnow }
+        annotations:
+          summary: "event loop p99 lag > 250ms — server is CPU-saturated or blocked"
+          runbook: "docs/runbook.md#event-loop-lag"

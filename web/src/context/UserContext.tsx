@@ -1,8 +1,9 @@
+import { getCsrfToken, apiFetch } from '../utils/api';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { daemon } from '../utils/daemonClient';
 import { keyStore } from '../crypto/keystore';
 
-interface UserProfile {
+export interface UserProfile {
   firstName: string;
   lastName: string;
   email: string;
@@ -62,23 +63,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
       // Daemon unavailable - fetch from offline API fallback
       try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.authenticated && data.user) {
-            setProfile(prev => ({ 
-              ...prev, 
-              firstName: data.user.firstName || '', 
-              lastName: data.user.lastName || '', 
-              email: data.user.email || '',
-              passwordChangedAt: data.user.passwordChangedAt,
-              recoveryKeyGeneratedAt: data.user.recoveryKeyGeneratedAt
-            }));
-          } else {
-            keyStore.clear();
-            window.dispatchEvent(new CustomEvent('sessionInvalid'));
-          }
-        } else if (res.status === 401 || res.status === 403) {
+        const data = await apiFetch<any>('/api/auth/me').catch(() => null);
+        if (data && data.authenticated && data.user) {
+          setProfile(prev => ({ 
+            ...prev, 
+            firstName: data.user.firstName || '', 
+            lastName: data.user.lastName || '', 
+            email: data.user.email || '',
+            passwordChangedAt: data.user.passwordChangedAt,
+            recoveryKeyGeneratedAt: data.user.recoveryKeyGeneratedAt
+          }));
+        } else {
           keyStore.clear();
           window.dispatchEvent(new CustomEvent('sessionInvalid'));
         }

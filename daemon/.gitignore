@@ -1,0 +1,10 @@
+/target
+*.db
+*.db-shm
+*.db-wal
+*.db.meta
+*.meta
+*.tmp
+*.wipe_tmp
+*.lock
+.master_key

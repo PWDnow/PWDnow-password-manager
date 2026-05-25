@@ -67,6 +67,33 @@ export default defineConfig(({mode}) => {
             if (id.includes('/node_modules/motion/') || id.includes('/node_modules/framer-motion/')) {
               return 'vendor-motion';
             }
+            if (id.includes('/node_modules/lucide-react/')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('/node_modules/dompurify/')) {
+              return 'vendor-dompurify';
+            }
+            if (id.includes('/node_modules/@msgpack/')) {
+              return 'vendor-msgpack';
+            }
+            if (id.includes('/node_modules/@noble/')) {
+              return 'vendor-noble';
+            }
+            if (id.includes('/node_modules/qrcode/')) {
+              return 'vendor-qrcode';
+            }
+            if (id.includes('/node_modules/zxcvbn/')) {
+              return 'vendor-zxcvbn';
+            }
+            if (id.includes('/node_modules/hash-wasm/')) {
+              return 'vendor-hashwasm';
+            }
+            if (id.includes('/node_modules/@fingerprintjs/')) {
+              return 'vendor-fingerprint';
+            }
+            if (id.includes('/node_modules/kdbxweb/') || id.includes('/node_modules/argon2-browser/')) {
+              return 'vendor-crypto';
+            }
           },
         },
       },

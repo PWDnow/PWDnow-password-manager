@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, Wallet, Globe, Briefcase, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, Shield, CreditCard, Key } from 'lucide-react';
+import { X, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
+import { useNotification } from '../context/NotificationContext';
 import { Folder } from '../types';
 import { sanitizeSvg } from '../utils/sanitize';
 import { generateUUID } from '../utils/crypto';
+import { ICON_MAP } from '../utils/folderIcons';
 
 interface CreateFolderModalProps {
   isOpen: boolean;
@@ -11,28 +14,31 @@ interface CreateFolderModalProps {
   onAddFolder: (folder: Folder) => void;
 }
 
-const PREDEFINED_ICONS = [
-  { name: 'Wallet', icon: Wallet },
-  { name: 'Globe', icon: Globe },
-  { name: 'Briefcase', icon: Briefcase },
-  { name: 'Gamepad2', icon: Gamepad2 },
-  { name: 'Bitcoin', icon: Bitcoin },
-  { name: 'Dices', icon: Dices },
-  { name: 'Folder', icon: FolderIcon },
-  { name: 'Shield', icon: Shield },
-  { name: 'CreditCard', icon: CreditCard },
-  { name: 'Key', icon: Key },
-];
+const PREDEFINED_ICONS = Object.entries(ICON_MAP).map(([name, icon]) => ({ name, icon }));
 
 const TEMPLATES = [
   'Personal Finance',
-  'Gaming',
+  'Banking',
+  'Investment',
   'Cryptocurrency',
+  'Gaming',
   'Streaming Services',
   'Emails',
+  'Social Media',
   'Shopping',
-  'Health',
+  'Health & Medical',
   'Travel',
+  'Work & Office',
+  'Developer Tools',
+  'Cloud Services',
+  'Education',
+  'Communication',
+  'Entertainment',
+  'Security & VPN',
+  'Utilities',
+  'Government',
+  'Family',
+  'Insurance',
 ];
 
 export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: CreateFolderModalProps) {
@@ -41,6 +47,9 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
   const [selectedIconName, setSelectedIconName] = useState<string>('Folder');
   const [customSvg, setCustomSvg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { addNotification } = useNotification();
+  const { t } = useTranslation();
 
   if (!isOpen) return null;
 
@@ -59,7 +68,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
           setCustomSvg(content);
           setSelectedIconName('custom');
         } else {
-          alert('Please upload a valid SVG file.');
+          addNotification({ title: t('folders.error', 'Error'), message: t('folders.invalidSvg', 'Please upload a valid SVG file.'), type: 'error' });
         }
       };
       reader.readAsText(file);
@@ -137,7 +146,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                 
                 {/* Templates */}
                 <div className="mt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Templates</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">{t('vault.templates', 'Templates')}</p>
                   <div className="flex flex-wrap gap-2">
                     {TEMPLATES.map((template) => (
                       <button

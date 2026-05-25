@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { keyStore } from './crypto/keystore';
 import { RouteErrorBoundary } from './components/ErrorBoundary';
+import { hasServerSession as _hasServerSession } from './utils/api';
 
 const AppLayout = lazy(() => import('./layouts/AppLayout'));
 
@@ -38,7 +39,7 @@ const wrap = (Component: React.ComponentType, fallback = <PageLoader />) => (
 // when the session is already known to be absent on the first render.
 function isAuthenticated(): boolean {
   return keyStore.hasToken ||
-    document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+    _hasServerSession();
 }
 
 function AuthedLayout() {

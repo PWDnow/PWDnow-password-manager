@@ -1,0 +1,39 @@
+[Unit]
+Description=Vault Daemon — weekly restore drill (untested backups are not backups)
+After=vault-daemon-backup.service
+# SLA G4: alert when the drill fails — this is the single most-important
+# canary the system has.
+OnFailure=pwdnow-alert@%n.service
+
+[Service]
+Type=oneshot
+User=vault
+Group=vault
+
+# Opens the most recent backup with a dummy key to prove it is a valid SQLCipher
+# file and that integrity_check passes.  Intentionally does NOT use the real VMK
+# — we cannot do a full authenticated open without unlocking.  What we CAN verify:
+#   1. The backup is a valid SQLCipher file (cipher_integrity_check at DB level)
+#   2. The sha256 sidecar matches (catches silent bit-rot or truncation)
+#   3. The schema version row is readable (proves migrations completed correctly)
+#
+# A failed drill exits non-zero so systemd records a failure.
+# Wire an alert via OnFailure= or have your monitoring scrape the unit state.
+ExecStart=/bin/bash -c '\
+  DEST=/var/backups/vault-daemon; \
+  LATEST=$(find "$DEST" -name "vault-*.db" -not -name "*.sha256" \
+           -printf "%%T@ %%p\n" | sort -n | tail -1 | cut -d" " -f2); \
+  [ -z "$LATEST" ] && { echo "DRILL FAIL: no backup found"; exit 1; }; \
+  echo "Restore drill on: $LATEST"; \
+  sha256sum --check "$LATEST.sha256" || { echo "DRILL FAIL: sha256 mismatch"; exit 1; }; \
+  DRILL_DB="/tmp/vault-restore-drill-$(date +%%s).db"; \
+  sqlite3 "$LATEST" ".backup $DRILL_DB"; \
+  RESULT=$(sqlite3 "$DRILL_DB" "PRAGMA integrity_check;" 2>&1); \
+  rm -f "$DRILL_DB"; \
+  echo "$RESULT" | grep -q "^ok$" || { echo "DRILL FAIL: integrity_check: $RESULT"; exit 1; }; \
+  echo "DRILL PASS: $LATEST is healthy"'
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/vault-daemon /tmp

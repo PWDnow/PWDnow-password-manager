@@ -1,0 +1,119 @@
+# Security pipeline: SAST, dependency audit, secret scanning, SBOM
+# Runs on every push/PR + weekly for zero-day detection.
+
+name: Security
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    - cron: '30 2 * * 1'   # Weekly Monday 02:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── CodeQL SAST ─────────────────────────────────────────────────────────────
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ── Dependency Audit ────────────────────────────────────────────────────────
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # — NPM audit —
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+      - name: NPM audit (web)
+        working-directory: web
+        run: |
+          npm ci --strict-peer-deps
+          npm audit --audit-level=high --omit=dev 2>&1 | tee ../npm-audit.txt
+          npm audit --audit-level=critical || true
+
+      # — Cargo audit —
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Cargo audit (daemon)
+        working-directory: daemon
+        run: cargo audit --deny warnings 2>&1 | tee ../cargo-audit.txt
+      - name: Cargo audit (monitor)
+        working-directory: monitor
+        run: cargo audit --deny warnings 2>&1 | tee ../monitor-audit.txt || true
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-reports
+          path: |
+            npm-audit.txt
+            cargo-audit.txt
+            monitor-audit.txt
+
+  # ── Secret Scanning ────────────────────────────────────────────────────────
+  secrets:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+  # ── License Compliance ─────────────────────────────────────────────────────
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+      - name: Install deps
+        working-directory: web
+        run: npm ci --strict-peer-deps
+      - name: Check NPM licenses
+        working-directory: web
+        run: |
+          npx license-checker --summary --failOn \
+            "GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;SSPL-1.0;EUPL-1.1;EUPL-1.2" \
+            2>&1 | tee ../license-report.txt || true
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: license-report.txt

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily backup integrity check for vault-daemon
+Requires=vault-daemon-backup-verify.service
+
+[Timer]
+# Run once per day at 03:30, 90 minutes after the hourly backup at 02:00
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

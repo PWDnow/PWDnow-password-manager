@@ -1,0 +1,33 @@
+[package]
+name = "vault-daemon-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rmp-serde = "1.3"
+
+[dependencies.vault-daemon]
+path = ".."
+
+[[bin]]
+name = "parse_frame"
+path = "fuzz_targets/parse_frame.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "decrypt_credential"
+path = "fuzz_targets/decrypt_credential.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parsePayload"
+path = "fuzz_targets/parsePayload.rs"
+test = false
+doc = false

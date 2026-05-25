@@ -1,0 +1,7 @@
+[profile.release]
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+[build]
+rustflags = ["-C", "metadata="]

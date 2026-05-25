@@ -1,3 +1,4 @@
+import { logger } from './logger';
 export async function enrollQuickUnlock(userId: string): Promise<Uint8Array | null> {
   if (!window.PublicKeyCredential) return null;
   const challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -25,7 +26,7 @@ export async function enrollQuickUnlock(userId: string): Promise<Uint8Array | nu
 
     const extResults = cred.getClientExtensionResults() as any;
     if (!extResults.prf?.enabled) {
-      console.warn('PRF not enabled by authenticator');
+      logger.warn('PRF not enabled by authenticator');
       return null; // PRF not supported
     }
 
@@ -36,7 +37,7 @@ export async function enrollQuickUnlock(userId: string): Promise<Uint8Array | nu
 
     return new Uint8Array(extResults.prf.results.first);
   } catch (e) {
-    console.error('Quick unlock enrollment failed', e);
+    logger.error('Quick unlock enrollment failed', e);
     return null;
   }
 }
@@ -77,7 +78,7 @@ export async function getQuickUnlockDbk(): Promise<Uint8Array | null> {
     }
     return new Uint8Array(extResults.prf.results.first);
   } catch (e) {
-    console.error('Quick unlock failed', e);
+    logger.error('Quick unlock failed', e);
     return null;
   }
 }

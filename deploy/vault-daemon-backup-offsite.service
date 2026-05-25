@@ -1,0 +1,29 @@
+[Unit]
+# SLA G3: dedicated off-site replication step. Decoupled from the local
+# backup so a flaky network doesn't drag down the hourly local snapshot.
+# Pulls $BACKUP_REMOTE from /etc/default/vault-backup (same file the local
+# backup uses) — if unset, this unit is a no-op and exits clean.
+Description=Vault Daemon — off-site backup replication
+After=vault-daemon-backup.service
+OnFailure=pwdnow-alert@%n.service
+
+[Service]
+Type=oneshot
+User=vault
+Group=vault
+EnvironmentFile=-/etc/default/vault-backup
+
+# Reuse the same script — it short-circuits to the off-site path when
+# REPLICATE_ONLY=1 (writes nothing locally; ships the newest existing
+# local backup to the remote).
+Environment=REPLICATE_ONLY=1
+ExecStart=/usr/local/sbin/vault-backup.sh
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# rsync/restic/aws need to read $HOME (~/.ssh, ~/.aws, ~/.config/restic);
+# tighten by symlinking creds into /var/lib/vault-daemon/.<cred-dir> and
+# adding it to ReadOnlyPaths if you don't want $HOME exposure.
+ReadWritePaths=/var/lib/vault-daemon /var/backups/vault-daemon

@@ -20,6 +20,9 @@ import { checkIsDuressPassword, recordFailedLoginAttempt, resetLoginAttempts, wi
 import { generateUUID } from '../utils/crypto';
 import { hasLocalQuickUnlock, getQuickUnlockDbk } from '../utils/quickUnlock';
 import { LoginPerfTracker } from '../utils/perf';
+import { apiFetch, hasServerSession as _hasServerSession, ApiError } from '../utils/api';
+import { logger } from '../utils/logger';
+import { isBraveBrowser } from '../utils/browser';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -43,7 +46,7 @@ export default function Login() {
     try {
       const dbk = await getQuickUnlockDbk();
       if (!dbk) {
-        setError('Quick unlock failed or canceled. Please use your master password.');
+        setError(t('login.quickUnlockFailed', 'Quick unlock failed or canceled. Please use your master password.'));
         return;
       }
       if (!daemon.isConnected) await daemon.connect();
@@ -119,7 +122,7 @@ export default function Login() {
   // Redirect already-authenticated users straight to the vault.
   useEffect(() => {
     keyStore.restoreAsync().finally(() => {
-      const hasServerSession = document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+      const hasServerSession = _hasServerSession();
       const hasLocalKeys = keyStore.getLocalKey(1) !== null || keyStore.getLocalKey(2) !== null;
       if (keyStore.hasToken || (hasServerSession && hasLocalKeys)) {
         navigate('/vault', { replace: true });
@@ -129,8 +132,7 @@ export default function Login() {
       // If the user has a session but no local keys (e.g. after a page refresh in Server Mode),
       // pre-fill their email so they only need to enter their password to unlock the vault.
       if (hasServerSession && !hasLocalKeys) {
-        fetch('/api/auth/me')
-          .then(r => r.json())
+        apiFetch<{ authenticated: boolean; user?: { email: string } }>('/api/auth/me')
           .then(data => {
             if (data.authenticated && data.user?.email) {
               setEmail(data.user.email);
@@ -152,9 +154,8 @@ export default function Login() {
 
   // Redirect to /setup if first-run setup has not been completed yet.
   useEffect(() => {
-    fetch('/api/setup-status')
-      .then(r => r.json())
-      .then(({ completed }: { completed: boolean }) => {
+    apiFetch<{ completed: boolean }>('/api/setup-status')
+      .then(({ completed }) => {
         if (!completed) navigate('/setup', { replace: true });
       })
       .catch(() => { /* API unreachable - allow login to proceed */ });
@@ -174,24 +175,15 @@ export default function Login() {
           if (!daemon.isConnected) await daemon.connect();
           return await daemon.getLoginHints();
         } catch (e) {
-          console.debug('Daemon hints failed:', e);
+          logger.debug('Daemon hints failed:', e);
           return null;
         }
       })();
 
-      const serverHintsPromise = (async () => {
-        try {
-          const res = await fetch('/api/auth/login-hints', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-          });
-          if (res.ok) return await res.json();
-        } catch (e) {
-          console.debug('Server hints failed:', e);
-        }
-        return null;
-      })();
+      const serverHintsPromise = apiFetch<{ hints: LoginHints & { cryptoSalt?: string } }>('/api/auth/login-hints', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }).catch((e) => { logger.debug('Server hints failed:', e); return null; });
 
       const [dh, sh] = await Promise.all([daemonHintsPromise, serverHintsPromise]);
 
@@ -257,7 +249,7 @@ export default function Login() {
         }
       }
     } catch (err) {
-      console.debug('[Login] hints fetch error:', err);
+      logger.debug('[Login] hints fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -308,30 +300,18 @@ export default function Login() {
     if (serverHasCryptoSalt) return; // Server already has it — nothing to do
     const salt = localStorage.getItem('_lk_salt');
     if (!salt) return; // No local salt to publish — shouldn't happen post-login
-    const csrfMatch = document.cookie.match(/(?:^|;\s*)_pwd_csrf=([^;]*)/);
-    const csrf = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
     try {
-      const res = await fetch('/api/auth/crypto-salt', {
+      const data = await apiFetch<{ cryptoSalt?: string }>('/api/auth/crypto-salt', {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrf,
-        },
         body: JSON.stringify({ cryptoSalt: salt }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        // Store the server's authoritative salt (which may be the one we just sent,
-        // or the one that was already on the server if a race occurred)
-        if (data.cryptoSalt) {
-          localStorage.setItem('_pwd_lks', data.cryptoSalt);
-          localStorage.setItem('_lk_salt', data.cryptoSalt);
-        }
-        console.log('[Login] Published cryptoSalt to server');
+      if (data.cryptoSalt) {
+        localStorage.setItem('_pwd_lks', data.cryptoSalt);
+        localStorage.setItem('_lk_salt', data.cryptoSalt);
       }
+      logger.log('[Login] Published cryptoSalt to server');
     } catch (e) {
-      console.warn('[Login] Failed to publish cryptoSalt:', e);
+      logger.warn('[Login] Failed to publish cryptoSalt:', e);
     }
   };
 
@@ -401,13 +381,11 @@ export default function Login() {
         const body: Record<string, string> = { partialToken: serverPartialToken };
         if (mfaMethod === 'totp') body.totpCode = token;
         else body.emailCode = token;
-        const finishRes = await fetch('/api/auth/login/finish', {
+        const finishData = await apiFetch<{ ok: boolean }>('/api/auth/login/finish', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        const finishData = await finishRes.json().catch(() => ({ ok: false }));
-        if (!finishRes.ok || !finishData.ok) {
+        if (!finishData.ok) {
           setTotpError(t('login.mfaInvalidCode', 'Incorrect code. Please try again.'));
           setServerPartialToken(null);
           setTotpCode(['', '', '', '', '', '']);
@@ -476,19 +454,24 @@ export default function Login() {
     // Phase A: start v2 Argon2id AND v1 PBKDF2 concurrently with daemon.unlock
     // so both browser KDF costs overlap with the 6–8 s daemon Argon2id window.
     const browserMasterPromise = deriveArgon2idMaster(password, salt).catch(e => {
-      console.warn('[Login] Argon2id master derivation failed:', e);
+      logger.warn('[Login] Argon2id master derivation failed:', e);
       return null;
     });
     perf.markStart('pbkdf2V1');
     const v1Promise = deriveV1Only(password, salt).catch(e => {
-      console.warn('[Login] V1 key derivation failed:', e);
+      logger.warn('[Login] V1 key derivation failed:', e);
       return null as { encKey: CryptoKey; sigKey: CryptoKey } | null;
     });
 
     try {
       if (!daemon.isConnected) await daemon.connect();
       perf.markStart('daemonUnlock');
-      await daemon.unlock(password);
+      const isRecoveryKey = /^[A-Z2-9]{8}-[A-Z2-9]{8}-[A-Z2-9]{8}-[A-Z2-9]{8}$/i.test(password.trim());
+      if (isRecoveryKey) {
+        await daemon.unlockWithRecoveryKey(password.trim());
+      } else {
+        await daemon.unlock(password);
+      }
       perf.markEnd('daemonUnlock');
       daemonUnlocked = true;
     } catch { /* daemon unavailable - fall through to offline auth */ }
@@ -517,27 +500,27 @@ export default function Login() {
             const saltBytes = Uint8Array.from(salt.match(/../g)!.map(h => parseInt(h, 16)));
             keyStore.setV2Salt(saltBytes);
           }
-        }).catch(e => console.warn('[Login] Background v2 failed:', e));
+        }).catch(e => logger.warn('[Login] Background v2 failed:', e));
 
       } catch (e) {
         // crypto.subtle is missing on plain HTTP for non-localhost — known limitation,
         // documented as "non-fatal" historically. Anything else is a real bug:
         // log it loudly so it cannot hide behind a swallowed catch again.
-        console.error('[Login] Local key derivation failed:', e);
+        logger.error('[Login] Local key derivation failed:', e);
       }
 
       // Post-unlock work in parallel: MFA config, passkey hint, legacy key.
       const backgroundTasks: Promise<unknown>[] = [
-        loadMfaConfig().catch(e => console.warn('MFA load failed', e)),
+        loadMfaConfig().catch(e => logger.warn('MFA load failed', e)),
         loadPasskeyHint().then(() => {
           setHasPasskeyHint(getPasskeyHint().length > 0);
-        }).catch(e => console.warn('Passkey hint load failed', e))
+        }).catch(e => logger.warn('Passkey hint load failed', e))
       ];
       if (legacyLkSalt) {
         backgroundTasks.push(
           deriveLocalKey(password, legacyLkSalt)
             .then(k => keyStore.storeLegacyKey(k))
-            .catch(e => console.warn('[Login] legacy key derivation failed', e))
+            .catch(e => logger.warn('[Login] legacy key derivation failed', e))
         );
       }
 
@@ -565,7 +548,7 @@ export default function Login() {
     try {
       const browser = await (async () => {
         try {
-          if ((navigator as any).brave && typeof (navigator as any).brave.isBrave === 'function' && await (navigator as any).brave.isBrave()) return 'Brave';
+          if (await isBraveBrowser()) return 'Brave';
         } catch { /* ignore */ }
         return 'Unknown';
       })();
@@ -661,7 +644,7 @@ export default function Login() {
             // `_lk_salt` to match `_pwd_lks` — that is fine because the
             // legacy slot above keeps the old key recoverable.)
             primaryV1 = await deriveV1Only(password, serverSalt!).catch(e => {
-              console.warn('[Login] v1 from server salt failed:', e);
+              logger.warn('[Login] v1 from server salt failed:', e);
               return null;
             });
             // The old local-salt v1 was already kicked off as v1Promise;
@@ -711,7 +694,7 @@ export default function Login() {
               const saltBytes = Uint8Array.from(v2Salt.match(/../g)!.map(h => parseInt(h, 16)));
               keyStore.setV2Salt(saltBytes);
             }
-          }).catch(e => console.warn('[Login] Background server-mode v2 failed:', e));
+          }).catch(e => logger.warn('[Login] Background server-mode v2 failed:', e));
 
           // Run remaining post-unlock work in parallel: legacy-key derivation,
           // MFA config load (local + server), passkey hint load.
@@ -724,14 +707,14 @@ export default function Login() {
             tasks.push(
               deriveLocalKey(password, legacyLkSalt)
                 .then(k => keyStore.storeLegacyKey(k))
-                .catch(e => console.warn('[Login] legacy key derivation failed', e)),
+                .catch(e => logger.warn('[Login] legacy key derivation failed', e)),
             );
           }
           await Promise.all(tasks);
           setHasPasskeyHint(getPasskeyHint().length > 0);
           if (primaryV1) window.dispatchEvent(new CustomEvent('demoKeyAvailable'));
         } catch (e) {
-          console.error('[Login] Key derivation failed:', e);
+          logger.error('[Login] Key derivation failed:', e);
         }
 
         const cfg = getMfaConfig();
@@ -752,7 +735,7 @@ export default function Login() {
         return;
       }
     } catch (err) {
-      console.error('[Login] offline auth error:', err);
+      logger.error('[Login] offline auth error:', err);
     }
 
     // Both daemon and offline auth failed.
@@ -819,16 +802,16 @@ export default function Login() {
 
         <div className="relative z-10 max-w-lg mt-12">
           <h2 className="text-4xl xl:text-5xl font-headline font-bold mb-6 leading-[1.1] tracking-tight text-white">
-            {t('login.heroTitle', 'Secure your enterprise digital assets.')}
+            {t('login.heroTitle', 'Open Source Password Management')}
           </h2>
           <p className="text-slate-400 text-lg leading-relaxed mb-12">
-            {t('login.heroSubtitle', 'Military-grade encryption, seamless access control, and comprehensive audit logs designed for modern teams.')}
+            {t('login.heroSubtitle', 'A high-security, zero-knowledge vault for your credentials, fully open source and self-hostable.')}
           </p>
 
           <div className="space-y-4">
             {[
               t('login.feature1', 'Zero-knowledge architecture'),
-              t('login.feature2', 'SOC2 Type II Certified'),
+              t('login.feature2', 'Open Source & Auditable'),
               t('login.feature3', 'End-to-end encryption')
             ].map((feature, idx) => (
               <div key={idx} className="flex items-center gap-3 text-slate-300">
@@ -938,7 +921,7 @@ export default function Login() {
                   <ChevronLeft size={16} />{email}
                 </button>
                 <h1 className="text-3xl sm:text-4xl font-headline font-bold text-black dark:text-white mb-3 tracking-tight">
-                  Sign in as
+                  {t('login.signInAs', 'Sign in as')}
                 </h1>
                 <p className="text-on-surface-variant text-base font-semibold truncate">{email}</p>
               </div>
@@ -947,7 +930,7 @@ export default function Login() {
                 {selectedMfaChannel ? (
                   <form onSubmit={handleLogin} className="space-y-4">
                     <button type="button" onClick={() => setSelectedMfaChannel(null)} className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-black dark:hover:text-white transition-colors mb-2">
-                      <ChevronLeft size={16} /> Back to options
+                      <ChevronLeft size={16} /> {t('login.backToOptions', 'Back to options')}
                     </button>
                     <div>
                       <div className="flex items-center justify-between mb-2">
@@ -999,8 +982,8 @@ export default function Login() {
                             : <Fingerprint size={20} className="text-white dark:text-black" />}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-sm text-black dark:text-white">Passkey / Touch ID / Windows Hello</p>
-                          <p className="text-xs text-on-surface-variant mt-0.5">Use your fingerprint, face, or device PIN</p>
+                          <p className="font-bold text-sm text-black dark:text-white">{t('login.passkeyCard', 'Passkey / Touch ID / Windows Hello')}</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">{t('login.passkeyDesc', 'Use your fingerprint, face, or device PIN')}</p>
                         </div>
                         <ArrowRight size={16} className="ml-auto shrink-0 text-on-surface-variant group-hover:text-black dark:group-hover:text-white transition-colors" />
                       </button>
@@ -1052,15 +1035,15 @@ export default function Login() {
                                   : <Fingerprint size={20} className="text-white" />}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-bold text-sm text-blue-900 dark:text-blue-100">Unlock with Touch ID / Windows Hello</p>
-                                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">Quickly unlock this device</p>
+                                <p className="font-bold text-sm text-blue-900 dark:text-blue-100">{t('login.quickUnlockTitle', 'Unlock with Touch ID / Windows Hello')}</p>
+                                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">{t('login.quickUnlockDesc', 'Quickly unlock this device')}</p>
                               </div>
                               <ArrowRight size={16} className="ml-auto shrink-0 text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform" />
                             </button>
                             
                             <div className="flex items-center gap-4">
                               <div className="h-px bg-slate-200 dark:bg-white/10 flex-1"></div>
-                              <span className="text-xs font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">or</span>
+                              <span className="text-xs font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">{t('common.or', 'or')}</span>
                               <div className="h-px bg-slate-200 dark:bg-white/10 flex-1"></div>
                             </div>
                           </div>
@@ -1191,10 +1174,10 @@ export default function Login() {
               {/* Email OTP demo preview */}
               {mfaMethod === 'email' && emailSimCode && (
                 <div className="mb-6 p-4 bg-slate-50 dark:bg-[#141414] border border-slate-200 dark:border-white/10 rounded-xl">
-                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Simulated Email Preview</p>
-                  <p className="text-sm text-on-surface-variant">Your one-time code:</p>
+                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">{t('login.simEmailPreview', 'Simulated Email Preview')}</p>
+                  <p className="text-sm text-on-surface-variant">{t('login.simEmailCode', 'Your one-time code:')}</p>
                   <p className="text-3xl font-black text-black dark:text-white tracking-[0.3em] mt-1">{emailSimCode}</p>
-                  <p className="text-[10px] text-on-surface-variant mt-2">Valid for 5 minutes. Do not share.</p>
+                  <p className="text-[10px] text-on-surface-variant mt-2">{t('login.simEmailNote', 'Valid for 5 minutes. Do not share.')}</p>
                 </div>
               )}
 

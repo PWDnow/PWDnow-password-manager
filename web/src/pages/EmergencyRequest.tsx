@@ -1,3 +1,4 @@
+import { apiFetch, ApiError } from '../utils/api';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ShieldAlert, Mail, User, Clock, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
@@ -18,17 +19,21 @@ export default function EmergencyRequest() {
     if (!name.trim()) return;
     setState('submitting');
     try {
-      const res = await fetch(`/api/emergency/request/${token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requesterName: name.trim(), requesterEmail: email.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? 'request_failed');
-      setWaitHours(data.waitPeriodHours);
+      const data = await apiFetch<{ ok: boolean; waitPeriodHours?: number; error?: string }>(
+        `/api/emergency/request/${token}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ requesterName: name.trim(), requesterEmail: email.trim() }),
+        }
+      );
+      if (!data.ok) throw new Error(data.error ?? 'request_failed');
+      setWaitHours(data.waitPeriodHours ?? null);
       setState('success');
-    } catch (err: any) {
-      setErrorMsg(err.message === 'not_found' ? 'This emergency access link is invalid or has been revoked.' : 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      const isNotFound =
+        (err instanceof ApiError && (err.data as { error?: string })?.error === 'not_found') ||
+        (err instanceof Error && err.message === 'not_found');
+      setErrorMsg(isNotFound ? 'This emergency access link is invalid or has been revoked.' : 'Something went wrong. Please try again.');
       setState('error');
     }
   }

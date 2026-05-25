@@ -1,3 +1,4 @@
+import { logger } from './logger';
 /** @vitest-environment jsdom */
 /**
  * Login KDF performance bench.
@@ -29,7 +30,7 @@ describe.skipIf(!SHOULD_RUN)('login KDF perf', () => {
     const elapsed = performance.now() - t0;
 
     // eslint-disable-next-line no-console
-    console.log(`[KDF perf] deriveLocalKeys total = ${elapsed.toFixed(0)} ms` +
+    logger.log(`[KDF perf] deriveLocalKeys total = ${elapsed.toFixed(0)} ms` +
                 ` (v1=${!!v1} v2=${!!v2})`);
   }, 120_000);
 });

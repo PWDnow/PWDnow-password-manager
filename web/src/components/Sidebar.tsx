@@ -1,3 +1,4 @@
+import { getCsrfToken, apiFetch } from '../utils/api';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sanitizeSvg } from '../utils/sanitize';
@@ -26,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { Folder } from '../types';
 import { clearAllSessions } from '../utils/sessionTracker';
 import { keyStore } from '../crypto/keystore';
+import { ICON_MAP } from '../utils/folderIcons';
 import { clearMfaCache } from '../utils/mfa';
 
 interface SidebarProps {
@@ -38,18 +40,7 @@ interface SidebarProps {
   onManageFolders: () => void;
 }
 
-const ICON_MAP: Record<string, React.FC<any>> = {
-  Wallet,
-  Globe,
-  Briefcase,
-  Gamepad2,
-  Bitcoin,
-  Dices,
-  Folder: FolderIcon,
-  Shield,
-  CreditCard,
-  Key
-};
+
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, folders, onCreateFolder, onManageFolders }: SidebarProps) {
   const { t } = useTranslation();
@@ -65,12 +56,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, fold
     
     // Call offline API to clear JWE cookies
     try {
-      const csrfMatch = document.cookie.match(/(?:^|;\s*)_pwd_csrf=([^;]*)/);
-      const csrf = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        headers: { 'X-CSRF-Token': csrf }
-      });
+      await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch { /* ignore offline errors */ }
     
     navigate('/login');
@@ -93,7 +79,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose, fold
       );
     }
     
-    const IconComponent = folder.iconName ? ICON_MAP[folder.iconName] : FolderIcon;
+    const IconComponent = (folder.iconName && ICON_MAP[folder.iconName]) ? ICON_MAP[folder.iconName] : FolderIcon;
     return <IconComponent size={20} className="shrink-0" />;
   };
 

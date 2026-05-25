@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly restore drill for vault-daemon backups
+Requires=vault-daemon-restore-drill.service
+
+[Timer]
+# Run Sundays at 04:00, after the nightly backup+verify cycle
+OnCalendar=Sun *-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

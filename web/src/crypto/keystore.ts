@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 // CNSA 2.0: HKDF-SHA-384 replaces HKDF-SHA3-512 (SHA3 not in CNSA 2.0 approved set).
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha384 } from '@noble/hashes/sha2.js';
@@ -111,7 +112,14 @@ export class SecureKeyStore {
   private async persistToSessionStorage() {
     if (typeof sessionStorage === 'undefined') return;
     try {
-      const data: any = {};
+      const data: {
+        token?: number[];
+        v2Salt?: number[];
+        localKeyV1?: number[] | null;
+        sigKeyV1?: number[] | null;
+        localKeyV2?: number[] | null;
+        sigKeyV2?: number[] | null;
+      } = {};
       if (this.#token) data.token = Array.from(this.#token);
       if (this.#v2Salt) data.v2Salt = Array.from(this.#v2Salt);
       
@@ -128,7 +136,7 @@ export class SecureKeyStore {
       
       sessionStorage.setItem('_pwd_ks', JSON.stringify(data));
     } catch (e) {
-      console.warn('Failed to persist keys to sessionStorage', e);
+      logger.warn('Failed to persist keys to sessionStorage', e);
     }
   }
 
@@ -160,7 +168,7 @@ export class SecureKeyStore {
       if (data.localKeyV2 && !this.#localKeyV2) importKey(data.localKeyV2, true).then(k => this.#localKeyV2 = k);
       if (data.sigKeyV2 && !this.#sigKeyV2) importKey(data.sigKeyV2, false).then(k => this.#sigKeyV2 = k);
     } catch (e) {
-      console.warn('Failed to restore keys from sessionStorage', e);
+      logger.warn('Failed to restore keys from sessionStorage', e);
     } finally {
       this._isRestoring = false;
     }
@@ -190,7 +198,7 @@ export class SecureKeyStore {
       if (data.localKeyV2 && !this.#localKeyV2) this.#localKeyV2 = await importKey(data.localKeyV2, true);
       if (data.sigKeyV2 && !this.#sigKeyV2) this.#sigKeyV2 = await importKey(data.sigKeyV2, false);
     } catch (e) {
-      console.warn('Failed to restore keys from sessionStorage', e);
+      logger.warn('Failed to restore keys from sessionStorage', e);
     }
   }
 }
@@ -337,7 +345,7 @@ export async function deriveLocalKeys(
   if (v1Result.status === 'rejected') throw v1Result.reason;
   const v2 = v2Result.status === 'fulfilled' ? v2Result.value : null;
   if (v2Result.status === 'rejected') {
-    console.warn('[keystore] v2 (Argon2id) derivation failed; falling back to v1 only:', v2Result.reason);
+    logger.warn('[keystore] v2 (Argon2id) derivation failed; falling back to v1 only:', v2Result.reason);
   }
   return { v1: v1Result.value, v2 };
 }

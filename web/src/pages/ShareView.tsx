@@ -1,3 +1,4 @@
+import { apiFetch, ApiError } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Share2, Copy, Check, AlertTriangle, Clock, Loader2, Eye } from 'lucide-react';
@@ -82,20 +83,24 @@ export default function ShareView() {
         const keyBase64 = decodeURIComponent(window.location.hash.slice(1));
         if (!keyBase64) { setState('error'); return; }
 
-        const res = await fetch(`/api/share/${shareId}`);
-        const data = await res.json();
-
-        if (res.status === 410) {
-          setState(data.error === 'already_viewed' ? 'already_viewed' : 'expired');
+        let data: { ok?: boolean; error?: string; expiresAt?: number; singleView?: boolean; encryptedBlob?: string; iv?: string };
+        try {
+          data = await apiFetch(`/api/share/${shareId}`);
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 410) {
+            setState((e.data as { error?: string })?.error === 'already_viewed' ? 'already_viewed' : 'expired');
+            return;
+          }
+          setState('error');
           return;
         }
-        if (!res.ok || !data.ok) { setState('error'); return; }
+        if (!data.ok) { setState('error'); return; }
 
         setExpiresAt(data.expiresAt);
-        setIsSingleView(data.singleView);
+        setIsSingleView(data.singleView ?? false);
         setState('decrypting');
 
-        const cred = await decryptCredential(data.encryptedBlob, data.iv, keyBase64);
+        const cred = await decryptCredential(data.encryptedBlob!, data.iv!, keyBase64);
         setCredential(cred);
         setState('success');
       } catch {

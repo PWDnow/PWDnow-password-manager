@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import { keyStore, V2_M_LOG2, V2_T, V2_P } from '../crypto/keystore';
 
 // ── Compact token format ──────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ export async function encryptForServer(value: string): Promise<string | null> {
     payload.set(ct, iv.length);
     return toB64u(payload);
   } catch (e) { 
-    console.error('[localCrypto] encryptForServer failed:', e);
+    logger.error('[localCrypto] encryptForServer failed:', e);
     return null; 
   }
 }
@@ -100,7 +101,7 @@ export async function decryptFromServer(token: string): Promise<string | null> {
     }
     return null;
   } catch (e) { 
-    console.error('[localCrypto] decryptFromServer failed:', e);
+    logger.error('[localCrypto] decryptFromServer failed:', e);
     return null; 
   }
 }
@@ -145,7 +146,7 @@ export async function writeEncryptedLocal(key: string, value: string): Promise<v
       localStorage.setItem(key, token);
       return;
     } catch (e) {
-      console.error('[localCrypto] v2 write failed:', e);
+      logger.error('[localCrypto] v2 write failed:', e);
     }
   }
 

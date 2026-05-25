@@ -1,0 +1,14 @@
+[Unit]
+Description=Vault Daemon — off-site replication (twice daily)
+Requires=vault-daemon-backup-offsite.service
+
+[Timer]
+# Twice daily — 02:15 and 14:15. Stagger 15 min after the hourly local
+# backup so the freshest local copy is always the one shipped.
+OnCalendar=*-*-* 02:15:00
+OnCalendar=*-*-* 14:15:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

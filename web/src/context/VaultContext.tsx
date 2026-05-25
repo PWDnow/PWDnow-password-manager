@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Folder, Credential, AssetHolder } from '../types';
@@ -6,7 +7,8 @@ import { generateUUID } from '../utils/crypto';
 import { daemon } from '../utils/daemonClient';
 import { writeEncryptedLocal, readDecryptedLocal, encryptForServer, decryptFromServer } from '../utils/localCrypto';
 import { keyStore } from '../crypto/keystore';
-import { getTravelModeConfig } from '../utils/securityModes';
+import { getTravelModeConfig, getTravelModeConfigAsync } from '../utils/securityModes';
+import { getCsrfToken, apiFetch, hasServerSession as _hasServerSession, ApiError } from '../utils/api';
 
 interface VaultContextType {
   folders: Folder[];
@@ -67,7 +69,7 @@ function serializedWrite<T>(key: string, fn: () => Promise<T>): Promise<T> {
 // and unauthenticated visitors (e.g. the login page) never have this cookie.
 function hasServerSession(): boolean {
   if (typeof document === 'undefined') return false;
-  return document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+  return _hasServerSession();
 }
 
 /** Sentinel thrown when ciphertext is present but the local AES key is not yet
@@ -83,16 +85,18 @@ const _localRead = async (key: string): Promise<string | null> => {
   if (hasServerSession()) {
     const endpoint = key.replace('vault_', '').replace(LOCAL_SUFFIX, '');
     const url = `/api/vault/${endpoint.replace('_', '-')}`;
-    const res = await fetch(url, { credentials: 'same-origin' });
-    if (res.status === 401) {
-      // Session cookie was cleared or expired - notify AppLayout to redirect.
-      keyStore.clear();
-      document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      window.dispatchEvent(new CustomEvent('sessionInvalid'));
+    let data: any;
+    try {
+      data = await apiFetch(url);
+    } catch (e: any) {
+      if (e.status === 401) {
+        // Session cookie was cleared or expired - notify AppLayout to redirect.
+        keyStore.clear();
+        document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        window.dispatchEvent(new CustomEvent('sessionInvalid'));
+      }
       return null;
     }
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
     if (data && typeof data.data === 'string') {
       // Ensure keys are fully imported before decryption attempt
       await keyStore.restoreAsync();
@@ -117,9 +121,6 @@ const _localWrite = (key: string, value: string): Promise<void> => serializedWri
   if (isServer) {
     const endpoint = key.replace('vault_', '').replace(LOCAL_SUFFIX, '');
     const url = `/api/vault/${endpoint.replace('_', '-')}`;
-    const csrfMatch = document.cookie.match(/(?:^|;\s*)_pwd_csrf=([^;]*)/);
-    const csrf = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
-
     const encryptedValue = await encryptForServer(value);
     if (!encryptedValue) {
       // Refuse to proceed: writing plaintext is forbidden by the security
@@ -128,24 +129,19 @@ const _localWrite = (key: string, value: string): Promise<void> => serializedWri
       throw new Error('vault encryption key not ready');
     }
 
-    const res = await fetch(url, {
-      method: 'PUT',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrf,
-      },
-      body: JSON.stringify({ data: encryptedValue }),
-    });
-
-    if (res.status === 401) {
-      keyStore.clear();
-      document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      window.dispatchEvent(new CustomEvent('sessionInvalid'));
-      throw new Error('session expired');
-    }
-    if (!res.ok) {
-      throw new Error(`vault PUT ${endpoint} failed: ${res.status}`);
+    try {
+      await apiFetch(url, {
+        method: 'PUT',
+        body: JSON.stringify({ data: encryptedValue }),
+      });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        keyStore.clear();
+        document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        window.dispatchEvent(new CustomEvent('sessionInvalid'));
+        throw new Error('session expired');
+      }
+      throw new Error(`vault PUT ${endpoint} failed: ${e instanceof ApiError ? e.status : 'unknown'}`);
     }
     localStorage.removeItem(key);
     return;
@@ -171,7 +167,7 @@ async function loadLocalFolders(): Promise<Folder[]> {
         return { ...f, id };
       });
     } catch (e) {
-      console.error('[VaultContext] Folder parse error:', e);
+      logger.error('[VaultContext] Folder parse error:', e);
       // Don't throw - allow demoKeyAvailable reload to retry with correct keys
     }
   } else if (isServer) {
@@ -197,7 +193,7 @@ async function loadLocalCredentials(): Promise<Credential[]> {
         return { ...c, id };
       });
     } catch (e) {
-      console.error('[VaultContext] Credential parse error:', e);
+      logger.error('[VaultContext] Credential parse error:', e);
       // Don't throw - allow demoKeyAvailable reload to retry with correct keys
     }
   } else if (isServer) {
@@ -220,7 +216,7 @@ async function loadLocalAssetHolder(): Promise<AssetHolder> {
         };
       }
     } catch (e) {
-      console.error('[VaultContext] Assets parse error:', e);
+      logger.error('[VaultContext] Assets parse error:', e);
       // Don't throw - allow demoKeyAvailable reload to retry with correct keys
     }
   } else if (isServer) {
@@ -318,9 +314,9 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       let a: AssetHolder | null = null;
       let pendingError = false;
 
-      try { f = await loadLocalFolders(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else console.error(e); }
-      try { c = await loadLocalCredentials(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else console.error(e); }
-      try { a = await loadLocalAssetHolder(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else console.error(e); }
+      try { f = await loadLocalFolders(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else logger.error(e); }
+      try { c = await loadLocalCredentials(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else logger.error(e); }
+      try { a = await loadLocalAssetHolder(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else logger.error(e); }
 
       if (hasServerSession() && !keyStore.hasToken) {
         // Still no keys after restore attempt? User needs to log in to derive them.
@@ -337,7 +333,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       }
 
       // Filter for Travel Mode
-      const travel = getTravelModeConfig();
+      const travel = await getTravelModeConfigAsync();
       if (travel.active) {
         if (f !== null) {
           f = f.filter(folder => !travel.hiddenFolderIds.includes(folder.id));
@@ -369,7 +365,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         setVaultLocked(true);
         setVaultReady(false);
       } else {
-        console.error('[VaultContext] Failed to load local vault:', err);
+        logger.error('[VaultContext] Failed to load local vault:', err);
         setLoadError(true);
         setVaultReady(false);
       }
@@ -416,7 +412,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     try {
       await persistFolders(updated);
     } catch (err) {
-      console.error('[VaultContext] addFolder persist failed:', err);
+      logger.error('[VaultContext] addFolder persist failed:', err);
       setFolders(prevFolders);
       addNotification({
         type: 'persistence_failed',
@@ -446,7 +442,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     try {
       await persistFolders(updated);
     } catch (err) {
-      console.error('[VaultContext] updateFolder persist failed:', err);
+      logger.error('[VaultContext] updateFolder persist failed:', err);
       setFolders(prevFolders);
       throw err;
     }
@@ -472,7 +468,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
           newCreds.length !== prevCreds.length ? persistCredentials(newCreds) : Promise.resolve(),
         ]);
       } catch (err) {
-        console.error('[VaultContext] deleteFolder persist failed:', err);
+        logger.error('[VaultContext] deleteFolder persist failed:', err);
         setFolders(prevFolders);
         setCredentials(prevCreds);
         throw err;
@@ -499,7 +495,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     try {
       await persistFolders(newFolders);
     } catch (err) {
-      console.error('[VaultContext] reorderFolders persist failed:', err);
+      logger.error('[VaultContext] reorderFolders persist failed:', err);
       setFolders(prev);
       throw err;
     }

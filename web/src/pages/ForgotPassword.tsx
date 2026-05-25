@@ -5,6 +5,7 @@ import { keyStore } from '../crypto/keystore';
 import { Shield, ArrowRight, CheckCircle2, Loader2, MailCheck } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';
 import SEO from '../components/SEO';
+import { hasServerSession as _hasServerSession } from '../utils/api';
 
 export default function ForgotPassword() {
   const { t } = useTranslation();
@@ -12,7 +13,7 @@ export default function ForgotPassword() {
   const [view, setView] = useState<'form' | 'success'>('form');
 
   useEffect(() => {
-    const hasServerSession = document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+    const hasServerSession = _hasServerSession();
     if (keyStore.hasToken || hasServerSession) {
       navigate('/vault', { replace: true });
     }

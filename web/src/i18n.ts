@@ -1,7 +1,18 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import Backend from 'i18next-http-backend';
 import enTranslations from './locales/en.json';
+import frTranslations from './locales/fr.json';
+import esTranslations from './locales/es.json';
+import deTranslations from './locales/de.json';
+import itTranslations from './locales/it.json';
+import ptTranslations from './locales/pt.json';
+import ruTranslations from './locales/ru.json';
+import arTranslations from './locales/ar.json';
+import hiTranslations from './locales/hi.json';
+import zhTranslations from './locales/zh.json';
+import jaTranslations from './locales/ja.json';
+import koTranslations from './locales/ko.json';
+import idTranslations from './locales/id.json';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', name: 'English',    nativeName: 'English'           },
@@ -22,22 +33,29 @@ export const SUPPORTED_LANGUAGES = [
 const RTL_LANGS = new Set(['ar']);
 
 i18n
-  .use(Backend)
   .use(initReactI18next)
   .init({
-    lng: 'en',
+    lng: localStorage.getItem('i18nextLng') || 'en',
     fallbackLng: 'en',
     supportedLngs: SUPPORTED_LANGUAGES.map(l => l.code),
-    // English is bundled inline (zero-RTT); all other locales load on demand.
-    resources: { en: { translation: enTranslations } },
-    partialBundledLanguages: true,
-    backend: {
-      loadPath: '/locales/{{lng}}/translation.json',
+    resources: {
+      en: { translation: enTranslations },
+      fr: { translation: frTranslations },
+      es: { translation: esTranslations },
+      de: { translation: deTranslations },
+      it: { translation: itTranslations },
+      pt: { translation: ptTranslations },
+      ru: { translation: ruTranslations },
+      ar: { translation: arTranslations },
+      hi: { translation: hiTranslations },
+      zh: { translation: zhTranslations },
+      ja: { translation: jaTranslations },
+      ko: { translation: koTranslations },
+      id: { translation: idTranslations },
     },
     interpolation: {
       escapeValue: false,
     },
-    // RouterProvider is not wrapped in Suspense - disable throwing promises.
     react: {
       useSuspense: false,
     },
@@ -45,6 +63,7 @@ i18n
 
 i18n.on('languageChanged', (lng) => {
   document.documentElement.dir = RTL_LANGS.has(lng) ? 'rtl' : 'ltr';
+  localStorage.setItem('i18nextLng', lng);
 });
 
 export default i18n;
