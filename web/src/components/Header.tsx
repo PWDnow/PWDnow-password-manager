@@ -1,3 +1,4 @@
+import { getCsrfToken, apiFetch } from '../utils/api';
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Menu, Settings, LogOut, Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -55,14 +56,7 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
     
     // Call offline API to clear JWE cookies
     try {
-      const csrfMatch = document.cookie.match(/(?:^|;\s*)_pwd_csrf=([^;]*)/);
-      const csrf = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
-      if (csrf) {
-        await fetch('/api/auth/logout', { 
-          method: 'POST',
-          headers: { 'X-CSRF-Token': csrf }
-        });
-      }
+      await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch { /* ignore offline errors */ }
     
     navigate('/login');

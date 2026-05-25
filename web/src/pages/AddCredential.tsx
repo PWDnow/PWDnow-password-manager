@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useReducer } from 'react';
 import { ChevronRight, RefreshCw, Copy, Info, Lock, Briefcase, User, Wallet, MoreHorizontal, Check, X, Wand2, Hash, Type, Globe, Plus, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, CreditCard, Key, Clock, Eye, EyeOff, Smartphone, HelpCircle, Shield, Bold, Italic, Underline, List, Eraser, ToggleLeft, ToggleRight, FileText, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation, Trans } from 'react-i18next';
@@ -86,6 +86,43 @@ function parseMarkdown(text: string): React.ReactNode[] {
   return result;
 }
 
+// ── Form state managed by useReducer ──────────────────────────────────────
+interface CredentialFormState {
+  credentialType: CredentialType;
+  // Passkey fields
+  rpId: string; rpName: string; credentialId: string; userHandle: string;
+  authenticatorName: string; backedUp: boolean;
+  // Secure note
+  noteContent: string;
+  // Payment card
+  cardholderName: string; cardNumber: string; cardExpiry: string;
+  cardCvv: string; cardBillingAddress: string;
+  // Login basics
+  title: string; username: string; url: string; password: string;
+  otpSecret: string; otpAlgorithm: 'SHA1' | 'SHA256' | 'SHA512'; otpDigits: number;
+  description: string; accountType: string;
+  // Expiry
+  expiryEnabled: boolean; expiryValue: number;
+  expiryUnit: 'days' | 'months' | 'years'; expiryNotifyEmail: boolean;
+  // Folder + tags + arrays
+  folderId: string; tags: string[];
+  phoneNumbers: { id: string; iso: string; value: string }[];
+  kba: { id: string; question: string; answer: string }[];
+  u2fKeys: { id: string; value: string }[];
+}
+
+type FormAction =
+  | { type: 'setField'; field: keyof CredentialFormState; value: CredentialFormState[keyof CredentialFormState] }
+  | { type: 'reset'; from: Partial<CredentialFormState> };
+
+function formReducer(state: CredentialFormState, action: FormAction): CredentialFormState {
+  switch (action.type) {
+    case 'setField': return { ...state, [action.field]: action.value };
+    case 'reset': return { ...state, ...action.from };
+    default: return state;
+  }
+}
+
 export default function AddCredential({ folders, activeTab, initialData, onCreateFolder, onAddCredential, onUpdateCredential, onCancel }: AddCredentialProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -109,28 +146,9 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       } catch { /* noop */ }
     });
   }, []);
-  const [credentialType, setCredentialType] = useState<CredentialType>(initialData?.credentialType || 'login');
-  // Passkey fields
-  const [rpId, setRpId]                         = useState(initialData?.rpId || '');
-  const [rpName, setRpName]                     = useState(initialData?.rpName || '');
-  const [credentialId, setCredentialId]         = useState(initialData?.credentialId || '');
-  const [userHandle, setUserHandle]             = useState(initialData?.userHandle || '');
-  const [authenticatorName, setAuthenticatorName] = useState(initialData?.authenticatorName || '');
-  const [backedUp, setBackedUp]                 = useState(initialData?.backedUp ?? false);
-  // Secure note fields
-  const [noteContent, setNoteContent]           = useState(initialData?.noteContent || '');
-  // Payment card fields
-  const [cardholderName, setCardholderName]     = useState(initialData?.cardholderName || '');
-  const [cardNumber, setCardNumber]             = useState(initialData?.cardNumber || '');
-  const [cardExpiry, setCardExpiry]             = useState(initialData?.cardExpiry || '');
-  const [cardCvv, setCardCvv]                   = useState(initialData?.cardCvv || '');
-  const [cardBillingAddress, setCardBillingAddress] = useState(initialData?.cardBillingAddress || '');
   const [showCardNumber, setShowCardNumber]     = useState(false);
   const [showCvv, setShowCvv]                   = useState(false);
 
-  const [title, setTitle] = useState(initialData?.service || '');
-  const [username, setUsername] = useState(initialData?.username === 'No username' ? '' : (initialData?.username || ''));
-  const [url, setUrl] = useState(initialData?.url || '');
   const [length, setLength] = useState(24);
   const [wordCount, setWordCount] = useState(6);
   const [includeUppercase, setIncludeUppercase] = useState(true);
@@ -138,37 +156,107 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   const [includeNumbers, setIncludeNumbers] = useState(true);
   const [includeSymbols, setIncludeSymbols] = useState(true);
   const [isPassphrase, setIsPassphrase] = useState(false);
-  const [password, setPassword] = useState(initialData?.password || '');
   const [isGeneratorVisible, setIsGeneratorVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [otpSecret, setOtpSecret] = useState(initialData?.otpSecret || '');
   const { addNotification } = useNotification();
-  const [description, setDescription] = useState(initialData?.description ?? '');
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const [accountType, setAccountType] = useState(initialData?.accountType ?? '');
-  const [expiryEnabled, setExpiryEnabled] = useState(initialData?.expiryEnabled ?? false);
-  const [expiryValue, setExpiryValue] = useState(initialData?.expiryValue ?? 90);
-  const [expiryUnit, setExpiryUnit] = useState<'days' | 'months' | 'years'>(initialData?.expiryUnit ?? 'days');
-  const [expiryNotifyEmail, setExpiryNotifyEmail] = useState(initialData?.expiryNotifyEmail ?? false);
   const [hasSmtp, setHasSmtp] = useState(false);
   // HIBP breach status for the current password. Advisory only - does not
   // block submit. Kept in state rather than derived so the UI can show
   // "checking…" feedback during the async daemon round-trip.
   const [breachStatus, setBreachStatus] = useState<BreachStatus>('idle');
-  
+
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
   const [showPhoneSuggestions, setShowPhoneSuggestions] = useState<string | null>(null);
   const [showU2fSuggestions, setShowU2fSuggestions] = useState<string | null>(null);
 
   // Default to activeTab if it's a valid folder, otherwise default to the first folder
-  const initialFolder = initialData?.folderId || ((activeTab && activeTab !== 'vault' && folders.some(f => f.id === activeTab)) 
-    ? activeTab 
+  const initialFolder = initialData?.folderId || ((activeTab && activeTab !== 'vault' && folders.some(f => f.id === activeTab))
+    ? activeTab
     : (folders[0]?.id || 'work'));
-    
-  const [selectedFolder, setSelectedFolder] = useState(initialFolder);
+
+  const [formState, dispatch] = useReducer(formReducer, undefined, (): CredentialFormState => ({
+    credentialType: initialData?.credentialType || 'login',
+    rpId: initialData?.rpId || '',
+    rpName: initialData?.rpName || '',
+    credentialId: initialData?.credentialId || '',
+    userHandle: initialData?.userHandle || '',
+    authenticatorName: initialData?.authenticatorName || '',
+    backedUp: initialData?.backedUp ?? false,
+    noteContent: initialData?.noteContent || '',
+    cardholderName: initialData?.cardholderName || '',
+    cardNumber: initialData?.cardNumber || '',
+    cardExpiry: initialData?.cardExpiry || '',
+    cardCvv: initialData?.cardCvv || '',
+    cardBillingAddress: initialData?.cardBillingAddress || '',
+    title: initialData?.service || '',
+    username: initialData?.username === 'No username' ? '' : (initialData?.username || ''),
+    url: initialData?.url || '',
+    password: initialData?.password || '',
+    otpSecret: initialData?.otpSecret || '',
+    otpAlgorithm: (initialData as any)?.otpAlgorithm || 'SHA1',
+    otpDigits: (initialData as any)?.otpDigits || 6,
+    description: initialData?.description ?? '',
+    accountType: initialData?.accountType ?? '',
+    expiryEnabled: initialData?.expiryEnabled ?? false,
+    expiryValue: initialData?.expiryValue ?? 90,
+    expiryUnit: initialData?.expiryUnit ?? 'days',
+    expiryNotifyEmail: initialData?.expiryNotifyEmail ?? false,
+    folderId: initialFolder,
+    tags: (() => {
+      const initialTags = initialData?.tags || [];
+      const finalTags = [...initialTags];
+      if (initialData?.otpSecret && !finalTags.includes('OTP')) finalTags.push('OTP');
+      if (initialData?.phoneNumber && Array.isArray(initialData.phoneNumber) && initialData.phoneNumber.length > 0 && !finalTags.includes('2FA')) finalTags.push('2FA');
+      else if (initialData?.phoneNumber && typeof initialData.phoneNumber === 'string' && !finalTags.includes('2FA')) finalTags.push('2FA');
+      return finalTags;
+    })(),
+    phoneNumbers: (() => {
+      if (Array.isArray(initialData?.phoneNumber)) {
+        return initialData!.phoneNumber.map(p => {
+          const match = COUNTRIES.find(c => p.startsWith(c.code));
+          if (match) return { id: generateUUID(), iso: match.iso, value: p.replace(match.code, '').trim() };
+          return { id: generateUUID(), iso: 'US', value: p };
+        });
+      } else if (initialData?.phoneNumber) {
+        const p = initialData.phoneNumber as string;
+        const match = COUNTRIES.find(c => p.startsWith(c.code));
+        if (match) return [{ id: generateUUID(), iso: match.iso, value: p.replace(match.code, '').trim() }];
+        return [{ id: generateUUID(), iso: 'US', value: p }];
+      }
+      return [{ id: generateUUID(), iso: 'US', value: '' }];
+    })(),
+    kba: (() => {
+      if (initialData?.kba && initialData.kba.length > 0) {
+        return initialData.kba.map(k => ({ ...k, id: generateUUID() }));
+      }
+      if ((initialData as any)?.kbaQuestion || (initialData as any)?.kbaAnswer) {
+        return [{ id: generateUUID(), question: (initialData as any).kbaQuestion || '', answer: (initialData as any).kbaAnswer || '' }];
+      }
+      return [{ id: generateUUID(), question: '', answer: '' }];
+    })(),
+    u2fKeys: (() => {
+      if (Array.isArray(initialData?.u2fKeyName)) {
+        return initialData!.u2fKeyName.map(u => ({ id: generateUUID(), value: u }));
+      } else if (initialData?.u2fKeyName) {
+        return [{ id: generateUUID(), value: initialData.u2fKeyName as string }];
+      }
+      return [{ id: generateUUID(), value: '' }];
+    })(),
+  }));
+
+  // Destructure for convenience — all handlers continue to use the same names
+  const {
+    credentialType, rpId, rpName, credentialId, userHandle, authenticatorName, backedUp,
+    noteContent, cardholderName, cardNumber, cardExpiry, cardCvv, cardBillingAddress,
+    title, username, url, password, otpSecret, description, accountType,
+    expiryEnabled, expiryValue, expiryUnit, expiryNotifyEmail,
+    folderId: selectedFolder, tags, phoneNumbers, kba, u2fKeys,
+  } = formState;
+
   const [showFolderOptions, setShowFolderOptions] = useState(false);
   const folderOptionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -181,60 +269,6 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showFolderOptions]);
-  const [tags, setTags] = useState<string[]>(() => {
-    const initialTags = initialData?.tags || [];
-    const finalTags = [...initialTags];
-    if (initialData?.otpSecret && !finalTags.includes('OTP')) {
-      finalTags.push('OTP');
-    }
-    if (initialData?.phoneNumber && Array.isArray(initialData.phoneNumber) && initialData.phoneNumber.length > 0 && !finalTags.includes('2FA')) {
-      finalTags.push('2FA');
-    } else if (initialData?.phoneNumber && typeof initialData.phoneNumber === 'string' && !finalTags.includes('2FA')) {
-      finalTags.push('2FA');
-    }
-    return finalTags;
-  });
-  const [phoneNumbers, setPhoneNumbers] = useState<{id: string, iso: string, value: string}[]>(() => {
-    if (Array.isArray(initialData?.phoneNumber)) {
-      return initialData.phoneNumber.map(p => {
-        const match = COUNTRIES.find(c => p.startsWith(c.code));
-        if (match) {
-          return { id: generateUUID(), iso: match.iso, value: p.replace(match.code, '').trim() };
-        }
-        return { id: generateUUID(), iso: 'US', value: p };
-      });
-    } else if (initialData?.phoneNumber) {
-      const p = initialData.phoneNumber as string;
-      const match = COUNTRIES.find(c => p.startsWith(c.code));
-      if (match) {
-        return [{ id: generateUUID(), iso: match.iso, value: p.replace(match.code, '').trim() }];
-      }
-      return [{ id: generateUUID(), iso: 'US', value: p }];
-    }
-    return [{ id: generateUUID(), iso: 'US', value: '' }];
-  });
-  const [kba, setKba] = useState<{id: string, question: string, answer: string}[]>(() => {
-    if (initialData?.kba && initialData.kba.length > 0) {
-      return initialData.kba.map(k => ({ ...k, id: generateUUID() }));
-    }
-    // Handle legacy data format
-    if ((initialData as any)?.kbaQuestion || (initialData as any)?.kbaAnswer) {
-      return [{ 
-        id: generateUUID(),
-        question: (initialData as any).kbaQuestion || '', 
-        answer: (initialData as any).kbaAnswer || '' 
-      }];
-    }
-    return [{ id: generateUUID(), question: '', answer: '' }];
-  });
-  const [u2fKeys, setU2fKeys] = useState<{id: string, value: string}[]>(() => {
-    if (Array.isArray(initialData?.u2fKeyName)) {
-      return initialData.u2fKeyName.map(u => ({ id: generateUUID(), value: u }));
-    } else if (initialData?.u2fKeyName) {
-      return [{ id: generateUUID(), value: initialData.u2fKeyName as string }];
-    }
-    return [{ id: generateUUID(), value: '' }];
-  });
 
   // Toggles markdown formatting markers around the selection.
   // Applying bold to already-bold text removes the markers instead of double-wrapping.
@@ -246,7 +280,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
     // No selection → insert empty marker pair, place cursor between them.
     if (s === e) {
-      setDescription(value.slice(0, s) + marker + marker + value.slice(s));
+      dispatch({ type: 'setField', field: 'description', value: value.slice(0, s) + marker + marker + value.slice(s) });
       requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + m, s + m); });
       return;
     }
@@ -262,7 +296,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       !(marker === '*' && (selected[1] === '*' || selected[selected.length - 2] === '*'))
     ) {
       const inner = selected.slice(m, -m);
-      setDescription(value.slice(0, s) + inner + value.slice(e));
+      dispatch({ type: 'setField', field: 'description', value: value.slice(0, s) + inner + value.slice(e) });
       requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s, s + inner.length); });
       return;
     }
@@ -279,7 +313,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
           (e + m < value.length && value[e + m] === '*')
         );
         if (!bogus) {
-          setDescription(value.slice(0, s - m) + selected + value.slice(e + m));
+          dispatch({ type: 'setField', field: 'description', value: value.slice(0, s - m) + selected + value.slice(e + m) });
           requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s - m, s - m + selected.length); });
           return;
         }
@@ -287,7 +321,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     }
 
     // Case 3: not wrapped → wrap.
-    setDescription(value.slice(0, s) + marker + selected + marker + value.slice(e));
+    dispatch({ type: 'setField', field: 'description', value: value.slice(0, s) + marker + selected + marker + value.slice(e) });
     requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + m, e + m); });
   };
 
@@ -301,11 +335,11 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     const line      = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd);
     if (line.startsWith('- ')) {
       const next = value.slice(0, lineStart) + line.slice(2) + (lineEnd === -1 ? '' : value.slice(lineEnd));
-      setDescription(next);
+      dispatch({ type: 'setField', field: 'description', value: next });
       requestAnimationFrame(() => { el.focus(); el.setSelectionRange(Math.max(lineStart, s - 2), Math.max(lineStart, s - 2)); });
     } else {
       const next = value.slice(0, lineStart) + '- ' + line + (lineEnd === -1 ? '' : value.slice(lineEnd));
-      setDescription(next);
+      dispatch({ type: 'setField', field: 'description', value: next });
       requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + 2, s + 2); });
     }
   };
@@ -316,13 +350,13 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     const { selectionStart: s, selectionEnd: e, value } = el;
     const cleaned = value.slice(s, e).replace(/\*\*|__|(?<!\*)\*(?!\*)/g, '');
     const newVal = value.slice(0, s) + cleaned + value.slice(e);
-    setDescription(newVal);
+    dispatch({ type: 'setField', field: 'description', value: newVal });
     requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s, s + cleaned.length); });
   };
 
   const addPhoneNumber = () => {
     if (phoneNumbers.length < 2) {
-      setPhoneNumbers([...phoneNumbers, { id: generateUUID(), iso: 'US', value: '' }]);
+      dispatch({ type: 'setField', field: 'phoneNumbers', value: [...phoneNumbers, { id: generateUUID(), iso: 'US', value: '' }] });
     }
   };
 
@@ -347,7 +381,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   };
 
   const updatePhoneNumber = (id: string, field: 'iso' | 'value', val: string) => {
-    setPhoneNumbers(phoneNumbers.map(item => {
+    dispatch({ type: 'setField', field: 'phoneNumbers', value: phoneNumbers.map(item => {
       if (item.id === id) {
         if (field === 'value') {
           return { ...item, value: formatPhoneNumber(val, item.iso) };
@@ -355,47 +389,47 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
         return { ...item, iso: val, value: formatPhoneNumber(item.value, val) };
       }
       return item;
-    }));
+    }) });
   };
 
   const removePhoneNumber = (id: string) => {
     if (phoneNumbers.length > 1) {
-      setPhoneNumbers(phoneNumbers.filter(item => item.id !== id));
+      dispatch({ type: 'setField', field: 'phoneNumbers', value: phoneNumbers.filter(item => item.id !== id) });
     }
   };
 
   const addU2fKey = () => {
     if (u2fKeys.length < 2) {
-      setU2fKeys([...u2fKeys, { id: generateUUID(), value: '' }]);
+      dispatch({ type: 'setField', field: 'u2fKeys', value: [...u2fKeys, { id: generateUUID(), value: '' }] });
     }
   };
 
   const updateU2fKey = (id: string, value: string) => {
-    setU2fKeys(u2fKeys.map(item => item.id === id ? { ...item, value } : item));
+    dispatch({ type: 'setField', field: 'u2fKeys', value: u2fKeys.map(item => item.id === id ? { ...item, value } : item) });
   };
 
   const removeU2fKey = (id: string) => {
     if (u2fKeys.length > 1) {
-      setU2fKeys(u2fKeys.filter(item => item.id !== id));
+      dispatch({ type: 'setField', field: 'u2fKeys', value: u2fKeys.filter(item => item.id !== id) });
     }
   };
 
   const addKbaQuestion = () => {
-    setKba([...kba, { id: generateUUID(), question: '', answer: '' }]);
+    dispatch({ type: 'setField', field: 'kba', value: [...kba, { id: generateUUID(), question: '', answer: '' }] });
   };
 
   const updateKba = (id: string, field: 'question' | 'answer', value: string) => {
-    setKba(kba.map(item => item.id === id ? { ...item, [field]: value } : item));
+    dispatch({ type: 'setField', field: 'kba', value: kba.map(item => item.id === id ? { ...item, [field]: value } : item) });
   };
 
   const removeKbaQuestion = (id: string) => {
     if (kba.length > 1) {
-      setKba(kba.filter(item => item.id !== id));
+      dispatch({ type: 'setField', field: 'kba', value: kba.filter(item => item.id !== id) });
     }
   };
 
   const toggleTag = (tag: string) => {
-    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    dispatch({ type: 'setField', field: 'tags', value: tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag] });
   };
 
   const renderFolderIcon = (folder: Folder, isSelected: boolean) => {
@@ -460,7 +494,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
           result = result + symbol;
         }
       }
-      setPassword(result);
+      dispatch({ type: 'setField', field: 'password', value: result });
     } else {
       let charset = '';
       const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -479,7 +513,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       for (let i = 0; i < length; i++) {
         generatedPassword += charset[secureRandInt(charset.length)];
       }
-      setPassword(generatedPassword);
+      dispatch({ type: 'setField', field: 'password', value: generatedPassword });
     }
   }, [length, wordCount, includeUppercase, includeLowercase, includeNumbers, includeSymbols, isPassphrase]);
 
@@ -695,7 +729,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
               ] as const).map(({ type, icon, label }) => (
                 <button
                   key={type} type="button"
-                  onClick={() => setCredentialType(type)}
+                  onClick={() => dispatch({ type: 'setField', field: 'credentialType', value: type })}
                   className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${credentialType === type ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'}`}
                 >
                   {icon}{label}
@@ -715,7 +749,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 type="text" 
                 required
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => dispatch({ type: 'setField', field: 'title', value: e.target.value })}
                 placeholder={t('addCredential.servicePlaceholder', 'e.g. GitHub Enterprise')} 
                 aria-label="Service Name"
                 className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
@@ -730,7 +764,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.folderAssignment', 'Folder Assignment')}</label>
                   <div className="flex flex-wrap gap-3">
                     {folders.map(folder => (
-                      <button key={folder.id} type="button" onClick={() => setSelectedFolder(folder.id)}
+                      <button key={folder.id} type="button" onClick={() => dispatch({ type: 'setField', field: 'folderId', value: folder.id })}
                         className={`px-5 py-2.5 rounded-xl flex items-center gap-2 transition-all text-xs font-bold ${selectedFolder === folder.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-surface-container-high text-black dark:text-white hover:bg-surface-container-highest'}`}
                       >
                         {renderFolderIcon(folder, selectedFolder === folder.id)}
@@ -749,28 +783,28 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpId', 'Relying Party ID')}</label>
-                        <input type="text" value={rpId} onChange={e => setRpId(e.target.value)} placeholder="github.com"
+                        <input type="text" value={rpId} onChange={e => dispatch({ type: 'setField', field: 'rpId', value: e.target.value })} placeholder="github.com"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpName', 'Site Name')}</label>
-                        <input type="text" value={rpName} onChange={e => setRpName(e.target.value)} placeholder="GitHub"
+                        <input type="text" value={rpName} onChange={e => dispatch({ type: 'setField', field: 'rpName', value: e.target.value })} placeholder="GitHub"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.credentialId', 'Credential ID (optional)')}</label>
-                        <input type="text" value={credentialId} onChange={e => setCredentialId(e.target.value)} placeholder="base64url…"
+                        <input type="text" value={credentialId} onChange={e => dispatch({ type: 'setField', field: 'credentialId', value: e.target.value })} placeholder="base64url…"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono text-sm outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.authenticatorName', 'Authenticator')}</label>
-                        <input type="text" value={authenticatorName} onChange={e => setAuthenticatorName(e.target.value)} placeholder="YubiKey 5C NFC"
+                        <input type="text" value={authenticatorName} onChange={e => dispatch({ type: 'setField', field: 'authenticatorName', value: e.target.value })} placeholder="YubiKey 5C NFC"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => setBackedUp(b => !b)}>
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => dispatch({ type: 'setField', field: 'backedUp', value: !backedUp })}>
                       {backedUp ? <ToggleRight size={28} className="text-black dark:text-white shrink-0" /> : <ToggleLeft size={28} className="text-on-surface-variant shrink-0" />}
                       <span className="text-sm font-bold">{t('addCredential.backedUp', 'Backed up (synced passkey)')}</span>
                     </div>
@@ -781,7 +815,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 {credentialType === 'secure_note' && (
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.noteContent', 'Note')} <span className="text-red-500">*</span></label>
-                    <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} rows={12}
+                    <textarea value={noteContent} onChange={e => dispatch({ type: 'setField', field: 'noteContent', value: e.target.value })} rows={12}
                       placeholder={t('addCredential.noteContentPlaceholder', 'Write your secure note here…')}
                       className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant resize-y outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                     {noteContent.length > 45000 && <p className="text-xs text-error">{t('addCredential.noteTooLong', 'Note is very long - consider splitting into multiple notes.')}</p>}
@@ -797,14 +831,14 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardholderName', 'Cardholder Name')}</label>
-                        <input type="text" value={cardholderName} onChange={e => setCardholderName(e.target.value)} placeholder="John Doe"
+                        <input type="text" value={cardholderName} onChange={e => dispatch({ type: 'setField', field: 'cardholderName', value: e.target.value })} placeholder="John Doe"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardNumber', 'Card Number')}</label>
                         <div className="relative">
                           <input type={showCardNumber ? 'text' : 'password'} value={cardNumber}
-                            onChange={e => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 19))}
+                            onChange={e => dispatch({ type: 'setField', field: 'cardNumber', value: e.target.value.replace(/\D/g, '').slice(0, 19) })}
                             placeholder="•••• •••• •••• ••••" inputMode="numeric"
                             className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12" />
                           <button type="button" onClick={() => setShowCardNumber(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
@@ -816,14 +850,14 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardExpiry', 'Expiry (MM/YYYY)')}</label>
-                        <input type="text" value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} placeholder="12/2028" maxLength={7}
+                        <input type="text" value={cardExpiry} onChange={e => dispatch({ type: 'setField', field: 'cardExpiry', value: e.target.value })} placeholder="12/2028" maxLength={7}
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardCvv', 'CVV')}</label>
                         <div className="relative">
                           <input type={showCvv ? 'text' : 'password'} value={cardCvv}
-                            onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            onChange={e => dispatch({ type: 'setField', field: 'cardCvv', value: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                             placeholder="•••" inputMode="numeric"
                             className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12" />
                           <button type="button" onClick={() => setShowCvv(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
@@ -834,7 +868,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     </div>
                     <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardBillingAddress', 'Billing Address (optional)')}</label>
-                      <input type="text" value={cardBillingAddress} onChange={e => setCardBillingAddress(e.target.value)} placeholder="123 Main St, City"
+                      <input type="text" value={cardBillingAddress} onChange={e => dispatch({ type: 'setField', field: 'cardBillingAddress', value: e.target.value })} placeholder="123 Main St, City"
                         className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                     </div>
                   </div>
@@ -852,7 +886,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   value={username}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setUsername(val);
+                    dispatch({ type: 'setField', field: 'username', value: val });
                     // Regex validation: must have @ and a dot in domain, and no spaces
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                     if (val && !emailRegex.test(val)) {
@@ -867,7 +901,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     // Clean up email: remove non-essential characters if it looks like an email
                     if (username.includes('@')) {
                       const cleaned = username.replace(/[^\w@.-]/g, '');
-                      if (cleaned !== username) setUsername(cleaned);
+                      if (cleaned !== username) dispatch({ type: 'setField', field: 'username', value: cleaned });
                     }
                   }}
                   placeholder="name@example.com" 
@@ -896,7 +930,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           key={i}
                           type="button"
                           onClick={() => {
-                            setUsername(email);
+                            dispatch({ type: 'setField', field: 'username', value: email });
                             setShowEmailSuggestions(false);
                           }}
                           className="w-full text-left px-6 py-3 hover:bg-surface-container-low transition-colors text-sm font-bold text-black dark:text-white"
@@ -915,7 +949,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   type="text" 
                   value={url}
                   onChange={(e) => {
-                    setUrl(e.target.value);
+                    dispatch({ type: 'setField', field: 'url', value: e.target.value });
                     if (urlError) setUrlError(null);
                   }}
                   placeholder="https://github.com" 
@@ -942,7 +976,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   id="password-input"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => dispatch({ type: 'setField', field: 'password', value: e.target.value })}
                   aria-label="Password"
                   className="w-full px-6 py-4 pr-52 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white font-mono tracking-widest focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                 />
@@ -993,7 +1027,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
               <input
                 type="text"
                 value={accountType}
-                onChange={e => setAccountType(e.target.value.slice(0, 50))}
+                onChange={e => dispatch({ type: 'setField', field: 'accountType', value: e.target.value.slice(0, 50) })}
                 placeholder={t('addCredential.accountTypePlaceholder', 'e.g. Free, Starter, Pro')}
                 className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none text-sm"
               />
@@ -1012,7 +1046,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 </div>
                 <button
                   type="button"
-                  onClick={() => setExpiryEnabled(v => !v)}
+                  onClick={() => dispatch({ type: 'setField', field: 'expiryEnabled', value: !expiryEnabled })}
                   className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${expiryEnabled ? 'bg-black dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}`}
                   aria-pressed={expiryEnabled}
                   aria-label={t('addCredential.expiryLabel', 'Password Expiry')}
@@ -1041,7 +1075,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           value={expiryValue}
                           onChange={e => {
                             const n = parseInt(e.target.value, 10);
-                            if (!isNaN(n)) setExpiryValue(Math.min(1000, Math.max(1, n)));
+                            if (!isNaN(n)) dispatch({ type: 'setField', field: 'expiryValue', value: Math.min(1000, Math.max(1, n)) });
                           }}
                           className="w-full px-4 py-3 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none text-sm font-mono"
                         />
@@ -1052,7 +1086,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                         </label>
                         <select
                           value={expiryUnit}
-                          onChange={e => setExpiryUnit(e.target.value as 'days' | 'months' | 'years')}
+                          onChange={e => dispatch({ type: 'setField', field: 'expiryUnit', value: e.target.value as 'days' | 'months' | 'years' })}
                           className="w-full px-4 py-3 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none text-sm"
                         >
                           <option value="days">{t('addCredential.expiryDays', 'Days')}</option>
@@ -1069,7 +1103,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                         </p>
                         <button
                           type="button"
-                          onClick={() => setExpiryNotifyEmail(v => !v)}
+                          onClick={() => dispatch({ type: 'setField', field: 'expiryNotifyEmail', value: !expiryNotifyEmail })}
                           className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${expiryNotifyEmail ? 'bg-black dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'}`}
                           aria-pressed={expiryNotifyEmail}
                           aria-label={t('addCredential.expiryNotifyEmail', 'Notify me by email on expiry')}
@@ -1150,7 +1184,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     id="otp-secret"
                     type="text" 
                     value={otpSecret}
-                    onChange={(e) => setOtpSecret(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                    onChange={(e) => dispatch({ type: 'setField', field: 'otpSecret', value: e.target.value.replace(/\s+/g, '').toUpperCase() })}
                     placeholder="JBSWY3DPEHPK3PXP" 
                     className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                   />
@@ -1405,7 +1439,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   <button 
                     key={folder.id}
                     type="button" 
-                    onClick={() => setSelectedFolder(folder.id)}
+                    onClick={() => dispatch({ type: 'setField', field: 'folderId', value: folder.id })}
                     role="radio"
                     aria-checked={selectedFolder === folder.id}
                     aria-label={`Assign to ${folder.label} folder`}
@@ -1504,7 +1538,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 <textarea
                   ref={descTextareaRef}
                   value={description}
-                  onChange={e => setDescription(e.target.value)}
+                  onChange={e => dispatch({ type: 'setField', field: 'description', value: e.target.value })}
                   onKeyDown={e => {
                     if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
                       if (e.key === 'b') { e.preventDefault(); toggleWrap('**'); }

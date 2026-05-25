@@ -1,3 +1,4 @@
+import { getCsrfToken, apiFetch } from './api';
 /**
  * Multi-Factor Authentication utilities
  *
@@ -62,9 +63,7 @@ export interface MfaConfig {
 }
 
 // ─── CSRF helper (shared by all server-side fetch calls in this module) ───────
-function getCsrfToken(): string {
-  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('_pwd_csrf='))?.split('=')[1] ?? '';
-}
+
 
 // ─── Login Hints ──────────────────────────────────────────────────────────────
 // Hints are fetched live from the daemon/server on the email step and held in
@@ -104,13 +103,10 @@ export function refreshLoginHints(): void {
     passwordlessEnabled: (cfg.passwordlessEnabled === true) && hasHardware,
   };
 
-  // Sync to server only
-  const csrf = getCsrfToken();
-  if (csrf) {
-    fetch('/api/auth/login-hints', {
+  // Sync to server only (fire-and-forget; daemon-only sessions have no CSRF cookie)
+  if (getCsrfToken()) {
+    apiFetch('/api/auth/login-hints', {
       method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
       body: JSON.stringify({ hints }),
     }).catch(() => { /* silent fail */ });
   }
@@ -172,11 +168,16 @@ export function saveMfaConfig(cfg: MfaConfig): void {
 
   // Sync policy flags to daemon if connected.
   if (daemon.isConnected) {
-    daemon.updateLoginPolicy(
-      cfg.passwordLoginEnabled !== false,
-      cfg.totp.enabled,
-      cfg.email.enabled,
-    ).catch(() => { /* non-fatal */ });
+    (async () => {
+      const { getDuressModeConfig } = await import('./securityModes');
+      const dCfg = getDuressModeConfig();
+      daemon.updateLoginPolicy(
+        cfg.passwordLoginEnabled !== false,
+        cfg.totp.enabled,
+        cfg.email.enabled,
+        dCfg.armed ? dCfg.maxAttempts : 0
+      ).catch(() => { /* non-fatal */ });
+    })();
   }
 
   // Persist to localStorage using the shared signed+encrypted format.
@@ -188,16 +189,13 @@ export function saveMfaConfig(cfg: MfaConfig): void {
 // encrypted at rest like credentials and folders. This survives logout/login.
 
 async function saveMfaConfigToServer(cfg: MfaConfig): Promise<void> {
-  const csrf = getCsrfToken();
-  if (!csrf) return; // not in a server session
+  if (!getCsrfToken()) return; // not in a server session
 
   const encData = await encryptForServer(JSON.stringify(cfg));
   if (!encData) return;
 
-  await fetch('/api/vault/mfa', {
+  await apiFetch('/api/vault/mfa', {
     method: 'PUT',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     body: JSON.stringify({ data: encData }),
   });
 }
@@ -210,9 +208,7 @@ export async function loadMfaConfigFromServer(): Promise<void> {
   // MFA config lives in the encrypted localStorage blob for daemon-mode users.
   if (!getCsrfToken()) return;
   try {
-    const res = await fetch('/api/vault/mfa', { credentials: 'same-origin' });
-    if (!res.ok) return;
-    const body = await res.json();
+    const body = await apiFetch<{ data?: string }>('/api/vault/mfa');
     let data: MfaConfig | null = null;
     
     if (body && typeof body.data === 'string') {

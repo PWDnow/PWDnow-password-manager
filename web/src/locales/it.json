@@ -17,7 +17,14 @@
     "close": "Chiudi",
     "copy": "Copia",
     "on": "ATTIVO",
-    "off": "INATTIVO"
+    "off": "INATTIVO",
+    "remove": "Rimuovi",
+    "done": "Fatto",
+    "verify": "Verifica",
+    "enabled": "Abilitato",
+    "disabled": "Disabilitato",
+    "searchCountries": "Cerca paesi...",
+    "or": "o"
   },
   "pwa": {
     "installTitle": "Installa PWDnow",
@@ -35,7 +42,9 @@
     "createFolder": "Crea cartella",
     "folders": "Cartelle",
     "brand": "PWDnow",
-    "status": "Bastione Digitale Attivo"
+    "status": "Bastione Digitale Attivo",
+    "health": "Salute del vault",
+    "assetHolder": "I miei asset"
   },
   "header": {
     "searchPlaceholder": "Cerca nel tuo santuario...",
@@ -45,6 +54,8 @@
     "suggestFeature": "Suggerisci funzionalità"
   },
   "vault": {
+    "noteBadge": "Note",
+    "templates": "Templates",
     "title": "Il Tuo Caveau",
     "subtitle": "Gestisci in modo sicuro le tue credenziali e gli asset sensibili.",
     "addCredential": "Aggiungi credenziale",
@@ -613,6 +624,7 @@
     "subtitle": "Accedi per accedere al tuo caveau sicuro.",
     "continue": "Continua",
     "invalidCredentials": "Password master non valida.",
+    "serviceUnavailable": "Un servizio non è al momento disponibile. Riprova tra un momento o contatta il tuo amministratore.",
     "heroTitle": "Proteggi i tuoi asset digitali aziendali.",
     "heroSubtitle": "Crittografia di grado militare, controllo degli accessi fluido e registri di audit completi per team moderni.",
     "feature1": "Architettura a conoscenza zero",
@@ -647,7 +659,17 @@
     "methodPasswordTotp": "Password + App autenticatore",
     "methodPasswordEmail": "Password + OTP email",
     "methodPasswordOnly": "Solo password",
-    "methodPasswordOnlyDesc": "Accedi con la tua password (senza secondo fattore)"
+    "methodPasswordOnlyDesc": "Accedi con la tua password (senza secondo fattore)",
+    "quickUnlockFailed": "Sblocco rapido fallito o annullato. Utilizza la tua password principale.",
+    "signInAs": "Accedi come",
+    "backToOptions": "Torna alle opzioni",
+    "quickUnlockTitle": "Sblocca con Touch ID / Windows Hello",
+    "quickUnlockDesc": "Sblocca rapidamente questo dispositivo",
+    "passkeyCard": "Passkey / Touch ID / Windows Hello",
+    "passkeyDesc": "Usa la tua impronta digitale, il viso o il PIN del dispositivo",
+    "simEmailPreview": "Anteprima e-mail simulata",
+    "simEmailCode": "Il tuo codice monouso:",
+    "simEmailNote": "Valido per 5 minuti. Non condividere."
   },
   "register": {
     "title": "Crea un account",
@@ -756,5 +778,50 @@
     "goodShapeTitle": "Account in buona forma!",
     "goodShapeMessage": "Password di {{service}} aggiornata con monitoraggio della scadenza. Eccellente igiene della sicurezza!",
     "update": "Aggiorna"
+  },
+  "assetHolder": {
+    "subtitle": "Salva gli identificatori comuni una volta. Si auto-suggeriscono nel modulo delle credenziali.",
+    "howItWorks": "Quando aggiungi o modifichi una credenziale, i campi suggeriscono automaticamente email, numeri di telefono e chiavi di sicurezza.",
+    "add": "Aggiungi",
+    "emailTitle": "Indirizzi e-mail",
+    "emailDesc": "Usati come nome utente/email quando si aggiungono credenziali di accesso.",
+    "phoneTitle": "Numeri di telefono",
+    "phoneDesc": "Per 2FA (SMS / autenticatore). Suggerito quando il tag 2FA è attivo.",
+    "u2fTitle": "Chiavi di sicurezza (U2F)",
+    "u2fDesc": "Nomi delle chiavi hardware (YubiKey, ecc.). Suggerito quando il tag U2F è attivo.",
+    "u2fPlaceholder": "es. YubiKey 5C NFC",
+    "u2fMax": "Massimo 2 chiavi",
+    "save": "Salva modelli"
+  },
+  "vaultHealth": {
+    "title": "Salute del vault",
+    "subtitle": "Un audit in tempo reale delle tue password — deboli, riutilizzate e compromesse.",
+    "basedOn": "Basato su {{count}} password",
+    "scoreExcellent": "Eccellente",
+    "scoreGood": "Buono",
+    "scoreFair": "Discreto",
+    "scorePoor": "Scarso",
+    "statCompromised": "Compromesse",
+    "statCompromisedDesc": "Trovate in liste di violazioni note",
+    "statWeak": "Deboli",
+    "statWeakDesc": "Password corte o semplici",
+    "statReused": "Riutilizzate",
+    "statReusedDesc": "Stessa password su più account",
+    "statHealthy": "Sicure",
+    "statHealthyDesc": "Nessun problema rilevato",
+    "issuesFound": "Problemi trovati ({{count}})",
+    "goToVault": "Vai al vault",
+    "issueBreached": "Compromessa",
+    "issueWeak": "Debole",
+    "issueReused": "Riutilizzata",
+    "allClearTitle": "Tutto in ordine",
+    "allClearDesc": "Nessuna password debole, riutilizzata o compromessa rilevata.",
+    "emptyState": "Nessuna credenziale con password trovata.",
+    "checkCompromisedTitle": "Verifica compromissione",
+    "checkCompromisedDesc": "Confronto con 500+ password da rockyou.txt e ricerca HIBP. Usa il Monitor Violazioni per una scansione più approfondita con il dataset completo 900M+ HIBP.",
+    "checkStrengthTitle": "Analisi della forza",
+    "checkStrengthDesc": "Valuta lunghezza e diversità dei caratteri (maiuscole, minuscole, numeri, simboli). Le password con punteggio ≤ 1/5 sono segnalate come deboli.",
+    "checkReuseTitle": "Rilevamento riutilizzo",
+    "checkReuseDesc": "Identifica password condivise tra più account. Tutti i confronti avvengono localmente — le password non lasciano mai questa pagina."
   }
 }

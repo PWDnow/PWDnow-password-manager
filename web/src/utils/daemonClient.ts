@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import { encode, decode } from '@msgpack/msgpack';
 import { keyStore } from '../crypto/keystore';
 import type { Folder, Credential, AssetHolder } from '../types';
@@ -106,7 +107,7 @@ export class DaemonClient {
    * Resolves when the socket is open, rejects if the connection fails within 5s.
    * After a failure, fast-rejects for 30 s to avoid blocking callers on every attempt.
    */
-  connect(url = `ws://${location.host}/ws`): Promise<void> {
+  connect(url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`): Promise<void> {
     if (this.#connected) return Promise.resolve();
     if (this.#connectPromise) return this.#connectPromise;
     if (Date.now() < this.#unavailableUntil) {
@@ -157,7 +158,7 @@ export class DaemonClient {
             const data = resp['data'] as Record<string, unknown> | undefined;
             const code = String(data?.['code'] ?? '');
             const msg = String(data?.['message'] ?? '');
-            console.warn('[Daemon Error]', { code, msg });
+            logger.warn('[Daemon Error]', { code, msg });
             
             const SAFE_MESSAGES: Record<string, string> = {
               'InvalidPassword': 'Authentication failed.',
@@ -212,7 +213,7 @@ export class DaemonClient {
 
   private async request<T = unknown>(
     cmd: string,
-    payload?: any,
+    payload?: unknown,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
   ): Promise<T> {
     if (!this.#ws || !this.#connected) {
@@ -273,14 +274,16 @@ export class DaemonClient {
     password_login_enabled: boolean;
     totp_enabled: boolean;
     email_otp_enabled: boolean;
+    recovery_key_active: boolean;
     fido2_ids: Uint8Array[];
   }> {
-    type Raw = { password_login_enabled: boolean; totp_enabled: boolean; email_otp_enabled: boolean; fido2_ids: number[][] };
+    type Raw = { password_login_enabled: boolean; totp_enabled: boolean; email_otp_enabled: boolean; recovery_key_active: boolean; fido2_ids: number[][] };
     const d = await this.rpc<Raw>('GetLoginHints');
     return {
       password_login_enabled: d.password_login_enabled,
       totp_enabled: d.totp_enabled,
       email_otp_enabled: d.email_otp_enabled,
+      recovery_key_active: !!d.recovery_key_active,
       fido2_ids: d.fido2_ids.map((arr) => new Uint8Array(arr)),
     };
   }
@@ -350,6 +353,25 @@ export class DaemonClient {
     await this.request('QuickUnlockRevoke', {
       session_token: this.token,
     });
+  }
+
+  async enrollRecoveryKey(recoveryKey: string): Promise<void> {
+    await this.request('EnrollRecoveryKey', {
+      session_token: this.token,
+      recovery_key: Array.from(new TextEncoder().encode(recoveryKey)),
+    });
+  }
+
+  async unlockWithRecoveryKey(recoveryKey: string): Promise<void> {
+    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    const data = await this.rpc<UnlockData>('UnlockWithRecoveryKey', {
+      recovery_key: Array.from(new TextEncoder().encode(recoveryKey)),
+    });
+    if (!data?.session_token) throw new Error('no session token in recovery unlock response');
+    if (data.wipe_ticket?.length) {
+      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    }
+    keyStore.store(data.session_token);
   }
 
   /**
@@ -540,7 +562,7 @@ export class DaemonClient {
     } catch (e) {
       // Non-fatal: registration's primary goal (vault creation + unlock) is
       // already done. The user can still set their profile from Settings.
-      console.warn('[daemon.register] profile write failed:', e);
+      logger.warn('[daemon.register] profile write failed:', e);
     }
   }
 
@@ -557,25 +579,21 @@ export class DaemonClient {
     );
   }
 
-  async verifyPassword(password: string): Promise<boolean> {
+  async verifyPassword(password: string): Promise<void> {
     const bytes = Array.from(new TextEncoder().encode(password));
-    try {
-      await this.request('VerifyMasterPassword', {
-        session_token: this.token,
-        password: bytes,
-      });
-      return true;
-    } catch {
-      return false;
-    }
+    await this.request('VerifyMasterPassword', {
+      session_token: this.token,
+      password: bytes,
+    });
   }
 
-  async updateLoginPolicy(passwordEnabled: boolean, totpEnabled: boolean, emailOtpEnabled: boolean): Promise<void> {
+  async updateLoginPolicy(passwordEnabled: boolean, totpEnabled: boolean, emailOtpEnabled: boolean, duressMaxAttempts: number = 0): Promise<void> {
     await this.request('UpdateLoginPolicy', {
       session_token: this.token,
       password_login_enabled: passwordEnabled,
       totp_enabled: totpEnabled,
       email_otp_enabled: emailOtpEnabled,
+      duress_max_attempts: duressMaxAttempts,
     });
   }
 

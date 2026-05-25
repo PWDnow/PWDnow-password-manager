@@ -1,0 +1,514 @@
+use std::ffi::{CStr, CString};
+use std::ptr;
+use std::sync::Once;
+use hkdf::Hkdf;
+use crate::error::VaultError;
+use super::fido2_sys;
+
+#[derive(Debug, Clone)]
+pub struct RegisterOutput {
+    pub credential_id: Vec<u8>,
+    pub public_key_cbor: Vec<u8>,
+    pub auth_data: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AssertOutput {
+    pub credential_id: Vec<u8>,
+    pub auth_data: Vec<u8>,
+    pub signature: Vec<u8>,
+}
+
+pub trait DeviceBackend: Send + Sync {
+    fn list_devices(&self) -> Result<Vec<String>, VaultError>;
+    fn make_credential(
+        &self,
+        device_path: &str,
+        rp_id: &str,
+        user_id: &[u8],
+        client_data_hash: &[u8; 32],
+        resident_key: bool,
+    ) -> Result<RegisterOutput, VaultError>;
+    #[allow(dead_code)]
+    fn get_assertion(
+        &self,
+        device_path: &str,
+        rp_id: &str,
+        credential_id: &[u8],
+        client_data_hash: &[u8; 32],
+    ) -> Result<AssertOutput, VaultError>;
+    fn verify_assertion(
+        &self,
+        public_key_cbor: &[u8],
+        assertion: &AssertOutput,
+        client_data_hash: &[u8; 32],
+        rp_id: &str,
+        require_uv: bool,
+    ) -> Result<(), VaultError>;
+}
+
+static FIDO_INIT: Once = Once::new();
+
+pub struct FidoDevice;
+
+impl FidoDevice {
+    pub fn new() -> Self {
+        FIDO_INIT.call_once(|| {
+            unsafe { fido2_sys::fido_init(0); }
+        });
+        Self
+    }
+}
+
+struct FidoDev(*mut fido2_sys::fido_dev_t);
+impl Drop for FidoDev {
+    fn drop(&mut self) {
+        unsafe {
+            fido2_sys::fido_dev_close(self.0);
+            fido2_sys::fido_dev_free(&mut self.0);
+        }
+    }
+}
+
+struct FidoCred(*mut fido2_sys::fido_cred_t);
+impl Drop for FidoCred {
+    fn drop(&mut self) {
+        unsafe { fido2_sys::fido_cred_free(&mut self.0); }
+    }
+}
+
+struct FidoAssert(*mut fido2_sys::fido_assert_t);
+impl Drop for FidoAssert {
+    fn drop(&mut self) {
+        unsafe { fido2_sys::fido_assert_free(&mut self.0); }
+    }
+}
+
+struct FidoDevInfo(*mut fido2_sys::fido_dev_info_t, usize);
+impl Drop for FidoDevInfo {
+    fn drop(&mut self) {
+        unsafe { fido2_sys::fido_dev_info_free(&mut self.0, self.1); }
+    }
+}
+
+impl DeviceBackend for FidoDevice {
+    fn list_devices(&self) -> Result<Vec<String>, VaultError> {
+        unsafe {
+            const MAX_DEVS: usize = 64;
+            let di_ptr = fido2_sys::fido_dev_info_new(MAX_DEVS);
+            if di_ptr.is_null() {
+                return Err(VaultError::Auth("fido_dev_info_new failed".into()));
+            }
+            let _di = FidoDevInfo(di_ptr, MAX_DEVS);
+            let mut found: usize = 0;
+            let r = fido2_sys::fido_dev_info_manifest(di_ptr, MAX_DEVS, &mut found);
+            if r != fido2_sys::FIDO_OK as i32 {
+                return Ok(vec![]); // no devices found is not an error
+            }
+            let mut paths = Vec::new();
+            for i in 0..found {
+                let info = fido2_sys::fido_dev_info_ptr(di_ptr, i);
+                if !info.is_null() {
+                    let path_ptr = fido2_sys::fido_dev_info_path(info);
+                    if !path_ptr.is_null() {
+                        if let Ok(s) = CStr::from_ptr(path_ptr).to_str() {
+                            paths.push(s.to_string());
+                        }
+                    }
+                }
+            }
+            Ok(paths)
+        }
+    }
+
+    fn make_credential(
+        &self, device_path: &str, rp_id: &str, user_id: &[u8],
+        client_data_hash: &[u8; 32], resident_key: bool,
+    ) -> Result<RegisterOutput, VaultError> {
+        let path = CString::new(device_path)
+            .map_err(|_| VaultError::Auth("invalid device path".into()))?;
+        let rp = CString::new(rp_id)
+            .map_err(|_| VaultError::Auth("invalid rp_id".into()))?;
+
+        unsafe {
+            let dev_ptr = fido2_sys::fido_dev_new();
+            if dev_ptr.is_null() { return Err(VaultError::Auth("fido_dev_new failed".into())); }
+            let _dev = FidoDev(dev_ptr);
+
+            let open_r = fido2_sys::fido_dev_open(dev_ptr, path.as_ptr());
+            if open_r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("fido_dev_open failed: {open_r}")));
+            }
+
+            let cred_ptr = fido2_sys::fido_cred_new();
+            if cred_ptr.is_null() {
+                return Err(VaultError::Auth("fido_cred_new failed".into()));
+            }
+            let _cred = FidoCred(cred_ptr);
+
+            fido2_sys::fido_cred_set_type(cred_ptr, fido2_sys::COSE_ES256);
+            fido2_sys::fido_cred_set_rp(cred_ptr, rp.as_ptr(), rp.as_ptr()); // id, name
+            fido2_sys::fido_cred_set_user(cred_ptr,
+                user_id.as_ptr(), user_id.len(),
+                ptr::null(), ptr::null(), ptr::null()); // id, id_len, name, display, icon
+            fido2_sys::fido_cred_set_clientdata_hash(cred_ptr,
+                client_data_hash.as_ptr(), client_data_hash.len());
+            if resident_key {
+                fido2_sys::fido_cred_set_rk(cred_ptr, fido2_sys::fido_opt_t_FIDO_OPT_TRUE);
+            }
+
+            let make_r = fido2_sys::fido_dev_make_cred(dev_ptr, cred_ptr, ptr::null());
+            if make_r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("make_credential failed: {make_r}")));
+            }
+
+            let cred_id_ptr = fido2_sys::fido_cred_id_ptr(cred_ptr);
+            let cred_id_len = fido2_sys::fido_cred_id_len(cred_ptr);
+            let credential_id = std::slice::from_raw_parts(cred_id_ptr, cred_id_len).to_vec();
+
+            let pk_ptr = fido2_sys::fido_cred_pubkey_ptr(cred_ptr);
+            let pk_len = fido2_sys::fido_cred_pubkey_len(cred_ptr);
+            let public_key_cbor = std::slice::from_raw_parts(pk_ptr, pk_len).to_vec();
+
+            let ad_ptr = fido2_sys::fido_cred_authdata_ptr(cred_ptr);
+            let ad_len = fido2_sys::fido_cred_authdata_len(cred_ptr);
+            let auth_data = std::slice::from_raw_parts(ad_ptr, ad_len).to_vec();
+
+            Ok(RegisterOutput { credential_id, public_key_cbor, auth_data })
+        }
+    }
+
+    fn get_assertion(
+        &self, device_path: &str, rp_id: &str, credential_id: &[u8],
+        client_data_hash: &[u8; 32],
+    ) -> Result<AssertOutput, VaultError> {
+        let path = CString::new(device_path)
+            .map_err(|_| VaultError::Auth("invalid device path".into()))?;
+        let rp = CString::new(rp_id)
+            .map_err(|_| VaultError::Auth("invalid rp_id".into()))?;
+
+        unsafe {
+            let dev_ptr = fido2_sys::fido_dev_new();
+            if dev_ptr.is_null() { return Err(VaultError::Auth("fido_dev_new failed".into())); }
+            let _dev = FidoDev(dev_ptr);
+            
+            let open_r = fido2_sys::fido_dev_open(dev_ptr, path.as_ptr());
+            if open_r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("fido_dev_open: {open_r}")));
+            }
+
+            let assert_ptr = fido2_sys::fido_assert_new();
+            if assert_ptr.is_null() { return Err(VaultError::Auth("fido_assert_new failed".into())); }
+            let _assert = FidoAssert(assert_ptr);
+
+            fido2_sys::fido_assert_set_rp(assert_ptr, rp.as_ptr());
+            fido2_sys::fido_assert_set_clientdata_hash(assert_ptr,
+                client_data_hash.as_ptr(), client_data_hash.len());
+            fido2_sys::fido_assert_allow_cred(assert_ptr,
+                credential_id.as_ptr(), credential_id.len());
+            fido2_sys::fido_assert_set_up(assert_ptr, fido2_sys::fido_opt_t_FIDO_OPT_TRUE);
+
+            let r = fido2_sys::fido_dev_get_assert(dev_ptr, assert_ptr, ptr::null());
+            if r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("get_assertion failed: {r}")));
+            }
+
+            let ad_ptr = fido2_sys::fido_assert_authdata_ptr(assert_ptr, 0);
+            let ad_len = fido2_sys::fido_assert_authdata_len(assert_ptr, 0);
+            let auth_data = std::slice::from_raw_parts(ad_ptr, ad_len).to_vec();
+
+            let sig_ptr = fido2_sys::fido_assert_sig_ptr(assert_ptr, 0);
+            let sig_len = fido2_sys::fido_assert_sig_len(assert_ptr, 0);
+            let signature = std::slice::from_raw_parts(sig_ptr, sig_len).to_vec();
+
+            let cid_ptr = fido2_sys::fido_assert_id_ptr(assert_ptr, 0);
+            let cid_len = fido2_sys::fido_assert_id_len(assert_ptr, 0);
+            let ret_cred_id = std::slice::from_raw_parts(cid_ptr, cid_len).to_vec();
+
+            Ok(AssertOutput { credential_id: ret_cred_id, auth_data, signature })
+        }
+    }
+
+    fn verify_assertion(
+        &self, public_key_cbor: &[u8], assertion: &AssertOutput,
+        client_data_hash: &[u8; 32], rp_id: &str, require_uv: bool,
+    ) -> Result<(), VaultError> {
+        // F1-FIX: perform real libfido2 assertion verification.
+        // Populates a fido_assert_t with the authdata, signature, clientDataHash,
+        // and rpId, then calls fido_assert_verify with the stored COSE public key.
+        let rp_cstr = std::ffi::CString::new(rp_id)
+            .map_err(|_| VaultError::Auth("invalid rp_id".into()))?;
+
+        // H-24: if UV is required, ensure it is set in auth_data flags.
+        // auth_data[32] is the flags byte; bit 2 (0x04) is UV.
+        if require_uv {
+            if assertion.auth_data.len() < 33 {
+                return Err(VaultError::Auth("invalid auth_data length".into()));
+            }
+            if (assertion.auth_data[32] & 0x04) == 0 {
+                return Err(VaultError::Auth("User Verification (UV) required but not present".into()));
+            }
+        }
+
+        unsafe {
+            let assert_ptr = fido2_sys::fido_assert_new();
+            if assert_ptr.is_null() {
+                return Err(VaultError::Auth("fido_assert_new failed".into()));
+            }
+            let _assert = FidoAssert(assert_ptr);
+
+            // Set RP identifier.
+            fido2_sys::fido_assert_set_rp(assert_ptr, rp_cstr.as_ptr());
+
+            // Allocate exactly one statement slot.
+            let r = fido2_sys::fido_assert_set_count(assert_ptr, 1);
+            if r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("fido_assert_set_count: {r}")));
+            }
+
+            // clientDataHash — the 32-byte SHA-256 of clientDataJSON.
+            fido2_sys::fido_assert_set_clientdata_hash(
+                assert_ptr, client_data_hash.as_ptr(), client_data_hash.len(),
+            );
+
+            // Require User Presence (UP flag in authData).
+            fido2_sys::fido_assert_set_up(assert_ptr, fido2_sys::fido_opt_t_FIDO_OPT_TRUE);
+
+            // H-24: set UV requirement in libfido2 statement.
+            if require_uv {
+                fido2_sys::fido_assert_set_uv(assert_ptr, fido2_sys::fido_opt_t_FIDO_OPT_TRUE);
+            }
+
+            // Load the raw authData bytes into statement 0.
+            let r = fido2_sys::fido_assert_set_authdata_raw(
+                assert_ptr, 0,
+                assertion.auth_data.as_ptr(), assertion.auth_data.len(),
+            );
+            if r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("fido_assert_set_authdata_raw: {r}")));
+            }
+
+            // Load the signature into statement 0.
+            let r = fido2_sys::fido_assert_set_sig(
+                assert_ptr, 0,
+                assertion.signature.as_ptr(), assertion.signature.len(),
+            );
+            if r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("fido_assert_set_sig: {r}")));
+            }
+
+            // Verify: libfido2 recomputes the signed data and checks the ES256 sig.
+            let r = fido2_sys::fido_assert_verify(
+                assert_ptr as *const _,
+                0,
+                fido2_sys::COSE_ES256,
+                public_key_cbor.as_ptr() as *const std::os::raw::c_void,
+            );
+            if r != fido2_sys::FIDO_OK as i32 {
+                return Err(VaultError::Auth(format!("fido_assert_verify: {r}")));
+            }
+
+            Ok(())
+        }
+    }
+}
+
+#[cfg(any(test, feature = "mock-fido2"))]
+pub struct SoftwareBackend {
+    registered: std::sync::Mutex<Vec<Vec<u8>>>,
+}
+
+#[cfg(any(test, feature = "mock-fido2"))]
+impl SoftwareBackend {
+    pub fn new() -> Self {
+        Self { registered: std::sync::Mutex::new(Vec::new()) }
+    }
+}
+
+#[cfg(any(test, feature = "mock-fido2"))]
+impl DeviceBackend for SoftwareBackend {
+    fn list_devices(&self) -> Result<Vec<String>, VaultError> {
+        Ok(vec!["mock://device0".into()])
+    }
+
+    fn make_credential(
+        &self, _device_path: &str, _rp_id: &str, user_id: &[u8],
+        _client_data_hash: &[u8; 32], _resident_key: bool,
+    ) -> Result<RegisterOutput, VaultError> {
+        let mut reg = self.registered.lock().unwrap();
+        if reg.len() >= 2 {
+            return Err(VaultError::Auth("maximum 2 FIDO2 credentials".into()));
+        }
+        // Deterministic credential_id = SHA3-512(user_id) truncated to 16 bytes
+        use sha3::{Sha3_512, Digest};
+        let hash = Sha3_512::digest(user_id);
+        let credential_id = hash[..16].to_vec();
+        reg.push(credential_id.clone());
+        // auth_data: 33 bytes stable prefix (rpIdHash 32 + flags 1) + 4 bytes signCount
+        // rpIdHash = all 0x42, flags = 0x41 (UP+AT), signCount = 0
+        let mut auth_data = vec![0x42u8; 32];
+        auth_data.push(0x41); // flags: UP + AT
+        auth_data.extend_from_slice(&[0u8; 4]); // signCount
+        auth_data.extend_from_slice(&[0u8; 100]); // rest of authData (attested cred data stub)
+        Ok(RegisterOutput {
+            credential_id,
+            public_key_cbor: vec![0x02u8; 64],
+            auth_data,
+        })
+    }
+
+    fn get_assertion(
+        &self, _device_path: &str, _rp_id: &str, credential_id: &[u8],
+        _client_data_hash: &[u8; 32],
+    ) -> Result<AssertOutput, VaultError> {
+        let reg = self.registered.lock().unwrap();
+        if !reg.iter().any(|c| c == credential_id) {
+            return Err(VaultError::Auth("unknown credential_id in mock".into()));
+        }
+        // Return stable auth_data (same prefix as registration for deterministic VMK wrap key)
+        let mut auth_data = vec![0x42u8; 32]; // rpIdHash
+        auth_data.push(0x01); // flags: UP only (no AT in assertions)
+        auth_data.extend_from_slice(&[0u8; 4]); // signCount
+        Ok(AssertOutput {
+            credential_id: credential_id.to_vec(),
+            auth_data,
+            signature: vec![0xABu8; 64],
+        })
+    }
+
+    fn verify_assertion(
+        &self, _public_key_cbor: &[u8], _assertion: &AssertOutput,
+        _client_data_hash: &[u8; 32], _rp_id: &str, _require_uv: bool,
+    ) -> Result<(), VaultError> {
+        Ok(()) // mock always succeeds
+    }
+}
+
+/// Derive a 32-byte VMK wrapping key from stable FIDO2 authData bytes.
+/// authData[0..33] = rpIdHash(32) || flags(1) — excludes signCount for determinism.
+pub fn derive_vmk_wrap_key(auth_data: &[u8], credential_id: &[u8], suite: u8) -> Result<[u8; 32], VaultError> {
+    use sha3::Sha3_512;
+    if auth_data.len() < 33 {
+        return Err(VaultError::Auth("authData too short for VMK derivation".into()));
+    }
+    let info: &[u8] = match suite {
+        3 => b"vault-passkey-vmk-v3-l5-sha3-512".as_slice(),
+        2 => b"vault-passkey-vmk-v2-l5".as_slice(),
+        1 => b"vault-passkey-vmk-v2-hybrid768".as_slice(),
+        _ => b"vault-passkey-vmk-v1".as_slice(),
+    };
+    // Strip the AT bit (0x40) from the flags byte so registration (flags=0x41)
+    // and assertion (flags=0x01) produce the same wrap key. The AT bit is only
+    // present in registration authData and must not participate in the KDF.
+    let mut prefix = [0u8; 33];
+    prefix[..32].copy_from_slice(&auth_data[..32]);
+    prefix[32] = auth_data[32] & !0x40;
+    let hk = Hkdf::<Sha3_512>::new(Some(credential_id), &prefix);
+    let mut out = [0u8; 32];
+    hk.expand(info, &mut out)
+        .map_err(|_| VaultError::Auth("HKDF expand failed".into()))?;
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::xchacha20;
+
+    fn mock() -> SoftwareBackend { SoftwareBackend::new() }
+
+    #[test]
+    fn test_software_backend_make_credential_returns_outputs() {
+        let backend = mock();
+        let out = backend.make_credential("mock://device0", "vault.local",
+            b"user1", &[0u8; 32], false).unwrap();
+        assert!(!out.credential_id.is_empty());
+        assert_eq!(out.public_key_cbor.len(), 64);
+        assert!(out.auth_data.len() >= 37);
+    }
+
+    #[test]
+    fn test_software_backend_get_assertion_returns_stable_prefix() {
+        let backend = mock();
+        let reg = backend.make_credential("mock://device0", "vault.local",
+            b"user1", &[0u8; 32], false).unwrap();
+        let assert_out = backend.get_assertion("mock://device0", "vault.local",
+            &reg.credential_id, &[0xABu8; 32]).unwrap();
+        // First 33 bytes must be stable (rpIdHash + flags, no signCount)
+        assert_eq!(&assert_out.auth_data[0..33], &[0x42u8; 32].iter().chain(&[0x01]).copied().collect::<Vec<_>>()[..]);
+    }
+
+    #[test]
+    fn test_software_backend_verify_roundtrip() {
+        let backend = mock();
+        let reg = backend.make_credential("mock://device0", "vault.local",
+            b"user1", &[0u8; 32], false).unwrap();
+        let assert_out = backend.get_assertion("mock://device0", "vault.local",
+            &reg.credential_id, &[0xABu8; 32]).unwrap();
+        assert!(backend.verify_assertion(&reg.public_key_cbor, &assert_out,
+            &[0xABu8; 32], "vault.local", false).is_ok());
+    }
+
+    #[test]
+    fn test_software_backend_max_two_credentials_enforced() {
+        let backend = mock();
+        backend.make_credential("mock://device0", "vault.local", b"u1", &[0u8; 32], false).unwrap();
+        backend.make_credential("mock://device0", "vault.local", b"u2", &[0u8; 32], false).unwrap();
+        let result = backend.make_credential("mock://device0", "vault.local", b"u3", &[0u8; 32], false);
+        assert!(result.is_err(), "third credential must be rejected");
+    }
+
+    #[test]
+    fn test_software_backend_unknown_credential_assertion_fails() {
+        let backend = mock();
+        let result = backend.get_assertion("mock://device0", "vault.local",
+            &[0xFFu8; 16], &[0u8; 32]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_vmk_wrap_key_derivation_is_deterministic() {
+        let auth_data = vec![0x42u8; 37];
+        let cred_id = vec![0x01u8; 16];
+        let k1 = derive_vmk_wrap_key(&auth_data, &cred_id, 0).unwrap();
+        let k2 = derive_vmk_wrap_key(&auth_data, &cred_id, 0).unwrap();
+        assert_eq!(k1, k2);
+    }
+
+    #[test]
+    fn test_vmk_wrap_key_differs_across_credentials() {
+        let auth_data = vec![0x42u8; 37];
+        let k1 = derive_vmk_wrap_key(&auth_data, &[0x01u8; 16], 0).unwrap();
+        let k2 = derive_vmk_wrap_key(&auth_data, &[0x02u8; 16], 0).unwrap();
+        assert_ne!(k1, k2);
+    }
+
+    #[test]
+    fn test_vmk_wrap_key_register_vs_assert_flags_match() {
+        // Critical regression test: registration flags (0x41 = UP+AT) and assertion
+        // flags (0x01 = UP only) must derive the same wrap key after AT-bit masking.
+        let rp_id_hash = [0x42u8; 32];
+        let cred_id = vec![0x01u8; 16];
+        let mut reg_auth = rp_id_hash.to_vec();
+        reg_auth.push(0x41); // UP + AT set at registration
+        reg_auth.extend_from_slice(&[0u8; 4]);
+        let mut assert_auth = rp_id_hash.to_vec();
+        assert_auth.push(0x01); // UP only at assertion
+        assert_auth.extend_from_slice(&[0u8; 4]);
+        let k_reg = derive_vmk_wrap_key(&reg_auth, &cred_id, 3).unwrap();
+        let k_assert = derive_vmk_wrap_key(&assert_auth, &cred_id, 3).unwrap();
+        assert_eq!(k_reg, k_assert, "register and assert flags must yield identical wrap key");
+    }
+
+    #[test]
+    fn test_vmk_wrap_key_roundtrip_encrypt_decrypt() {
+        let auth_data = vec![0x42u8; 37];
+        let cred_id = vec![0x01u8; 16];
+        let wrap_key = derive_vmk_wrap_key(&auth_data, &cred_id, 0).unwrap();
+        let vmk = [0xDEu8; 32];
+        let (ct, nonce) = xchacha20::encrypt(&wrap_key, &vmk, b"passkey-vmk-aad").unwrap();
+        let recovered = xchacha20::decrypt(&wrap_key, &ct, &nonce, b"passkey-vmk-aad").unwrap();
+        assert_eq!(recovered.as_slice(), &vmk[..]);
+    }
+}
+

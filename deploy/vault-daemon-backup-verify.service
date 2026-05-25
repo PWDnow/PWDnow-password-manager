@@ -1,0 +1,31 @@
+[Unit]
+Description=Vault Daemon — daily backup integrity verify
+After=vault-daemon-backup.service
+# SLA G4: alert on silent verify failure — bit-rot detection is worthless
+# if nobody hears the alarm.
+OnFailure=pwdnow-alert@%n.service
+
+[Service]
+Type=oneshot
+User=vault
+Group=vault
+
+# Finds the most recent backup, verifies its sha256 sidecar, then runs SQLite
+# integrity_check.  Exits non-zero on any failure so systemd marks the unit
+# as failed and the timer's OnFailure= hook can send an alert.
+ExecStart=/bin/bash -c '\
+  DEST=/var/backups/vault-daemon; \
+  LATEST=$(find "$DEST" -name "vault-*.db" -not -name "*.sha256" -printf "%%T@ %%p\n" \
+           | sort -n | tail -1 | cut -d" " -f2); \
+  [ -z "$LATEST" ] && { echo "No backup found in $DEST"; exit 1; }; \
+  echo "Verifying $LATEST ..."; \
+  sha256sum --check "$LATEST.sha256" || { echo "sha256 mismatch"; exit 1; }; \
+  RESULT=$(sqlite3 "$LATEST" "PRAGMA integrity_check; PRAGMA cipher_integrity_check;" 2>&1); \
+  echo "$RESULT"; \
+  echo "$RESULT" | grep -qv "^ok$" && { echo "integrity_check failed"; exit 1; }; \
+  echo "Backup OK: $LATEST"'
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/var/backups/vault-daemon

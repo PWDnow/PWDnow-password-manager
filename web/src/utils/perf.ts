@@ -1,3 +1,4 @@
+import { logger } from './logger';
 export class LoginPerfTracker {
   private static instance = new LoginPerfTracker();
   private measurements: Record<string, number> = {};
@@ -17,7 +18,7 @@ export class LoginPerfTracker {
         this.measurements[step] = entries[entries.length - 1].duration;
       }
     } catch (e) {
-      console.warn(`[Perf] Failed to measure ${step}:`, e);
+      logger.warn(`[Perf] Failed to measure ${step}:`, e);
     }
   }
 

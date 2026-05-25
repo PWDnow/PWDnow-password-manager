@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+import { apiFetch } from '../utils/api';
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Wallet, Verified, Key, ChevronRight, Copy, MoreVertical, PlusCircle, TrendingUp, ShieldCheck, ArrowLeft, Check, Trash2, Pencil, AlertTriangle, X, Search, Globe, ImageOff, Shield, Clock, Timer, Share2, FileText, CreditCard } from 'lucide-react';
 import { secureClipboard, ClipboardGuardHandle } from '../utils/clipboardGuard';
@@ -191,7 +193,7 @@ export default function Vault() {
           const progress = Math.max(0, Math.min(100, (remaining / total) * 100));
           setOtpProgress(progress);
         } catch (error) {
-          console.error("Failed to generate TOTP", error);
+          logger.error("Failed to generate TOTP", error);
           setOtpCode("Error");
         }
       }
@@ -217,10 +219,8 @@ export default function Vault() {
       if (!raw) return;
       let smtp: unknown;
       try { smtp = JSON.parse(raw); } catch { return; }
-      const csrfToken = document.cookie.match(/_pwd_csrf=([^;]+)/)?.[1] ?? '';
-      fetch('/api/send-expiry-notification', {
+      apiFetch('/api/send-expiry-notification', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify({
           smtp,
           credentials: expired.map(c => ({ service: c.service, unit: c.expiryUnit, value: c.expiryValue })),
@@ -489,104 +489,84 @@ export default function Vault() {
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
           >
-            {/* Breadcrumbs & Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
-              <div className="space-y-2">
-                <nav className="flex items-center gap-2 text-[10px] font-black tracking-[0.3em] text-on-surface-variant uppercase">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
+              <div>
+                <nav className="flex items-center gap-2 text-[10px] font-bold tracking-[0.25em] text-on-surface-variant uppercase mb-1.5">
                   <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors">{t('sidebar.vault', 'Vault')}</span>
                   <ChevronRight size={10} className="opacity-40" />
                   <span className="text-black dark:text-white">{getFolderTitle()}</span>
                 </nav>
-                <h1 className="text-4xl md:text-6xl font-headline font-black tracking-tighter text-black dark:text-white leading-none">{getFolderTitle()}</h1>
-                <p className="text-on-surface-variant text-lg font-medium max-w-xl leading-relaxed">{getFolderDescription()}</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-2xl md:text-3xl font-headline font-black tracking-tight text-black dark:text-white">{getFolderTitle()}</h1>
+                  {!isEmptyFolder && (
+                    <span className="text-xs font-bold text-on-surface-variant bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/20">
+                      {totalItems} {t('vault.items', 'items')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-on-surface-variant text-sm mt-1 max-w-lg leading-relaxed">{getFolderDescription()}</p>
               </div>
-              <button 
+              <button
                 onClick={() => setIsAdding(true)}
                 aria-label={t('vault.addCredential', 'Add Credential')}
-                className="group relative inline-flex items-center gap-3 bg-black dark:bg-white text-white dark:text-black px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-95 shadow-[0_20px_50px_rgba(0,0,0,0.2)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
+                className="group inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 shrink-0"
               >
-                <PlusCircle size={20} className="group-hover:rotate-90 transition-transform duration-500" />
-                {t('vault.addCredential', 'New Credential')}
+                <PlusCircle size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+                {t('vault.addCredential', 'Add Credential')}
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-16">
-              <div className="md:col-span-4 bg-white dark:bg-surface-container-low p-6 sm:p-8 md:p-10 rounded-[2.5rem] relative overflow-hidden group flex flex-col border border-outline-variant/10 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-700">
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="w-16 h-16 bg-primary-container/20 text-on-primary-container rounded-[1.25rem] flex items-center justify-center shadow-inner">
-                    <Wallet size={32} fill="currentColor" className="opacity-80 group-hover:scale-110 transition-transform duration-500" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black tracking-[0.3em] text-on-surface-variant uppercase opacity-60 mb-1">{t('vault.assets', 'Vault Assets')}</div>
-                    <div className="text-3xl md:text-4xl font-black tracking-tighter text-black dark:text-white">{totalItems} <span className="text-sm font-medium text-on-surface-variant tracking-normal">{t('vault.items', 'Items')}</span></div>
-                  </div>
-                </div>
-                <div className="mt-auto pt-6 border-t border-outline-variant/5 flex items-center justify-between">
-                  <div className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em]">{t('vault.lastUpdated', 'Last Updated')}</div>
-                  <div className="text-[10px] font-black text-black dark:text-white uppercase tracking-[0.2em]">{t('vault.justNow', 'Just Now')}</div>
-                </div>
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary-container/5 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
+            {/* Stats bar */}
+            <div className="flex items-center gap-4 mb-5 px-4 py-3 bg-surface-container-low/60 rounded-2xl border border-outline-variant/10 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Wallet size={14} className="text-on-surface-variant" />
+                <span className="text-sm font-bold text-black dark:text-white">{totalItems}</span>
+                <span className="text-xs text-on-surface-variant">{t('vault.items', 'items')}</span>
               </div>
-
-              <div className="md:col-span-4 bg-white dark:bg-surface-container-low p-6 sm:p-8 md:p-10 rounded-[2.5rem] relative overflow-hidden group flex flex-col border border-outline-variant/10 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-700">
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="w-16 h-16 bg-green-50 text-green-700 rounded-[1.25rem] flex items-center justify-center shadow-inner">
-                    <ShieldCheck size={32} fill="currentColor" className="opacity-80 group-hover:scale-110 transition-transform duration-500" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black tracking-[0.3em] text-on-surface-variant uppercase opacity-60 mb-1">{t('vault.securityHealth', 'Security Health')}</div>
-                    <div className="text-3xl md:text-4xl font-black tracking-tighter text-black dark:text-white">{securityHealth}</div>
-                  </div>
-                </div>
-                <div className="mt-auto pt-6 border-t border-outline-variant/5 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase tracking-[0.2em]">
-                    <TrendingUp size={16} />
-                    {securityHealthScore === 100 ? t('vault.perfectScore', 'Perfect Score') : t('vault.improving', 'Improving')}
-                  </div>
-                  <div className="text-[10px] font-black text-black dark:text-white uppercase tracking-[0.2em]">{securityHealthScore}%</div>
-                </div>
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-green-500/5 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
+              <div className="w-px h-4 bg-outline-variant/20 hidden sm:block" />
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className={securityHealthScore >= 80 ? 'text-emerald-500' : 'text-orange-500'} />
+                <span className={`text-sm font-bold ${securityHealthScore >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600'}`}>{securityHealth}</span>
+                <span className="text-xs text-on-surface-variant">{t('vault.securityHealth', 'health')}</span>
               </div>
-
-              <div className="md:col-span-4 bg-white dark:bg-surface-container-low p-6 sm:p-8 md:p-10 rounded-[2.5rem] relative overflow-hidden group flex flex-col border border-outline-variant/10 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-700">
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="w-16 h-16 bg-orange-50 text-orange-700 rounded-[1.25rem] flex items-center justify-center shadow-inner">
-                    <Key size={32} fill="currentColor" className="opacity-80 group-hover:scale-110 transition-transform duration-500" />
+              {weakCount > 0 && (
+                <>
+                  <div className="w-px h-4 bg-outline-variant/20 hidden sm:block" />
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={14} className="text-orange-500" />
+                    <span className="text-sm font-bold text-orange-600">{weakCount}</span>
+                    <span className="text-xs text-on-surface-variant">{t('vault.weakPasswords', { count: weakCount, defaultValue: 'weak' })}</span>
                   </div>
-                  <div>
-                    <div className="text-[11px] font-black tracking-[0.3em] text-on-surface-variant uppercase opacity-60 mb-1">{t('vault.pendingActions', 'Pending Actions')}</div>
-                    <div className="text-3xl md:text-4xl font-black tracking-tighter text-black dark:text-white">{pendingActions.split(' ')[0]} <span className="text-sm font-medium text-on-surface-variant tracking-normal">{t('vault.actions', 'Actions')}</span></div>
-                  </div>
-                </div>
-                <div className="mt-auto pt-6 border-t border-outline-variant/5 flex items-center justify-between">
-                  <div className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em]">{!isEmptyFolder && pendingActionsSubtext}</div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_10px_rgba(249,115,22,0.4)]" />
-                </div>
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
+                </>
+              )}
+              <div className="ml-auto flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest hidden sm:block">AES-256</span>
               </div>
             </div>
 
-              {/* Search Bar */}
-              <div className="relative group max-w-xl mx-auto w-full mb-12">
-                <input 
-                  type="text" 
-                  placeholder={t('vault.searchPlaceholder', { folder: getFolderTitle(), defaultValue: `Search in ${getFolderTitle()}...` })}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-surface-container-low/60 backdrop-blur-md border border-outline-variant/10 rounded-2xl py-4 pl-14 pr-12 text-sm font-bold text-black dark:text-white placeholder:text-on-surface-variant/40 focus:ring-4 focus:ring-black/5 dark:focus:ring-white/5 focus:border-black/20 dark:focus:border-white/20 focus:bg-surface-container-low transition-all outline-none shadow-sm"
-                />
-                <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-on-surface-variant group-focus-within:text-black dark:group-focus-within:text-white transition-all duration-300 z-10">
-                  <Search size={18} strokeWidth={2.5} />
-                </div>
-                {searchTerm && (
-                  <button 
-                    onClick={() => setSearchTerm('')}
-                    className="absolute inset-y-0 right-5 flex items-center text-on-surface-variant hover:text-black dark:hover:text-white transition-all z-10"
-                  >
-                    <X size={18} strokeWidth={2.5} />
-                  </button>
-                )}
+            {/* Search Bar */}
+            <div className="relative group w-full mb-6">
+              <input
+                type="text"
+                placeholder={t('vault.searchPlaceholder', { folder: getFolderTitle(), defaultValue: `Search in ${getFolderTitle()}...` })}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white dark:bg-surface-container-low border border-outline-variant/20 rounded-xl py-3 pl-10 pr-10 text-sm font-medium text-black dark:text-white placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/40 transition-all outline-none shadow-sm"
+              />
+              <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-on-surface-variant/60 group-focus-within:text-emerald-600 transition-colors z-10">
+                <Search size={16} strokeWidth={2} />
               </div>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-3.5 flex items-center text-on-surface-variant hover:text-black dark:hover:text-white transition-colors z-10"
+                >
+                  <X size={16} strokeWidth={2} />
+                </button>
+              )}
+            </div>
 
             {/* Credentials List */}
             <div className="space-y-4">
@@ -625,12 +605,12 @@ export default function Vault() {
                     }
                   </p>
                   {!isSearchEmpty && (
-                    <button 
+                    <button
                       onClick={() => setIsAdding(true)}
-                      className="inline-flex items-center gap-3 bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-neutral-800 active:scale-95 shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
+                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-emerald-600/25"
                     >
-                      <PlusCircle size={20} />
-                      {t('vault.addNew', 'Add a new credential')}
+                      <PlusCircle size={18} />
+                      {t('vault.addNew', 'Add a credential')}
                     </button>
                   )}
                   {isSearchEmpty && (
@@ -760,7 +740,7 @@ export default function Vault() {
                               </span>
                             )}
                             {item.credentialType === 'secure_note' && (
-                              <span className="text-[10px] px-3 py-1.5 bg-purple-500/10 text-purple-600 rounded-lg font-bold uppercase tracking-widest">Note</span>
+                              <span className="text-[10px] px-3 py-1.5 bg-purple-500/10 text-purple-600 rounded-lg font-bold uppercase tracking-widest">{t('vault.noteBadge', 'Note')}</span>
                             )}
                             {item.credentialType === 'payment_card' && (
                               <span className="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg font-bold uppercase tracking-widest">{item.cardExpiry || 'Card'}</span>
@@ -773,15 +753,26 @@ export default function Vault() {
                             <SecurityBadge status={item.status} statusColor={item.statusColor} />
                           </div>
                           <div className="flex items-center gap-2 ml-auto">
-                            {(!item.credentialType || item.credentialType === 'login') && (
+                            {(!item.credentialType || item.credentialType === 'login') && (<>
+                              {item.username && item.username !== 'No username' && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleCopyUsername(item.username, item.id); }}
+                                  aria-label={`Copy username for ${item.service}`}
+                                  className="p-2 md:p-2.5 bg-surface-container-low/50 hover:bg-emerald-600 hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90"
+                                  title={t('vault.copyUsername', 'Copy username')}
+                                >
+                                  {copiedId === item.id ? <Check size={15} className="text-emerald-400" aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCopyPassword(item.password, item.id); }}
                                 aria-label={`Copy password for ${item.service}`}
-                                className="p-2 md:p-3 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-lg active:scale-90"
+                                className="p-2 md:p-2.5 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90"
+                                title={t('vault.copyPassword', 'Copy password')}
                               >
-                                {copiedPwdId === item.id ? <Check size={16} className="text-green-400" aria-hidden="true" /> : <Key size={16} aria-hidden="true" />}
+                                {copiedPwdId === item.id ? <Check size={15} className="text-green-400" aria-hidden="true" /> : <Key size={15} aria-hidden="true" />}
                               </button>
-                            )}
+                            </>)}
                             
                             <div className="relative" ref={activeDropdown === item.id ? dropdownRef : null}>
                               <button
@@ -907,8 +898,20 @@ export default function Vault() {
               )}
             </div>
 
+            {/* Floating Add Button */}
+            {!isEmptyFolder && (
+              <button
+                onClick={() => setIsAdding(true)}
+                aria-label={t('vault.addCredential', 'Add Credential')}
+                className="fixed bottom-8 right-8 z-50 inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-xl shadow-emerald-600/30 hover:shadow-emerald-600/50"
+              >
+                <PlusCircle size={18} />
+                <span className="hidden sm:inline">{t('vault.addCredential', 'Add Credential')}</span>
+              </button>
+            )}
+
             {/* Footer Context */}
-            <footer className="mt-24 pt-12 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8 pb-12">
+            <footer className="mt-16 pt-8 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8 pb-12">
               <div className="flex items-center gap-16">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-3">{t('vault.encryptionStatus', 'Encryption Status')}</div>

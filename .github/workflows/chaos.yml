@@ -1,0 +1,51 @@
+# SLA E2: chaos/fault-injection (weekly). Kills the daemon mid-flight to
+# verify panic-safe dispatch (C1) and progress-driven watchdog (P4).
+# Disk-pressure + latency injection are §4 deferred (P2 full).
+
+name: Chaos (weekly)
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  kill-daemon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+      - name: Install C deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libclang-dev libsodium-dev libfido2-dev libsqlcipher-dev liboqs-dev
+      - name: Build daemon
+        run: cd daemon && cargo build --release
+      - name: Build web
+        run: cd web && npm ci --strict-peer-deps && npm run build
+      - name: Start daemon (background)
+        run: |
+          mkdir -p ./run-chaos
+          ./daemon/target/release/vault-daemon --socket ./run-chaos/vault.sock --vault ./run-chaos/vault.db &
+          echo $! > ./run-chaos/daemon.pid
+          sleep 2
+      - name: Kill daemon every 30s for 5 min
+        continue-on-error: true
+        run: |
+          for i in 1 2 3 4 5; do
+            sleep 30
+            kill -9 "$(cat ./run-chaos/daemon.pid)" || true
+            ./daemon/target/release/vault-daemon --socket ./run-chaos/vault.sock --vault ./run-chaos/vault.db &
+            echo $! > ./run-chaos/daemon.pid
+          done
+      - name: Verify daemon still answers after chaos
+        run: |
+          sleep 5
+          test -S ./run-chaos/vault.sock

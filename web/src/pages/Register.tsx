@@ -7,13 +7,15 @@ import SEO from '../components/SEO';
 import { keyStore, deriveLocalKey, getOrCreateLocalKeySalt } from '../crypto/keystore';
 import { daemon } from '../utils/daemonClient';
 import { generateUUID } from '../utils/crypto';
+import { apiFetch, ApiError, hasServerSession as _hasServerSession } from '../utils/api';
+import { logger } from '../utils/logger';
 
 export default function Register() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const hasServerSession = document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
+    const hasServerSession = _hasServerSession();
     if (keyStore.hasToken || hasServerSession) {
       navigate('/vault', { replace: true });
     }
@@ -137,29 +139,16 @@ export default function Register() {
     // ── Offline / demo-mode registration ─────────────────────────────────────
     try {
       const lkSalt = getOrCreateLocalKeySalt();
-      const res = await fetch('/api/auth/register', {
+      await apiFetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: formData.email, 
-          password: formData.password, 
-          firstName: formData.firstName, 
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
           lastName: formData.lastName,
           cryptoSalt: lkSalt
         })
       });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        if (data.error === 'email_taken') {
-          setError(t('register.errorEmailTaken', 'An account with this email already exists.'));
-        } else {
-          setError(data.error || 'An unexpected error occurred. Please try again.');
-        }
-        setLoading(false);
-        return;
-      }
 
       // Mark this tab as authenticated
       keyStore.store(generateUUID());
@@ -172,8 +161,17 @@ export default function Register() {
 
       navigate('/vault');
     } catch (err) {
-      console.error('[Register] offline registration failed:', err);
-      setError(t('register.errorUnexpected', 'An unexpected error occurred. Please try again.'));
+      if (err instanceof ApiError) {
+        const errData = (err.data as { error?: string }) ?? {};
+        if (errData.error === 'email_taken') {
+          setError(t('register.errorEmailTaken', 'An account with this email already exists.'));
+        } else {
+          setError(errData.error || t('register.errorUnexpected', 'An unexpected error occurred. Please try again.'));
+        }
+      } else {
+        logger.error('[Register] offline registration failed:', err);
+        setError(t('register.errorUnexpected', 'An unexpected error occurred. Please try again.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -204,22 +202,22 @@ export default function Register() {
 
         <div className="relative z-10 max-w-lg mt-12">
           <h2 className="text-4xl xl:text-5xl font-headline font-bold mb-6 leading-[1.1] tracking-tight text-white">
-            {t('register.heroTitle', 'Join industry leaders securing their future.')}
+            {t('register.heroTitle', 'Secure your digital life with open source.')}
           </h2>
           <p className="text-slate-400 text-lg leading-relaxed mb-12">
-            {t('register.heroSubtitle', 'Deploy enterprise-grade credential management across your entire organization in minutes, not months.')}
+            {t('register.heroSubtitle', 'High-security vault with zero-knowledge architecture, designed for individuals and teams who value privacy.')}
           </p>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
               <Building2 className="text-blue-400 mb-4" size={28} />
-              <div className="text-2xl font-bold text-white mb-1">10k+</div>
-              <div className="text-sm text-slate-400 font-medium">Organizations</div>
+              <div className="text-2xl font-bold text-white mb-1">100%</div>
+              <div className="text-sm text-slate-400 font-medium">Open Source</div>
             </div>
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
               <Users className="text-indigo-400 mb-4" size={28} />
-              <div className="text-2xl font-bold text-white mb-1">2.5M+</div>
-              <div className="text-sm text-slate-400 font-medium">Active Users</div>
+              <div className="text-2xl font-bold text-white mb-1">Community</div>
+              <div className="text-sm text-slate-400 font-medium">Driven</div>
             </div>
           </div>
         </div>

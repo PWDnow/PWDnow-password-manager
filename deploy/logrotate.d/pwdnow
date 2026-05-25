@@ -1,0 +1,37 @@
+# SLA G8: log rotation for PWDnow.
+# Install: cp deploy/logrotate.d/pwdnow /etc/logrotate.d/pwdnow
+# Tested:  logrotate -d /etc/logrotate.d/pwdnow
+
+# ── Web tier (Express → /var/log/pwdnow) ─────────────────────────────────────
+# Uses copytruncate because the Node process holds an open fd; rotating with
+# `create` would orphan the writer onto the inode and silently lose logs.
+/var/log/pwdnow/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su pwdnow pwdnow
+    create 0640 pwdnow pwdnow
+}
+
+# ── Monitor ──────────────────────────────────────────────────────────────────
+# The monitor has its own internal rotation, but ship the OS-level safety net
+# anyway: if the monitor crashes mid-write, its rotation won't run and the
+# log can grow without bound until disk-full.
+/var/log/pwdnow-monitor.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+
+# ── Vault daemon ─────────────────────────────────────────────────────────────
+# The daemon logs only to the journal (StandardOutput=journal), and journald
+# has its own SystemMaxUse= controls. No rotation needed here, but document
+# the journal cap recommendation in deploy/host-hardening.md.

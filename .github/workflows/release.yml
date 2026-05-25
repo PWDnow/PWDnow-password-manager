@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+      - name: Install SBOM tool
+        run: npm install -g @cyclonedx/cyclonedx-npm
+      - name: Build Web
+        working-directory: web
+        run: |
+          npm ci --strict-peer-deps
+          npm run build
+          cyclonedx-npm --output-file ../bom-npm.json
+      - name: Upload web dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: |
+            web/dist
+            bom-npm.json
+
+  build-daemon:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: vault-daemon-linux-amd64
+          - os: ubuntu-24.04-arm64
+            target: aarch64-unknown-linux-gnu
+            artifact: vault-daemon-linux-arm64
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact: vault-daemon-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libclang-dev \
+            libsodium-dev libfido2-dev libsqlcipher-dev liboqs-dev
+      - name: Install C dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pkg-config libsodium sqlcipher libfido2 liboqs llvm
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            daemon/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build Daemon
+        working-directory: daemon
+        env:
+          SOURCE_DATE_EPOCH: "1714521600"
+        run: |
+          cargo build --release --features pq-hybrid-1024 --target ${{ matrix.target }}
+          cp "target/${{ matrix.target }}/release/vault-daemon" "../${{ matrix.artifact }}"
+      - name: Generate Rust SBOM (amd64 only)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: daemon
+        run: |
+          cargo install cargo-cyclonedx
+          cargo cyclonedx -f json -o ../bom-rust.json
+      - name: Upload daemon binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: [build-web, build-daemon]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Assemble release
+        run: |
+          mkdir -p release/pwdnow
+          cp -r artifacts/web-dist/web/dist release/pwdnow/web-dist
+          cp artifacts/web-dist/bom-npm.json release/pwdnow/ 2>/dev/null || true
+          for bin in vault-daemon-linux-amd64 vault-daemon-linux-arm64 vault-daemon-macos-arm64; do
+            src="artifacts/$bin/$bin"
+            [ -f "$src" ] && cp "$src" "release/pwdnow/$bin" || true
+          done
+          src="artifacts/vault-daemon-linux-amd64/bom-rust.json"
+          [ -f "$src" ] && cp "$src" release/pwdnow/ || true
+          cd release
+          tar -czvf pwdnow-release.tar.gz pwdnow/
+          cd pwdnow
+          sha256sum vault-daemon-linux-amd64 vault-daemon-linux-arm64 \
+            vault-daemon-macos-arm64 2>/dev/null > ../checksums.sha256 || true
+          sha256sum ../pwdnow-release.tar.gz >> ../checksums.sha256
+      - name: Generate SLSA Provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'release/pwdnow-release.tar.gz'
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.2.3'
+      - name: Sign Release Tarball
+        run: |
+          cosign sign-blob --yes --bundle release/pwdnow-release.bundle \
+            release/pwdnow-release.tar.gz
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/pwdnow-release.tar.gz
+            release/pwdnow-release.bundle
+            release/checksums.sha256
+            release/pwdnow/vault-daemon-linux-amd64
+            release/pwdnow/vault-daemon-linux-arm64
+            release/pwdnow/vault-daemon-macos-arm64
+            release/pwdnow/bom-npm.json
+            release/pwdnow/bom-rust.json

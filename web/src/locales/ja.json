@@ -17,7 +17,14 @@
     "close": "閉じる",
     "copy": "コピー",
     "on": "アクティブ",
-    "off": "非アクティブ"
+    "off": "非アクティブ",
+    "remove": "削除",
+    "done": "完了",
+    "verify": "確認",
+    "enabled": "有効",
+    "disabled": "無効",
+    "searchCountries": "国を検索...",
+    "or": "または"
   },
   "pwa": {
     "installTitle": "PWDnowをインストール",
@@ -35,7 +42,9 @@
     "createFolder": "フォルダを作成",
     "folders": "フォルダ",
     "brand": "PWDnow",
-    "status": "デジタル要塞アクティブ"
+    "status": "デジタル要塞アクティブ",
+    "health": "保管庫の健全性",
+    "assetHolder": "マイアセット"
   },
   "header": {
     "searchPlaceholder": "聖域を検索...",
@@ -45,6 +54,8 @@
     "suggestFeature": "機能を提案"
   },
   "vault": {
+    "noteBadge": "Note",
+    "templates": "Templates",
     "title": "ボールト",
     "subtitle": "認証情報と機密資産を安全に管理します。",
     "addCredential": "認証情報を追加",
@@ -613,6 +624,7 @@
     "subtitle": "安全なボールトにアクセスするにはログインしてください。",
     "continue": "続ける",
     "invalidCredentials": "無効なマスターパスワードです。",
+    "serviceUnavailable": "サービスが現在利用できません。後でもう一度お試しいただくか、管理者にお問い合わせください。",
     "heroTitle": "企業のデジタル資産を保護します。",
     "heroSubtitle": "ミリタリーグレードの暗号化、シームレスなアクセス制御、モダンチームのための包括的な監査ログ。",
     "feature1": "ゼロナレッジアーキテクチャ",
@@ -647,7 +659,17 @@
     "methodPasswordTotp": "パスワード + 認証アプリ",
     "methodPasswordEmail": "パスワード + メールOTP",
     "methodPasswordOnly": "パスワードのみ",
-    "methodPasswordOnlyDesc": "パスワードでログイン（第二要素なし）"
+    "methodPasswordOnlyDesc": "パスワードでログイン（第二要素なし）",
+    "quickUnlockFailed": "クイックアンロックに失敗またはキャンセルされました。マスターパスワードを使用してください。",
+    "signInAs": "としてサインイン",
+    "backToOptions": "オプションに戻る",
+    "quickUnlockTitle": "Touch ID / Windows Hello でアンロック",
+    "quickUnlockDesc": "このデバイスをすばやくアンロック",
+    "passkeyCard": "Passkey / Touch ID / Windows Hello",
+    "passkeyDesc": "指紋、顔、またはデバイスPINを使用",
+    "simEmailPreview": "シミュレートされたメールのプレビュー",
+    "simEmailCode": "ワンタイムコード:",
+    "simEmailNote": "5分間有効。共有しないでください。"
   },
   "register": {
     "title": "アカウントを作成",
@@ -756,5 +778,50 @@
     "goodShapeTitle": "アカウントは良好な状態です！",
     "goodShapeMessage": "{{service}}のパスワードを有効期限トラッキング付きで更新しました。優れたセキュリティ習慣です！",
     "update": "更新"
+  },
+  "assetHolder": {
+    "subtitle": "共通の識別子を一度保存してください。認証情報フォームで自動的に提案されます。",
+    "howItWorks": "認証情報を追加または編集する際、下のフィールドに保存済みのメール、電話番号、セキュリティキーが自動的に提案されます。",
+    "add": "追加",
+    "emailTitle": "メールアドレス",
+    "emailDesc": "ログイン認証情報を追加する際のユーザー名/メールとして使用されます。",
+    "phoneTitle": "電話番号",
+    "phoneDesc": "2FA（SMS/認証アプリ）用。2FA タグが有効な場合に提案されます。",
+    "u2fTitle": "セキュリティキー（U2F）",
+    "u2fDesc": "ハードウェアキー名（YubiKey など）。U2F タグが有効な場合に提案されます。",
+    "u2fPlaceholder": "例：YubiKey 5C NFC",
+    "u2fMax": "最大 2 個のキー",
+    "save": "テンプレートを保存"
+  },
+  "vaultHealth": {
+    "title": "保管庫の健全性",
+    "subtitle": "パスワードのリアルタイム監査 — 弱いパスワード、使い回し、漏洩済みパスワードを検出します。",
+    "basedOn": "{{count}} 件のパスワードを基に算出",
+    "scoreExcellent": "優秀",
+    "scoreGood": "良好",
+    "scoreFair": "普通",
+    "scorePoor": "要改善",
+    "statCompromised": "漏洩済み",
+    "statCompromisedDesc": "既知の漏洩リストに含まれています",
+    "statWeak": "弱い",
+    "statWeakDesc": "短いまたは単純なパスワード",
+    "statReused": "使い回し",
+    "statReusedDesc": "複数のアカウントで同じパスワードを使用",
+    "statHealthy": "安全",
+    "statHealthyDesc": "問題は検出されませんでした",
+    "issuesFound": "検出された問題 ({{count}})",
+    "goToVault": "保管庫へ",
+    "issueBreached": "漏洩済み",
+    "issueWeak": "弱い",
+    "issueReused": "使い回し",
+    "allClearTitle": "問題なし",
+    "allClearDesc": "弱いパスワード、使い回し、漏洩済みパスワードは検出されませんでした。",
+    "emptyState": "パスワード付きの認証情報が見つかりませんでした。",
+    "checkCompromisedTitle": "漏洩チェック",
+    "checkCompromisedDesc": "rockyou.txt の上位 500+ パスワードと HIBP 研究のデータと照合します。Breach Monitor を使用すると、900M+ 件の完全な HIBP データセットで詳細スキャンが可能です。",
+    "checkStrengthTitle": "強度分析",
+    "checkStrengthDesc": "長さと文字の多様性（大文字・小文字・数字・記号）を評価します。スコアが ≤ 1/5 のパスワードは弱いとしてフラグが立ちます。",
+    "checkReuseTitle": "使い回し検出",
+    "checkReuseDesc": "複数のアカウントで共用されているパスワードを識別します。すべての比較はローカルで実行され、パスワードがこのページを離れることはありません。"
   }
 }

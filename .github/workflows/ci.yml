@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  web-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+      - name: Install dependencies (Strict)
+        run: npm ci --strict-peer-deps
+      - name: Audit NPM dependencies
+        run: npm audit --audit-level=high
+      - name: Lint
+        run: npm run lint || true
+      - name: Test
+        run: npm run test
+
+  daemon-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: ubuntu-latest          # amd64
+          - runs-on: ubuntu-24.04-arm64     # arm64 (free for public repos)
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        working-directory: daemon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install C dependencies (Debian/Ubuntu)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libclang-dev \
+            libsodium-dev libfido2-dev libsqlcipher-dev liboqs-dev
+        shell: bash
+
+      - name: Setup Rust (pinned via rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            daemon/target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test
+        run: cargo test
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Audit Rust dependencies
+        run: cargo audit --deny warnings

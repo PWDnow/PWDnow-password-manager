@@ -17,7 +17,14 @@
     "close": "Tutup",
     "copy": "Salin",
     "on": "AKTIF",
-    "off": "NONAKTIF"
+    "off": "NONAKTIF",
+    "remove": "Hapus",
+    "done": "Selesai",
+    "verify": "Verifikasi",
+    "enabled": "Diaktifkan",
+    "disabled": "Dinonaktifkan",
+    "searchCountries": "Cari negara...",
+    "or": "atau"
   },
   "pwa": {
     "installTitle": "Instal PWDnow",
@@ -35,7 +42,9 @@
     "createFolder": "Buat folder",
     "folders": "Folder",
     "brand": "PWDnow",
-    "status": "Benteng Digital Aktif"
+    "status": "Benteng Digital Aktif",
+    "health": "Kesehatan Vault",
+    "assetHolder": "Aset Saya"
   },
   "header": {
     "searchPlaceholder": "Cari di tempat suci Anda...",
@@ -45,6 +54,8 @@
     "suggestFeature": "Sarankan fitur"
   },
   "vault": {
+    "noteBadge": "Note",
+    "templates": "Templates",
     "title": "Brankas Anda",
     "subtitle": "Kelola kredensial dan aset sensitif Anda dengan aman.",
     "addCredential": "Tambah kredensial",
@@ -613,6 +624,7 @@
     "subtitle": "Masuk untuk mengakses brankas aman Anda.",
     "continue": "Lanjutkan",
     "invalidCredentials": "Kata sandi master tidak valid.",
+    "serviceUnavailable": "Layanan saat ini tidak tersedia. Silakan coba lagi atau hubungi administrator Anda.",
     "heroTitle": "Amankan aset digital perusahaan Anda.",
     "heroSubtitle": "Enkripsi tingkat militer, kontrol akses mulus, dan log audit komprehensif untuk tim modern.",
     "feature1": "Arsitektur Zero-Knowledge",
@@ -647,7 +659,17 @@
     "methodPasswordTotp": "Kata sandi + Aplikasi Autentikator",
     "methodPasswordEmail": "Kata sandi + OTP email",
     "methodPasswordOnly": "Hanya kata sandi",
-    "methodPasswordOnlyDesc": "Masuk dengan kata sandi Anda (tanpa faktor kedua)"
+    "methodPasswordOnlyDesc": "Masuk dengan kata sandi Anda (tanpa faktor kedua)",
+    "quickUnlockFailed": "Buka kunci cepat gagal atau dibatalkan. Silakan gunakan kata sandi utama Anda.",
+    "signInAs": "Masuk sebagai",
+    "backToOptions": "Kembali ke opsi",
+    "quickUnlockTitle": "Buka kunci dengan Touch ID / Windows Hello",
+    "quickUnlockDesc": "Buka kunci perangkat ini dengan cepat",
+    "passkeyCard": "Passkey / Touch ID / Windows Hello",
+    "passkeyDesc": "Gunakan sidik jari, wajah, atau PIN perangkat Anda",
+    "simEmailPreview": "Pratinjau Email Simulasi",
+    "simEmailCode": "Kode sekali pakai Anda:",
+    "simEmailNote": "Berlaku selama 5 menit. Jangan dibagikan."
   },
   "register": {
     "title": "Buat akun",
@@ -756,5 +778,50 @@
     "goodShapeTitle": "Akun dalam kondisi baik!",
     "goodShapeMessage": "Kata sandi untuk {{service}} diperbarui dengan pelacakan kedaluwarsa. Kebersihan keamanan yang sangat baik!",
     "update": "Perbarui"
+  },
+  "assetHolder": {
+    "subtitle": "Simpan pengidentifikasi umum Anda sekali. Akan otomatis disarankan di formulir kredensial.",
+    "howItWorks": "Saat menambah atau mengedit kredensial, kolom di bawah secara otomatis menyarankan email, nomor telepon, dan kunci keamanan yang tersimpan.",
+    "add": "Tambah",
+    "emailTitle": "Alamat Email",
+    "emailDesc": "Digunakan sebagai nama pengguna/email saat menambahkan kredensial login.",
+    "phoneTitle": "Nomor Telepon",
+    "phoneDesc": "Untuk 2FA (SMS/autentikator). Disarankan saat tag 2FA aktif.",
+    "u2fTitle": "Kunci Keamanan (U2F)",
+    "u2fDesc": "Nama kunci perangkat keras (YubiKey, dll.). Disarankan saat tag U2F aktif.",
+    "u2fPlaceholder": "cth. YubiKey 5C NFC",
+    "u2fMax": "Maksimum 2 kunci",
+    "save": "Simpan Template"
+  },
+  "vaultHealth": {
+    "title": "Kesehatan Vault",
+    "subtitle": "Audit real-time kata sandi Anda — kata sandi lemah, digunakan ulang, dan yang telah dikompromikan.",
+    "basedOn": "Berdasarkan {{count}} kata sandi",
+    "scoreExcellent": "Sangat Baik",
+    "scoreGood": "Baik",
+    "scoreFair": "Cukup",
+    "scorePoor": "Buruk",
+    "statCompromised": "Dikompromikan",
+    "statCompromisedDesc": "Ditemukan dalam daftar pelanggaran yang diketahui",
+    "statWeak": "Lemah",
+    "statWeakDesc": "Kata sandi pendek atau sederhana",
+    "statReused": "Digunakan Ulang",
+    "statReusedDesc": "Kata sandi yang sama di beberapa akun",
+    "statHealthy": "Aman",
+    "statHealthyDesc": "Tidak ada masalah terdeteksi",
+    "issuesFound": "Masalah Ditemukan ({{count}})",
+    "goToVault": "Pergi ke Vault",
+    "issueBreached": "Dikompromikan",
+    "issueWeak": "Lemah",
+    "issueReused": "Digunakan Ulang",
+    "allClearTitle": "Semua Aman",
+    "allClearDesc": "Tidak ada kata sandi lemah, digunakan ulang, atau dikompromikan yang terdeteksi.",
+    "emptyState": "Tidak ada kredensial dengan kata sandi yang ditemukan.",
+    "checkCompromisedTitle": "Pemeriksaan Kompromi",
+    "checkCompromisedDesc": "Dibandingkan dengan 500+ kata sandi dari entri teratas rockyou.txt dan penelitian HIBP. Jalankan Breach Monitor untuk pemindaian lebih dalam menggunakan dataset HIBP 900M+ lengkap.",
+    "checkStrengthTitle": "Analisis Kekuatan",
+    "checkStrengthDesc": "Mengevaluasi panjang dan keragaman karakter (huruf besar, huruf kecil, angka, simbol). Kata sandi dengan skor ≤ 1/5 ditandai sebagai lemah.",
+    "checkReuseTitle": "Deteksi Penggunaan Ulang",
+    "checkReuseDesc": "Mengidentifikasi kata sandi yang digunakan di beberapa akun. Semua perbandingan dilakukan secara lokal — kata sandi Anda tidak pernah meninggalkan halaman ini."
   }
 }

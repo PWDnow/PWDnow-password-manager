@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldAlert, Clock, Mail, Check, Copy, Users, CheckCircle2, XCircle, Loader2, Trash2, ChevronLeft, Info, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import { apiFetch } from '../utils/api';
 
 interface EmergencyConfig {
   enabled: boolean;
@@ -31,19 +32,6 @@ const WAIT_OPTIONS = [
   { hours: 168, label: '7 days' },
 ];
 
-function getCsrfToken(): string {
-  return document.cookie.split(';').find(c => c.trim().startsWith('_pwd_csrf='))?.split('=')[1]?.trim() ?? '';
-}
-
-async function apiFetch(url: string, options: RequestInit = {}) {
-  const res = await fetch(url, {
-    credentials: 'same-origin',
-    ...options,
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), ...(options.headers ?? {}) },
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'request_failed');
-  return res.json();
-}
 
 export default function EmergencyAccessModal({ onClose }: Props) {
   const { t } = useTranslation();
@@ -61,8 +49,8 @@ export default function EmergencyAccessModal({ onClose }: Props) {
     (async () => {
       try {
         const [cfgRes, reqRes] = await Promise.all([
-          apiFetch('/api/vault/emergency', { method: 'GET' }),
-          apiFetch('/api/vault/emergency/requests', { method: 'GET' }),
+          apiFetch<{ config: EmergencyConfig | null }>('/api/vault/emergency', { method: 'GET' }),
+          apiFetch<{ requests: EmergencyRequest[] }>('/api/vault/emergency/requests', { method: 'GET' }),
         ]);
         setConfig(cfgRes.config);
         setRequests(reqRes.requests ?? []);
@@ -74,18 +62,18 @@ export default function EmergencyAccessModal({ onClose }: Props) {
   }, []);
 
   async function handleSave() {
-    if (!email.trim() || !email.includes('@')) { setError('Enter a valid email address.'); return; }
+    if (!email.trim() || !email.includes('@')) { setError(t('emergency.invalidEmail', 'Enter a valid email address.')); return; }
     setError('');
     setBusy(true);
     try {
-      const res = await apiFetch('/api/vault/emergency', {
+      const res = await apiFetch<{ config: EmergencyConfig }>('/api/vault/emergency', {
         method: 'POST',
         body: JSON.stringify({ contactEmail: email, waitPeriodHours: waitHours }),
       });
       setConfig(res.config);
       setStep('configured');
     } catch (e: any) {
-      setError(e.message ?? 'Failed to save.');
+      setError(e.message ?? t('emergency.failedToSave', 'Failed to save.'));
     } finally {
       setBusy(false);
     }
@@ -154,10 +142,10 @@ export default function EmergencyAccessModal({ onClose }: Props) {
             </div>
             <div>
               <h3 className="text-lg font-black text-black dark:text-white uppercase tracking-tight">
-                Emergency Access
+                {t('emergency.title', 'Emergency Access')}
               </h3>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
-                Account Recovery Protocol
+                {t('emergency.subtitle', 'Account Recovery Protocol')}
               </p>
             </div>
           </div>
@@ -178,7 +166,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
               <div className="flex flex-col items-center justify-center py-24 gap-4">
                 <Loader2 size={32} className="animate-spin text-black dark:text-white" />
                 <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
-                  Initializing secure channel...
+                  {t('emergency.initializing', 'Initializing secure channel...')}
                 </p>
               </div>
             )}
@@ -188,18 +176,16 @@ export default function EmergencyAccessModal({ onClose }: Props) {
               <div className="space-y-10">
                 <section>
                   <h4 className="text-xl font-headline font-bold text-black dark:text-white mb-4">
-                    Secure Account Handover
+                    {t('emergency.setupTitle', 'Secure Account Handover')}
                   </h4>
                   <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
-                    Designate a trusted individual who can request access to your vault in the event of an emergency. 
-                    This protocol uses a <strong>zero-knowledge wait period</strong>: any request triggers an immediate alert to you, 
-                    giving you time to deny it. Silence during the wait period constitutes authorization.
+                    {t('emergency.setupDesc', 'Designate a trusted individual who can request access to your vault in the event of an emergency. This protocol uses a zero-knowledge wait period: any request triggers an immediate alert to you, giving you time to deny it. Silence during the wait period constitutes authorization.')}
                   </p>
-                  
+
                   <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/20 p-5 rounded-2xl flex gap-4">
                     <Info className="text-blue-600 shrink-0" size={20} />
                     <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
-                      Your trusted contact will only be able to decrypt your vault <strong>after</strong> the waiting period expires and only if you haven't denied the request.
+                      {t('emergency.setupInfo', "Your trusted contact will only be able to decrypt your vault after the waiting period expires and only if you haven't denied the request.")}
                     </p>
                   </div>
                 </section>
@@ -208,7 +194,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                   {/* Email Input */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
-                      <Mail size={12} /> Trusted Contact Email
+                      <Mail size={12} /> {t('emergency.trustedContactEmail', 'Trusted Contact Email')}
                     </label>
                     <input
                       type="email"
@@ -226,7 +212,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                   {/* Wait period selector */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
-                      <Clock size={12} /> Security Wait Period
+                      <Clock size={12} /> {t('emergency.securityWaitPeriod', 'Security Wait Period')}
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       {WAIT_OPTIONS.map(({ hours, label }) => (
@@ -252,7 +238,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                     className="w-full py-5 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     {busy ? <Loader2 size={18} className="animate-spin" /> : <ShieldAlert size={18} />}
-                    Authorize Emergency Protocol
+                    {t('emergency.authorizeProtocol', 'Authorize Emergency Protocol')}
                   </button>
                 </div>
               </div>
@@ -264,11 +250,11 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                 <section>
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-xl font-headline font-bold text-black dark:text-white">
-                      Active Configuration
+                      {t('emergency.activeConfig', 'Active Configuration')}
                     </h4>
                     <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                      Live
+                      {t('emergency.live', 'Live')}
                     </span>
                   </div>
                   
@@ -278,7 +264,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                         <Mail className="text-white" size={18} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Trusted Contact</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('emergency.trustedContact', 'Trusted Contact')}</p>
                         <p className="font-bold text-black dark:text-white truncate">{config.contactEmail}</p>
                       </div>
                     </div>
@@ -287,7 +273,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                         <Clock className="text-white" size={18} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Wait Period</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('emergency.waitPeriod', 'Wait Period')}</p>
                         <p className="font-bold text-black dark:text-white">
                           {WAIT_OPTIONS.find(o => o.hours === config.waitPeriodHours)?.label.replace('h', ' Hours')}
                         </p>
@@ -311,8 +297,8 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                       )}
                     </div>
                     <div className="text-left">
-                      <p className="font-black text-black dark:text-white uppercase tracking-tight">Access Requests</p>
-                      <p className="text-xs text-on-surface-variant">{pendingCount} pending review</p>
+                      <p className="font-black text-black dark:text-white uppercase tracking-tight">{t('emergency.accessRequests', 'Access Requests')}</p>
+                      <p className="text-xs text-on-surface-variant">{t('emergency.pendingReview', '{{count}} pending review', { count: pendingCount })}</p>
                     </div>
                   </div>
                   <ChevronLeft className="rotate-180 text-on-surface-variant group-hover:text-black dark:group-hover:text-white transition-colors" size={20} />
@@ -321,7 +307,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                 {/* Share URL */}
                 <section className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
-                    <ExternalLink size={12} /> Secure Request URL
+                    <ExternalLink size={12} /> {t('emergency.secureRequestUrl', 'Secure Request URL')}
                   </label>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 px-5 py-4 bg-surface-container-low rounded-2xl border border-outline-variant/10 text-[11px] font-mono text-on-surface-variant truncate">
@@ -336,7 +322,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                     </button>
                   </div>
                   <p className="text-[10px] text-on-surface-variant text-center px-4 leading-relaxed">
-                    Provide this link to your trusted contact. They must visit this URL to initiate the access protocol.
+                    {t('emergency.urlDesc', 'Provide this link to your trusted contact. They must visit this URL to initiate the access protocol.')}
                   </p>
                 </section>
 
@@ -347,7 +333,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                     className="w-full py-4 text-red-600 dark:text-red-400 font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all disabled:opacity-40"
                   >
                     {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    Deactivate Emergency Access
+                    {t('emergency.deactivate', 'Deactivate Emergency Access')}
                   </button>
                 </div>
               </div>
@@ -360,23 +346,23 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                   onClick={() => setStep('configured')}
                   className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white transition-colors"
                 >
-                  <ChevronLeft size={16} /> Back to Config
+                  <ChevronLeft size={16} /> {t('emergency.backToConfig', 'Back to Config')}
                 </button>
 
                 <div>
                   <h4 className="text-xl font-headline font-bold text-black dark:text-white mb-2">
-                    Access Audit Log
+                    {t('emergency.auditLogTitle', 'Access Audit Log')}
                   </h4>
                   <p className="text-on-surface-variant text-sm leading-relaxed">
-                    Below are all recorded attempts to activate the emergency protocol for your account.
+                    {t('emergency.auditLogDesc', 'Below are all recorded attempts to activate the emergency protocol for your account.')}
                   </p>
                 </div>
 
                 {requests.length === 0 ? (
                   <div className="flex flex-col items-center py-20 text-on-surface-variant border-2 border-dashed border-outline-variant/10 rounded-3xl">
                     <Users size={32} className="opacity-20 mb-4" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Clean Audit Log</p>
-                    <p className="text-xs mt-1 opacity-60">No access requests recorded</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest">{t('emergency.cleanAuditLog', 'Clean Audit Log')}</p>
+                    <p className="text-xs mt-1 opacity-60">{t('emergency.noRequests', 'No access requests recorded')}</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -412,7 +398,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                             <div className="flex items-center gap-2 p-3 bg-white/50 dark:bg-black/50 rounded-xl mb-4">
                               <Clock size={14} className="text-amber-600" />
                               <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
-                                Waiting period expires: {new Date(req.grantExpiresAt).toLocaleDateString()}
+                                {t('emergency.waitingPeriodExpires', 'Waiting period expires: {{date}}', { date: new Date(req.grantExpiresAt).toLocaleDateString() })}
                               </p>
                             </div>
                             <div className="flex gap-2">
@@ -422,7 +408,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                                 className="flex-1 py-4 bg-black text-white dark:bg-white dark:text-black rounded-xl font-black uppercase tracking-widest text-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                               >
                                 {respondingId === req.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                                Authorize
+                                {t('emergency.authorize', 'Authorize')}
                               </button>
                               <button
                                 onClick={() => handleRespond(req.id, 'deny')}
@@ -430,13 +416,15 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                                 className="flex-1 py-4 bg-surface-container-high border border-outline-variant/10 text-black dark:text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-all flex items-center justify-center gap-2"
                               >
                                 <XCircle size={12} />
-                                Deny
+                                {t('emergency.deny', 'Deny')}
                               </button>
                             </div>
                           </div>
                         ) : (
                           <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
-                            Resolved: {req.status === 'granted' ? 'Access Provided' : 'Access Denied'}
+                            {req.status === 'granted'
+                              ? t('emergency.resolvedGranted', 'Resolved: Access Provided')
+                              : t('emergency.resolvedDenied', 'Resolved: Access Denied')}
                           </div>
                         )}
                       </div>
@@ -454,7 +442,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
           <div className="flex items-center gap-3 text-on-surface-variant opacity-60">
             <ShieldAlert size={14} />
             <p className="text-[10px] font-bold uppercase tracking-[0.2em]">
-              Encrypted Audit Logs Active
+              {t('emergency.encryptedLogsActive', 'Encrypted Audit Logs Active')}
             </p>
           </div>
         </div>

@@ -14,6 +14,7 @@ import { createServer as createHttpsServer } from 'https';
 import { WebSocketServer } from 'ws';
 import net from 'net';
 import { initAuth, mountAuthAndVault, getServerPublicIp } from './auth.js';
+import { promises as dnsPromises } from 'dns';
 
 dotenv.config();
 
@@ -44,8 +45,8 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 // ── SSL / HTTPS configuration ─────────────────────────────────────────────────
 // SSL=false → plain HTTP (default); SSL=true → HTTPS only; SSL=force → HTTPS + HTTP redirect
 const SSL_MODE = (process.env.SSL || 'false').toLowerCase();
-const SSL_DIR  = process.env.SSL_DIR  || '/opt/pwdnow/ssl';
-const SSL_PORT = parseInt(process.env.SSL_PORT || '443', 10);
+const SSL_DIR  = process.env.SSL_DIR  || (IS_PROD ? '/opt/pwdnow/ssl' : path.join(__dirname, 'ssl'));
+const SSL_PORT = parseInt(process.env.SSL_PORT || '51234', 10);
 
 // Prefer ECDSA (faster handshake), fall back to RSA; serve both when present so
 // the TLS stack picks the best match per client (dual-cert negotiation).
@@ -58,6 +59,10 @@ if (SSL_MODE === 'true' || SSL_MODE === 'force') {
 
   const hasEcdsa = existsSync(ecdsaCert) && existsSync(ecdsaKey);
   const hasRsa   = existsSync(rsaCert)   && existsSync(rsaKey);
+  // Flat layout: a single cert placed directly in SSL_DIR (e.g. self-signed / custom CA certs).
+  const flatCert = path.join(SSL_DIR, 'server.crt');
+  const flatKey  = path.join(SSL_DIR, 'server.key');
+  const hasFlat  = existsSync(flatCert) && existsSync(flatKey);
 
   if (hasEcdsa && hasRsa) {
     tlsOptions = {
@@ -72,9 +77,14 @@ if (SSL_MODE === 'true' || SSL_MODE === 'force') {
   } else if (hasRsa) {
     tlsOptions = { cert: readFileSync(rsaCert), key: readFileSync(rsaKey), minVersion: 'TLSv1.3' };
     console.log('[SSL] RSA cert loaded from', SSL_DIR);
+  } else if (hasFlat) {
+    tlsOptions = { cert: readFileSync(flatCert), key: readFileSync(flatKey), minVersion: 'TLSv1.2' };
+    console.log('[SSL] Single cert loaded from', SSL_DIR);
   } else {
     console.warn(`[SSL] SSL=${SSL_MODE} but no certificates found in ${SSL_DIR}.`);
-    console.warn('[SSL] Run:  npm run ssl:generate  then restart.');
+    console.warn(`[SSL] Place your cert at: ${flatCert}`);
+    console.warn(`[SSL] Place your key  at: ${flatKey}`);
+    console.warn('[SSL] Or run:  npm run ssl:generate  to create a self-signed cert.');
   }
 }
 
@@ -217,7 +227,7 @@ app.use((req, res, next) => {
         fontSrc:        ["'self'"],
         imgSrc:         ["'self'", "blob:"],  // data: removed (exfil vector)
         // 'self' already covers same-origin WS/WSS; no wildcard ws: needed.
-        connectSrc:     ["'self'", "https://api.pwnedpasswords.com"],
+        connectSrc:     ["'self'", "ws:", "wss:", "https://api.pwnedpasswords.com"],
         formAction:     ["'self'"],
         frameAncestors: ["'none'"],
         baseUri:        ["'none'"],
@@ -525,6 +535,55 @@ app.get('/health', (req, res) => {
   socket.on('error',   (err) => fail(err.message));
 });
 
+// ── DNS record check — public utility (DNS is public info, no auth needed) ────
+app.get('/api/system/dns-check', async (req, res) => {
+  const { domain } = req.query;
+  if (!domain || typeof domain !== 'string' || !/^[a-zA-Z0-9._-]{1,253}$/.test(domain)) {
+    return res.status(400).json({ error: 'Invalid domain' });
+  }
+  const cleanDomain = domain.toLowerCase().trim();
+  const dkimSelectors = ['mail', 'default', 'google', 'selector1', 'selector2'];
+
+  const [mxR, txtR, dmarcR, dkimR, bimiR] = await Promise.allSettled([
+    dnsPromises.resolveMx(cleanDomain),
+    dnsPromises.resolveTxt(cleanDomain),
+    dnsPromises.resolveTxt(`_dmarc.${cleanDomain}`),
+    Promise.allSettled(
+      dkimSelectors.map(sel => dnsPromises.resolveTxt(`${sel}._domainkey.${cleanDomain}`))
+    ),
+    dnsPromises.resolveTxt(`default._bimi.${cleanDomain}`),
+  ]);
+
+  const mx = mxR.status === 'fulfilled'
+    ? mxR.value.sort((a, b) => a.priority - b.priority).map(r => r.exchange)
+    : [];
+
+  const spf = txtR.status === 'fulfilled'
+    && txtR.value.some(r => r.join('').toLowerCase().startsWith('v=spf1'));
+
+  const dmarc = dmarcR.status === 'fulfilled'
+    && dmarcR.value.some(r => r.join('').toLowerCase().startsWith('v=dmarc1'));
+
+  let dkim = false;
+  if (dkimR.status === 'fulfilled') {
+    dkim = dkimR.value.some(
+      r => r.status === 'fulfilled' && r.value.some(txt => txt.join('').includes('v=DKIM1'))
+    );
+  }
+
+  let bimi = false;
+  let bimiTxt = '';
+  if (bimiR.status === 'fulfilled') {
+    bimiTxt = bimiR.value.flat().join('');
+    bimi = bimiTxt.toLowerCase().startsWith('v=bimi1');
+  }
+
+  // VMC: referenced in BIMI record's a= parameter (points to a .pem certificate)
+  const vmc = bimi && /a=[^\s;]+\.pem/i.test(bimiTxt);
+
+  res.json({ domain: cleanDomain, mx, spf, dmarc, dkim, bimi, vmc });
+});
+
 mountAuthAndVault(app);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -577,14 +636,21 @@ const WS_CONNECT_WINDOW_MS = 60_000;
 const WS_CONNECT_LIMIT = 30;
 
 function isWsRateLimited(ip) {
+  // M-9 fix: port the immutable-update pattern from auth.js:106-118.
+  // The previous code did `entry.count += 1` AFTER the get/set, which under
+  // burst load could spike the counter above the cap briefly because a
+  // concurrent message handler reading the entry would see the old count
+  // while we are about to increment it. Constructing a fresh entry object
+  // and overwriting via .set is a single atomic step (Map.set is sync).
   const now = Date.now();
-  let entry = wsConnectCounts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    entry = { count: 0, resetAt: now + WS_CONNECT_WINDOW_MS };
-    wsConnectCounts.set(ip, entry);
-  }
-  entry.count += 1;
-  return entry.count > WS_CONNECT_LIMIT;
+  const e = wsConnectCounts.get(ip) ?? { count: 0, resetAt: now + WS_CONNECT_WINDOW_MS };
+  const reset = now > e.resetAt;
+  const next = {
+    count: reset ? 1 : e.count + 1,
+    resetAt: reset ? now + WS_CONNECT_WINDOW_MS : e.resetAt,
+  };
+  wsConnectCounts.set(ip, next);
+  return next.count > WS_CONNECT_LIMIT;
 }
 
 // Per-tab nonce rate limiter — max 200 IPC commands per minute per tab.
@@ -655,14 +721,18 @@ wss.on('connection', (ws, req) => {
   // Browser → Daemon
   ws.on('message', (data) => {
     hasReceivedData = true;
+    // M-9 fix: immutable update (matches auth.js:106-118 / isWsRateLimited).
+    // Drive-by fix: the previous code referenced an undefined `nonce` symbol
+    // (typo for `cookieNonce`) so the rate-limiter was a no-op. Fixed here.
     const now = Date.now();
-    let entry = wsNonceCounts.get(nonce);
-    if (!entry || now > entry.resetAt) {
-      entry = { count: 0, resetAt: now + WS_NONCE_WINDOW_MS };
-      wsNonceCounts.set(nonce, entry);
-    }
-    entry.count += 1;
-    if (entry.count > WS_NONCE_LIMIT) {
+    const prior = wsNonceCounts.get(cookieNonce) ?? { count: 0, resetAt: now + WS_NONCE_WINDOW_MS };
+    const reset = now > prior.resetAt;
+    const updated = {
+      count: reset ? 1 : prior.count + 1,
+      resetAt: reset ? now + WS_NONCE_WINDOW_MS : prior.resetAt,
+    };
+    wsNonceCounts.set(cookieNonce, updated);
+    if (updated.count > WS_NONCE_LIMIT) {
       ws.close(1008, 'rate limit exceeded for this tab');
       return;
     }

@@ -1,0 +1,2810 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWDnow Complete Technical Reference</title>
+  <style>
+    
+/* Enterprise Styles for PWDnow Technical Reference */
+
+:root {
+  --primary-color: #1e293b;
+  --accent-color: #3b82f6;
+  --text-color: #334155;
+  --border-color: #e2e8f0;
+}
+
+body {
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+h1 {
+  font-size: 2.5em;
+  border-bottom: 2px solid var(--accent-color);
+  padding-bottom: 0.2em;
+}
+
+h2 {
+  font-size: 1.8em;
+  border-left: 5px solid var(--accent-color);
+  padding-left: 0.5em;
+}
+
+/* Cover Page */
+.cover-page {
+  text-align: center;
+  padding-top: 50mm;
+  page-break-after: always;
+}
+
+/* Table of Contents */
+#table-of-contents {
+  page-break-after: always;
+  min-height: 260mm;
+}
+
+#table-of-contents h2 {
+  font-size: 2.2em;
+  margin-bottom: 1em;
+}
+
+#table-of-contents table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  border: none;
+}
+
+#table-of-contents th {
+  border-bottom: 2px solid var(--primary-color);
+  background: transparent;
+  padding: 12px 0;
+  text-align: left;
+}
+
+#table-of-contents td {
+  border-bottom: 1px dotted var(--border-color);
+  padding: 15px 0;
+}
+
+#table-of-contents td:last-child {
+  text-align: right;
+  font-weight: bold;
+}
+
+#table-of-contents tr:nth-child(even) {
+  background-color: transparent;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+th, td {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+th {
+  background-color: #f8fafc;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background-color: #f1f5f9;
+}
+
+code {
+  font-family: "Cascadia Code", "Fira Code", monospace;
+  background-color: #f1f5f9;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+pre {
+  background-color: #1e293b;
+  color: #f8fafc;
+  padding: 1.5em;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* UML Diagrams (Mermaid) */
+.mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 2em 0;
+}
+
+.diagram-container {
+  display: flex;
+  justify-content: center;
+  margin: 2.5em 0;
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+/* Page Numbers and Footer */
+@page {
+  size: A4;
+  margin: 20mm;
+}
+
+@page {
+  @bottom-right {
+    content: "Page " counter(page);
+    font-size: 10pt;
+    font-family: "Segoe UI", sans-serif;
+    color: #64748b;
+  }
+}
+
+/* Accessibility: WCAG 2.1 AA Focus */
+a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* High Contrast for printing */
+@media print {
+  body {
+    color: black;
+    background: white;
+  }
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+  .print-banner { display: none; }
+  .document-container { box-shadow: none; padding: 0; }
+  
+  /* Ensure page numbers show up in some browsers */
+  .footer {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    font-size: 10pt;
+    color: #64748b;
+  }
+}
+
+    
+    /* Additional Master Document Styles */
+    body {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px;
+      background-color: #f1f5f9;
+    }
+    
+    .document-container {
+      background-color: #ffffff;
+      padding: 60px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
+
+    .page-break {
+      page-break-after: always;
+    }
+
+    @media print {
+      body { padding: 0; background-color: white; }
+      .document-container { box-shadow: none; padding: 0; }
+      .print-banner { display: none; }
+    }
+
+    .print-banner {
+      background-color: #1e293b;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      font-weight: bold;
+    }
+
+    .accessibility-badge {
+      display: inline-block;
+      background: #10b981;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-banner">
+    Enterprise Professional Reference: Open in browser and "Print to PDF" for the master version.
+  </div>
+
+  <main class="document-container" role="main">
+    <div class="accessibility-badge" aria-label="Accessibility Status">WCAG 2.1 AA COMPLIANT</div>
+    <!-- PWDnow Technical Reference — Rendered best in any Markdown viewer with CSS support -->
+<div style="page-break-after: always; text-align: center; padding-top: 200px;">
+<h1>PWDnow</h1>
+<h2>Complete Technical Reference</h2>
+<h3>Architecture, Cryptography, Data Formats, and Standards Compliance</h3>
+<hr>
+<p><strong>Classification:</strong> Internal Technical Documentation</p>
+<p><strong>Revision:</strong> 1.0.0</p>
+<p><strong>Date:</strong> May 10, 2026</p>
+<p><strong>Project:</strong> PWDnow Password Manager</p>
+<p><strong>Repository:</strong> <code>PWDnow/</code></p>
+<hr>
+<p>Standards addressed in this document:</p>
+<p>NIST SP 800-63B-4 (2024) | NIST SP 800-132 (2010) | NIST FIPS 140-3 | NIST FIPS 197
+NIST FIPS 202 | NIST FIPS 203 (ML-KEM) | NIST FIPS 204 (ML-DSA)
+NSA CNSA 2.0 | FIDO2 / WebAuthn (W3C) | RFC 8446 (TLS 1.3)
+RFC 6238 (TOTP) | RFC 4226 (HOTP) | OWASP ASVS 5.0 (2024)</p>
+</div>
+<hr>
+<div id="table-of-contents"><h2>Table of Contents</h2>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Title</th>
+<th>Page</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>System Overview</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Repository Layout and Build System</td>
+<td>4</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Two-Layer Architecture</td>
+<td>5</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Cryptographic Primitives Reference</td>
+<td>7</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Key Hierarchy and Derivation Chain</td>
+<td>11</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Layer 1: Vault Daemon (Rust)</td>
+<td>15</td>
+</tr>
+<tr>
+<td>7</td>
+<td>IPC Protocol Specification</td>
+<td>22</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Database Schema Reference</td>
+<td>27</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Layer 2: Web Layer</td>
+<td>32</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Authentication Flows — UML Sequence Diagrams</td>
+<td>39</td>
+</tr>
+<tr>
+<td>11</td>
+<td>The P2W Encrypted File Storage System</td>
+<td>46</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Security Modes</td>
+<td>51</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Offline HIBP Breach Detection</td>
+<td>54</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Vault Sync Architecture</td>
+<td>56</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Deployment Architecture</td>
+<td>58</td>
+</tr>
+<tr>
+<td>16</td>
+<td>UML Component and Class Diagrams</td>
+<td>61</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Standards Compliance Matrix</td>
+<td>67</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Threat Model and Mitigations</td>
+<td>70</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>1. System Overview</h2>
+<div style="text-align: right"><em>Page 3</em></div>
+<p>PWDnow is a zero-knowledge, local-first password manager designed to operate at NIST Security Level 5 with full CNSA 2.0 compliance. It is composed of two independent codebases that cooperate strictly through a documented, authenticated IPC boundary. No key material ever crosses from the cryptographic daemon into the web layer.</p>
+<p>The system is designed around three core invariants:</p>
+<p><strong>Invariant 1 — Cryptographic Confinement.</strong> All key derivation, encryption, and decryption operations occur exclusively within the Rust daemon process. The web layer (browser and Express server) receives only opaque ciphertexts and session tokens. It never receives, stores, or derives any variant of the Key Encryption Key (KEK), Vault Master Key (VMK), or per-credential Data Encryption Key (DEK).</p>
+<p><strong>Invariant 2 — Defense in Depth.</strong> Data is encrypted at three independent layers before reaching persistent storage: the credential blob is encrypted under a per-item DEK, the DEK is encrypted under the VMK, and the VMK is encrypted under the KEK derived from the master password. A SQLCipher-layer AES-256-CBC page encryption provides a fourth envelope around the entire database file.</p>
+<p><strong>Invariant 3 — Post-Quantum Readiness.</strong> The system can operate in two modes: a classical hybrid mode using X25519 + HKDF-SHA-256, and a CNSA 2.0 mode using X448 + ML-KEM-1024 + HKDF-SHA-384 for key encapsulation, ML-DSA-87 for signatures, and AES-256-GCM as the sole symmetric cipher. In CNSA strict mode, SHA-3, BLAKE3, XChaCha20-Poly1305, Ed25519, and X25519 are all removed from active code paths.</p>
+<hr>
+<h2>2. Repository Layout and Build System</h2>
+<div style="text-align: right"><em>Page 4</em></div>
+<pre><code>PWDnow/
+├── daemon/                  Rust binary (vault-daemon) — Layer 1
+│   ├── src/
+│   │   ├── main.rs          Tokio runtime, Unix socket listener, idle watchdog
+│   │   ├── error.rs         VaultError enum (thiserror)
+│   │   ├── auth/            Session management, FIDO2, TOTP, PQC authenticator
+│   │   ├── crypto/          AES-GCM, XChaCha20, KDF, KEM, blind indexing, HIBP
+│   │   ├── ipc/             Protocol types (msgpack), socket dispatcher
+│   │   ├── sync/            Cloudflare R2 encrypted vault sync
+│   │   └── vault/           SQLCipher DB, credentials, folders, assets, audit
+│   ├── migrations/          SQL migration files (v1_initial, v2_defense_in_depth, v3_pqc_auth)
+│   └── Cargo.toml           Feature flags: pq-hybrid-1024, cnsa-strict, mock-fido2
+│
+├── web/                     React 19 SPA + Express server — Layer 2
+│   ├── server.js            Express: CSP nonce injection, WebSocket proxy, setup API
+│   ├── auth.js              /api/auth/* and /api/vault/* routes, JWE sessions, scrypt
+│   ├── src/
+│   │   ├── main.tsx         React root, Trusted Types policy, context providers
+│   │   ├── router.tsx       All routes, AuthedLayout guard
+│   │   ├── types.ts         Core TypeScript types
+│   │   ├── crypto/          SecureKeyStore (mlock analog for JS private fields)
+│   │   ├── utils/           daemonClient, localCrypto, mfa, securityModes, importExport
+│   │   ├── context/         VaultContext, UserContext, NotificationContext
+│   │   ├── pages/           Login, Register, Vault, Settings, BreachMonitor, Setup
+│   │   └── components/      Header, Sidebar, ErrorBoundary, modals
+│   ├── auth_data/           Per-installation encrypted file store (P2W filesystem)
+│   │   ├── .master_key      32-byte CSPRNG master key (mode 0400)
+│   │   ├── users.enc        AES-256-GCM encrypted user registry
+│   │   └── vault/&lt;uid&gt;/     Per-user encrypted resource files
+│   └── vite.config.ts       Build config, @/ alias, sourcemaps off in prod
+│
+├── deploy/
+│   ├── nginx/vault.conf     TLS 1.3-only reverse proxy, CNSA 2.0 key groups
+│   ├── vault-daemon.service systemd unit, CAP_IPC_LOCK, MemorySwapMax=0
+│   ├── apparmor.d/          MAC confinement profile
+│   └── Makefile             Orchestrated build: cargo release + npm build
+│
+└── hibp/                    Offline HIBP Cuckoo filter builder script
+</code></pre>
+<h3>Build Feature Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pq-hybrid-1024</code> (default)</td>
+<td>Enables ML-KEM-1024 via the <code>ml-kem</code> crate. Activates <code>X448MlKem1024Kem</code> as the default KEM.</td>
+</tr>
+<tr>
+<td><code>cnsa-strict</code></td>
+<td>Implies <code>pq-hybrid-1024</code>. Forces HKDF-SHA-384, PBKDF2-SHA-512, SHA-384 audit hashing. Removes BLAKE3, SHA-3, XChaCha20-Poly1305, Ed25519, X25519 from all active paths.</td>
+</tr>
+<tr>
+<td><code>mock-fido2</code></td>
+<td>Replaces <code>libfido2</code> with a no-op stub for CI environments without hardware tokens.</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>3. Two-Layer Architecture</h2>
+<div style="text-align: right"><em>Page 5</em></div>
+<h3>3.1 Architectural Boundary</h3>
+<p>The system enforces a hard process boundary between cryptographic operations (Layer 1, Rust) and the user interface (Layer 2, Node.js/React). This boundary is authenticated at the OS level using <code>SO_PEERCRED</code> on the Unix domain socket.</p>
+
+<div class="diagram-container">
+  <svg width="760" height="420" viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg">
+    <!-- Browser Layer -->
+    <rect x="10" y="10" width="740" height="90" rx="8" ry="8" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <text x="380" y="35" font-family="Segoe UI, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#1e293b">Browser (Layer 2 Client)</text>
+    <text x="380" y="60" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">React 19 SPA — zero knowledge of KEK/VMK/DEK</text>
+    <text x="380" y="80" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">SecureKeyStore: session token in JS private field only</text>
+
+    <!-- Arrow 1 -->
+    <path d="M 380 100 L 380 140" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+    <text x="390" y="120" font-family="Segoe UI, sans-serif" font-size="12" fill="#64748b">WebSocket (binary, msgpack)</text>
+    <text x="390" y="135" font-family="Segoe UI, sans-serif" font-size="12" fill="#64748b">ws://localhost/ws</text>
+
+    <!-- Express Server Layer -->
+    <rect x="10" y="150" width="740" height="90" rx="8" ry="8" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <text x="380" y="175" font-family="Segoe UI, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#1e293b">Express Server (Layer 2 Server, server.js)</text>
+    <text x="380" y="200" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">WebSocket proxy: browser WS ↔ Unix socket (one-to-one mapping)</text>
+    <text x="380" y="220" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">CSP nonce injection, static asset serving, setup API</text>
+
+    <!-- Arrow 2 -->
+    <path d="M 380 240 L 380 280" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+    <text x="390" y="260" font-family="Segoe UI, sans-serif" font-size="12" fill="#64748b">Unix domain socket</text>
+    <text x="390" y="275" font-family="Segoe UI, sans-serif" font-size="12" fill="#64748b">/run/vault-daemon/vault.sock (SO_PEERCRED)</text>
+
+    <!-- Daemon Layer -->
+    <rect x="10" y="290" width="740" height="110" rx="8" ry="8" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+    <text x="380" y="315" font-family="Segoe UI, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#1e293b">vault-daemon (Layer 1, Rust + Tokio)</text>
+    <text x="380" y="340" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">All crypto: Argon2id, AES-256-GCM, XChaCha20-Poly1305, ...</text>
+    <text x="380" y="360" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">SQLCipher database: vault.db (AES-256-CBC pages)</text>
+    <text x="380" y="380" font-family="Segoe UI, sans-serif" font-size="14" text-anchor="middle" fill="#334155">VMK in mlock'd, PROT_NONE memory (LockedKey)</text>
+
+    <!-- Definitions for Arrowhead -->
+    <defs>
+      <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+      </marker>
+    </defs>
+  </svg>
+</div>
+<h3>3.2 Three Operating Modes</h3>
+<p>The web layer supports three distinct modes of operation. Mode detection happens in <code>VaultContext</code> by inspecting the <code>_pwd_csrf</code> cookie (JS-readable, non-HttpOnly).</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Trigger</th>
+<th>Vault Storage</th>
+<th>Session Credential</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Daemon</strong></td>
+<td><code>daemon.unlock()</code> succeeds</td>
+<td>Rust daemon, SQLCipher</td>
+<td>Session token in <code>SecureKeyStore</code> JS private field <code>#token</code></td>
+</tr>
+<tr>
+<td><strong>Server</strong></td>
+<td><code>POST /api/auth/login</code> succeeds</td>
+<td>AES-256-GCM encrypted <code>.enc</code> files in <code>auth_data/vault/&lt;uid&gt;/</code></td>
+<td>JWE cookie <code>_pwd_sess</code> (HttpOnly)</td>
+</tr>
+<tr>
+<td><strong>Unauthenticated</strong></td>
+<td>Neither above</td>
+<td>None</td>
+<td>None; redirect to <code>/login</code></td>
+</tr>
+</tbody>
+</table>
+<p>When <code>hasServerSession()</code> returns <code>true</code>, all vault reads and writes are routed to <code>/api/vault/*</code> REST endpoints instead of the daemon IPC connection. This allows the system to function on hosts where the daemon is not installed.</p>
+<h3>3.3 Process Supervision</h3>
+<p>The daemon runs under systemd with the following security constraints:</p>
+<pre><code class="language-ini">[Service]
+User=vault
+NoNewPrivileges=yes
+PrivateTmp=yes
+MemorySwapMax=0          # VMK pages must never reach disk
+AmbientCapabilities=CAP_IPC_LOCK   # required for mlock(2)
+</code></pre>
+<p>AppArmor confinement limits the daemon’s filesystem access to <code>/run/vault-daemon/</code>, the vault data directory, and required library paths.</p>
+<hr>
+<h2>4. Cryptographic Primitives Reference</h2>
+<div style="text-align: right"><em>Page 7</em></div>
+<h3>4.1 Symmetric Encryption</h3>
+<h4>AES-256-GCM (Primary AEAD, FIPS 197 + NIST SP 800-38D)</h4>
+<p>Used for: VMK encryption under KEK, per-credential DEK encryption under VMK, credential blob encryption under DEK, Quick Unlock KEK wrapping, server-side file encryption (auth_data), PQC VMK transport.</p>
+<ul>
+<li>Key length: 256 bits</li>
+<li>Nonce: 96 bits (12 bytes), randomly generated per operation via <code>OsRng</code></li>
+<li>Authentication tag: 128 bits (16 bytes, appended to ciphertext)</li>
+<li>AAD: bound to context (e.g., <code>b&quot;vmk-aad-v1&quot;</code>, <code>build_aad(vault_uuid, cred_id)</code>)</li>
+<li>Implementation: <code>aes-gcm</code> crate v0.10 (RustCrypto), constant-time</li>
+</ul>
+<p>Wire encoding: ciphertext bytes include the trailing 16-byte tag. Nonce stored separately as a raw 12-byte blob in SQLite.</p>
+<h4>XChaCha20-Poly1305 (Secondary AEAD, RFC 8439 extended nonce)</h4>
+<p>Used for: VMK encryption in legacy vaults, per-credential DEK and blob encryption when the vault was originally created in non-CNSA mode.</p>
+<ul>
+<li>Key length: 256 bits</li>
+<li>Nonce: 192 bits (24 bytes), randomly generated per operation</li>
+<li>Authentication tag: 128 bits</li>
+<li>AAD: identical binding context as AES-GCM paths</li>
+<li>Implementation: <code>chacha20poly1305</code> crate v0.10.1</li>
+</ul>
+<p>The 24-byte nonce length eliminates nonce-reuse risk from a random nonce across the entire vault lifetime. When the nonce field in SQLite is 12 bytes, the AES-GCM path is taken; when 24 bytes, XChaCha20-Poly1305 is taken. This is the only place both ciphers coexist.</p>
+<p>In <code>cnsa-strict</code> mode, XChaCha20-Poly1305 is removed from all new write paths. Existing databases created before CNSA migration continue to read legacy 24-byte-nonce records until they are re-encrypted.</p>
+<h3>4.2 Key Derivation Functions</h3>
+<h4>Argon2id (Default KDF, NIST SP 800-63B-4 (2024) §5.1.1.2, PHC winner)</h4>
+<p>Used for: KEK derivation from master password (primary path).</p>
+<p>Parameters (production, auto-tuned by <code>kdf_tune.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>m_cost</code></td>
+<td>1,048,576 KiB (1 GiB)</td>
+<td>Minimum for Level 5; tuner targets 1.0 s</td>
+</tr>
+<tr>
+<td><code>t_cost</code></td>
+<td>4 (minimum)</td>
+<td>Binary-searched to achieve ~1 s wall time</td>
+</tr>
+<tr>
+<td><code>p_cost</code></td>
+<td>2 lanes</td>
+<td>Parallelism</td>
+</tr>
+<tr>
+<td>Output</td>
+<td>64 bytes</td>
+<td><code>[0..32]</code> = KEK, <code>[32..64]</code> = AuthKey</td>
+</tr>
+<tr>
+<td>Salt</td>
+<td>32 bytes CSPRNG</td>
+<td>Stored in <code>vault.db.meta</code> sidecar</td>
+</tr>
+<tr>
+<td>Version</td>
+<td>0x13 (v1.3)</td>
+<td>Current Argon2 specification</td>
+</tr>
+</tbody>
+</table>
+<p>YubiKey augmentation: when a YubiKey HMAC-SHA256 challenge response is provided, the 20-byte response is appended to the password bytes before KDF input, forming: <code>KDF_input = password_bytes || yubikey_response[20]</code>.</p>
+<h4>PBKDF2-HMAC-SHA-512 (CNSA Path, NSA CNSA 2.0 / NIST SP 800-132 (2010))</h4>
+<p>Used for: KEK derivation when <code>m_cost == 0</code> (CNSA strict activation signal); legacy server-side verification in <code>auth.js</code> (superseded by Argon2id for new hashes).</p>
+<ul>
+<li>Iterations: 1,000,000 (NSA CNSA 2.0 / CSI-CNSA-2.0, Sept 2022 minimum; salt per NIST SP 800-132 (2010))</li>
+<li>PRF: HMAC-SHA-512</li>
+<li>Output: 64 bytes</li>
+<li>Implementation (daemon): <code>pbkdf2</code> crate v0.12.2</li>
+</ul>
+<p>Server-side (auth.js) uses Argon2id (m=128 MiB, t=3, p=1) via the native <code>argon2</code> npm package running in the libuv thread pool (non-blocking). PBKDF2-SHA-512 and scrypt legacy hashes continue to verify and are opportunistically upgraded to Argon2id on next login.</p>
+<h4>scrypt (Server-Mode Legacy Hash, NIST SP 800-63B-4 (2024))</h4>
+<p>Used for: legacy user password verification in server mode only. New passwords use Argon2id (above).</p>
+<ul>
+<li>N: 131072 (2^17)</li>
+<li>r: 8</li>
+<li>p: 1</li>
+<li>keylen: 64 bytes</li>
+<li>maxmem: 256 MiB ceiling</li>
+</ul>
+<h4>HKDF (Key Expansion, RFC 5869)</h4>
+<p>Three distinct HKDF instances appear in the system:</p>
+<table>
+<thead>
+<tr>
+<th>Instance</th>
+<th>Hash</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HKDF-SHA-256</code></td>
+<td>SHA-256</td>
+<td>X25519 KEM shared secret expansion (non-CNSA mode), SQLCipher key derivation from VMK (legacy)</td>
+</tr>
+<tr>
+<td><code>HKDF-SHA-384</code></td>
+<td>SHA-384</td>
+<td>X25519 KEM shared secret expansion (CNSA mode), hybrid KEM combiner (CNSA mode), server-side derived key cache (<code>auth.js</code>)</td>
+</tr>
+<tr>
+<td><code>HKDF-SHA3-512</code></td>
+<td>SHA3-512</td>
+<td>SQLCipher key derivation from VMK (<code>vault-sqlcipher-key-v2-sha3-512</code>), blind index key derivation (<code>vault-blind-index-key-v1-sha3-512</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>SQLCipher key derivation: <code>HKDF-SHA3-512(ikm=VMK[32], info=b&quot;vault-sqlcipher-key-v2-sha3-512&quot;) -&gt; [32 bytes]</code></p>
+<p>Blind index key derivation: <code>HKDF-SHA3-512(ikm=VMK[32], info=b&quot;vault-blind-index-key-v1-sha3-512&quot;) -&gt; [64 bytes]</code></p>
+<h3>4.3 Key Encapsulation Mechanisms</h3>
+<h4>X25519 KEM (Classical, Legacy)</h4>
+<p>Used when <code>pq-hybrid-1024</code> feature is disabled.</p>
+<ul>
+<li>Ephemeral key pair generated per encapsulation using <code>OsRng</code></li>
+<li>DH output expanded via <code>HKDF-SHA-256</code> (or <code>HKDF-SHA-384</code> in CNSA mode) with info <code>b&quot;vault-x25519-kem-v1&quot;</code> and salt <code>b&quot;vault-x25519-kem-salt&quot;</code></li>
+<li>Ciphertext: 32-byte ephemeral public key</li>
+</ul>
+<h4>X448 + ML-KEM-1024 Hybrid KEM (NIST Level 5, CNSA 2.0)</h4>
+<p>Activated by the <code>pq-hybrid-1024</code> (default) feature flag.</p>
+<p>This KEM provides security against both classical and quantum adversaries. A key exchange is secure as long as at least one component remains unbroken.</p>
+<p><strong>Disclaimer:</strong> This is a pre-standardization hybrid construction (IETF draft) utilized to meet the CNSA 2.0 requirement for quantum-resistant key establishment while maintaining classical security. Pure ML-KEM-1024 is planned as the sole KEM post-2030.</p>
+<p><strong>Public key format:</strong> <code>X448_PK[56] || ML-KEM-1024-EK[1568]</code> = 1624 bytes total</p>
+<p><strong>Ciphertext format:</strong> <code>X448_EPH_PK[56] || ML-KEM-1024-CT[1568]</code> = 1624 bytes total</p>
+<p><strong>Encapsulation procedure:</strong></p>
+<pre><code>1. Classical component (X448):
+   eph_sk, eph_pk = X448.keygen(OsRng)
+   x_ss = X448.DH(eph_sk, recipient_pk[0..56])
+
+2. Post-quantum component (ML-KEM-1024, FIPS 203):
+   m = OsRng[32]
+   ct, mlkem_ss = ML-KEM-1024.Encapsulate(recipient_pk[56..], m)
+
+3. Combination (non-CNSA):
+   ikm = x_ss[56] || mlkem_ss[32]
+   shared_secret = HKDF-SHA3-512(ikm, info=b&quot;vault-hybrid-kem-v3-x448-mlkem1024&quot;)[32]
+
+3. Combination (CNSA strict):
+   ikm = x_ss[56] || mlkem_ss[32]
+   shared_secret = HKDF-SHA-384(ikm, info=b&quot;vault-hybrid-kem-v3-x448-mlkem1024&quot;)[32]
+
+ciphertext = eph_pk[56] || ct[1568]
+</code></pre>
+<p>ML-KEM-1024 provides NIST Security Level 5 (IND-CCA2 secure under Module-LWE). The classical X448 component provides 224-bit classical security, exceeding the CNSA 2.0 floor of 192-bit classical security (P-384). SHA3-512 in the combiner provides 256-bit quantum collision resistance.</p>
+<h3>4.4 Digital Signatures</h3>
+<h4>ML-DSA-87 (FIPS 204, NIST Level 5)</h4>
+<p>Used for: PQC authenticator assertion signing, nightly audit log root signing.</p>
+<ul>
+<li>Public key (verifying key): 2592 bytes</li>
+<li>Signature: 4627 bytes</li>
+<li>Security level: NIST Level 5 (128-bit quantum security)</li>
+<li>Suite byte: <code>0x02</code> prepended to every signature blob</li>
+<li>Implementation: <code>ml-dsa</code> crate v0.1.0-rc.9</li>
+</ul>
+<h4>Ed25519 (RFC 8032, Legacy Verification Only)</h4>
+<p>Retained for backward-compatible signature verification only. Suite byte <code>0x01</code>. New code does not issue Ed25519 signatures.</p>
+<h3>4.5 Hash Functions</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Implementation</th>
+<th>Uses in PWDnow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SHA-256</td>
+<td><code>sha2</code> crate</td>
+<td>HKDF-SHA-256 (classical KEM), CSRF token derivation, partial MFA token hashing</td>
+</tr>
+<tr>
+<td>SHA-384</td>
+<td><code>sha2</code> crate</td>
+<td>HKDF-SHA-384 (CNSA paths), SHA-384 audit chain (CNSA strict)</td>
+</tr>
+<tr>
+<td>SHA-512</td>
+<td><code>sha2</code> crate</td>
+<td>PBKDF2-HMAC-SHA-512 PRF, HMAC-SHA-512 blind index</td>
+</tr>
+<tr>
+<td>SHA3-512</td>
+<td><code>sha3</code> crate</td>
+<td>HKDF-SHA3-512 (VMK-&gt;SQLCipher key, blind index key), wipe ticket hash</td>
+</tr>
+<tr>
+<td>BLAKE3</td>
+<td><code>blake3</code> crate</td>
+<td>Session token hashing (revocation list), audit log chain (non-CNSA)</td>
+</tr>
+<tr>
+<td>SHA-1</td>
+<td><code>sha1</code> crate</td>
+<td>HIBP Cuckoo filter fingerprint (HIBP dataset uses SHA-1 exclusively)</td>
+</tr>
+</tbody>
+</table>
+<p>SHA-1 is used only for HIBP compatibility. It is never used for any security-sensitive operation.</p>
+<h3>4.6 Message Authentication Codes</h3>
+<h4>HMAC-SHA-512 (Blind Index MAC)</h4>
+<p>Each searchable credential field (service, URL, username) is indexed as <code>HMAC-SHA-512(blind_index_key[64], field_value_utf8)</code>, hex-encoded. This allows equality search on encrypted data without revealing the plaintext.</p>
+<p>Blind index key derivation: see Section 4.2 HKDF table above. The 64-byte key prevents length-extension attacks and provides 256-bit quantum collision resistance.</p>
+<h4>HMAC-SHA-256 (Browser localStorage HMAC, Server Auth Layer)</h4>
+<p>The browser’s encrypted local storage format appends <code>HMAC-SHA-256(signing_key[32], header || iv || ciphertext)</code> as the third segment of its token format (see Section 11.2). This is derived from the same PBKDF2 pass that produces the AES-GCM key.</p>
+<hr>
+<h2>5. Key Hierarchy and Derivation Chain</h2>
+<div style="text-align: right"><em>Page 11</em></div>
+<h3>5.1 Daemon Key Hierarchy</h3>
+<p>The complete key derivation chain from user input to protected credential plaintext:</p>
+<pre><code>User Input
+───────────────────────────────────────────────────────
+master_password (UTF-8 bytes)
+[optional] yubikey_response (20 bytes HMAC-SHA256)
+
+KDF Layer (Argon2id or PBKDF2-SHA-512)
+───────────────────────────────────────────────────────
+KDF_input = master_password || yubikey_response
+
+Argon2id(KDF_input, argon2_salt[32], m=1GiB, t=4, p=2) -&gt; 64 bytes
+  or
+PBKDF2-HMAC-SHA-512(KDF_input, salt[32], iterations=1_000_000) -&gt; 64 bytes
+
+kek_material[64]:
+  KEK   = kek_material[0..32]    (Key Encryption Key)
+  AuthKey = kek_material[32..64] (reserved, future use)
+
+VMK Layer
+───────────────────────────────────────────────────────
+encrypted_vmk  = AES-256-GCM.Encrypt(key=KEK, pt=VMK[32], aad=b&quot;vmk-aad-v1&quot;)
+nonce          = random[12]
+
+Stored in vault.db.meta sidecar (plaintext JSON, pre-unlock readable)
+
+VMK -&gt; SQLCipher Key
+───────────────────────────────────────────────────────
+sqlcipher_key[32] = HKDF-SHA3-512(ikm=VMK[32],
+                                   info=b&quot;vault-sqlcipher-key-v2-sha3-512&quot;)
+Applied via: PRAGMA key = hex(sqlcipher_key)
+
+VMK -&gt; Blind Index Key
+───────────────────────────────────────────────────────
+blind_index_key[64] = HKDF-SHA3-512(ikm=VMK[32],
+                                      info=b&quot;vault-blind-index-key-v1-sha3-512&quot;)
+
+DEK Layer (per credential)
+───────────────────────────────────────────────────────
+DEK[32] = OsRng  (fresh for every write)
+encrypted_dek  = AES-256-GCM.Encrypt(key=VMK, pt=DEK[32], aad=build_aad(...))
+dek_nonce      = random[12]
+
+Credential Blob Layer
+───────────────────────────────────────────────────────
+ciphertext = AES-256-GCM.Encrypt(key=DEK, pt=credential_json, aad=build_aad(...))
+ct_nonce   = random[12]
+ct_aad     = vault_uuid_bytes || cred_id_bytes || schema_version_be32
+
+Blind Indexes (stored in SQLite, enables search without decryption)
+───────────────────────────────────────────────────────
+service_hash  = hex(HMAC-SHA-512(blind_index_key, service_name))
+url_hash      = hex(HMAC-SHA-512(blind_index_key, url))
+username_hash = hex(HMAC-SHA-512(blind_index_key, username))
+</code></pre>
+<h3>5.2 Passkey VMK Wrap Key Derivation</h3>
+<p>When a FIDO2 passkey is registered as an authentication method, the daemon derives a per-passkey VMK wrapping key from the FIDO2 authenticator data. This allows passwordless unlock.</p>
+<pre><code>auth_data[0..33]  (RP ID hash [32] + flags [1])
+credential_id     (raw bytes from FIDO2 authenticator)
+kem_suite         (u8 from VaultHeader)
+
+wrap_key[32] = HKDF-SHA-256(ikm = auth_data[0..33] || credential_id,
+                              info = b&quot;passkey-vmk-wrap-v1&quot;)
+
+vmk_copy = AES-256-GCM.Encrypt(key=wrap_key, pt=VMK[32],
+                                 aad=b&quot;passkey-vmk-aad-v1&quot;)
+</code></pre>
+<p>This VMK copy is stored in the <code>passkey_credentials</code> array within <code>vault.db.meta</code>. Each registered passkey gets its own encrypted VMK copy. All copies are invalidated (cleared) when the master password is changed.</p>
+<h3>5.3 Quick Unlock Key Wrapping</h3>
+<p>Quick Unlock uses a WebAuthn PRF extension output (32-byte Device Binding Key, DBK) to wrap the KEK. This allows biometric unlock without re-running the expensive KDF.</p>
+<pre><code>DBK[32]  &lt;- WebAuthn PRF output (from the browser's navigator.credentials.get)
+KEK[32]  &lt;- derived normally from master password
+
+enc_kek = AES-256-GCM.Encrypt(key=DBK, pt=KEK[32], aad=b&quot;quick-unlock-v1&quot;)
+nonce   = random[12]
+
+Stored in VaultHeader.quick_unlock_credentials[]
+
+Unlock:
+KEK = AES-256-GCM.Decrypt(key=DBK, ct=enc_kek, aad=b&quot;quick-unlock-v1&quot;)
+VMK = AES-256-GCM.Decrypt(key=KEK, ct=encrypted_vmk, aad=b&quot;vmk-aad-v1&quot;)
+</code></pre>
+<h3>5.4 Server-Mode Key Hierarchy (auth.js)</h3>
+<p>The Express server maintains its own independent key hierarchy for server-mode operation.</p>
+<pre><code>.master_key (32 bytes, OsRng, stored at auth_data/.master_key, mode 0400)
+   |
+   +-- HKDF-SHA-384(ikm=.master_key, info=b&quot;jwe/session&quot;,  len=32) -&gt; jwe_key
+   +-- HKDF-SHA-384(ikm=.master_key, info=b&quot;users/enc&quot;,    len=32) -&gt; users_enc_key
+   +-- HKDF-SHA-384(ikm=.master_key, info=b&quot;&lt;resource&gt;/enc&quot;, len=32) -&gt; per_resource_key
+
+Per-user file encryption:
+   AES-256-GCM.Encrypt(key=per_resource_key, pt=JSON_blob)
+
+JWE session tokens:
+   EncryptJWT(payload={sub, jti, iat, exp}, key=jwe_key, enc=&quot;A256GCM&quot;)
+
+User password storage (new):
+   Argon2id(password, salt[32], m=128MiB, t=3, p=1) -&gt; hash[64]
+   Stored as: &quot;$argon2id$v=19$m=131072,t=3,p=1$&quot; + hex(salt) + &quot;$&quot; + hex(hash)
+</code></pre>
+<h3>5.5 LockedKey Memory Protection</h3>
+<p>The VMK is held in a <code>LockedKey</code> struct that provides OS-level memory protection:</p>
+<pre><code>mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS) -&gt; ptr
+mlock(ptr, PAGE_SIZE)      &lt;- prevents OS from paging this memory to disk
+mprotect(ptr, PAGE_SIZE, PROT_NONE)  &lt;- seals the page: any CPU access faults
+
+Access window (as_bytes / as_bytes_mut):
+  mprotect(ptr, PROT_READ)         -&gt; open read window
+  [caller reads VMK bytes]
+  mprotect(ptr, PROT_NONE)         -&gt; seal again (RAII guard drop)
+
+Drop:
+  mprotect(ptr, PROT_READ|PROT_WRITE)
+  memset(ptr, 0, PAGE_SIZE)        &lt;- zeroize via zeroize crate
+  munlock(ptr, PAGE_SIZE)
+  munmap(ptr, PAGE_SIZE)
+</code></pre>
+<p>This design means that between vault operations, the VMK page produces a SIGSEGV for any process attempting to read it via <code>/proc/&lt;pid&gt;/mem</code> or ptrace. The key is readable only during the brief execution window of an encrypt or decrypt call.</p>
+<hr>
+<h2>6. Layer 1: Vault Daemon (Rust)</h2>
+<div style="text-align: right"><em>Page 15</em></div>
+<h3>6.1 Runtime Model</h3>
+<p>The daemon is a single Tokio async runtime with a Unix socket listener. Each incoming connection is handled in a spawned task. The <code>DaemonState</code> struct is wrapped in <code>Arc&lt;DaemonState&gt;</code> and shared across all connection tasks.</p>
+<pre><code>main() -&gt; tokio::main
+  |
+  +-- sd_notify::notify(READY=1)   &lt;- systemd readiness notification
+  |
+  +-- Arc::new(DaemonState::new(vault_path))
+  |
+  +-- tokio::spawn(idle_watchdog)  &lt;- auto-lock after IDLE_TIMEOUT_SECS (900s)
+  |
+  +-- UnixListener::bind(&quot;/run/vault-daemon/vault.sock&quot;)
+       |
+       for each connection:
+         tokio::spawn(handle_connection(state.clone(), stream))
+           |
+           loop:
+             frame = read_frame(&amp;mut stream)       &lt;- 4-byte BE length + body
+             req   = rmp_serde::from_slice(&amp;frame) &lt;- deserialize Request
+             resp  = dispatch(&amp;state, req, uid)    &lt;- SO_PEERCRED uid
+             write_frame(&amp;mut stream, &amp;rmp_serde::to_vec(&amp;resp))
+</code></pre>
+<h3>6.2 DaemonState Structure</h3>
+<p><code>DaemonState</code> holds all mutable runtime state under appropriate synchronization primitives:</p>
+<pre><code class="language-rust">pub struct DaemonState {
+    pub sessions: SessionStore,          // RwLock&lt;HashMap&lt;token, Session&gt;&gt;
+    pub db: Mutex&lt;Option&lt;Connection&gt;&gt;,   // SQLCipher connection (None = locked)
+    vmk: RwLock&lt;Option&lt;LockedKey&gt;&gt;,      // mlock'd VMK (None = locked)
+    pub vault_uuid: Mutex&lt;Option&lt;String&gt;&gt;,
+    wipe_ticket: Mutex&lt;Option&lt;Vec&lt;u8&gt;&gt;&gt;, // 32-byte forensic wipe capability
+    pub vault_path: PathBuf,
+    pub last_activity: Arc&lt;AtomicU64&gt;,   // Unix epoch, updated by touch()
+    passkey_challenge: Mutex&lt;Option&lt;[u8; 32]&gt;&gt;,  // consumed once
+    pqc_challenge: Mutex&lt;Option&lt;[u8; 32]&gt;&gt;,
+    failed_unlock_attempts: AtomicU32,
+    unlock_locked_until: Mutex&lt;Option&lt;Instant&gt;&gt;,
+    pending_audit: Mutex&lt;Vec&lt;(String, Option&lt;String&gt;)&gt;&gt;,
+}
+</code></pre>
+<h3>6.3 Brute-Force Lockout (H-01)</h3>
+<p>Failed unlock attempts trigger exponential back-off:</p>
+<pre><code>LOCKOUT_SCHEDULE_SECS = [0, 0, 0, 0, 0, 30, 60, 120, 300, 600]
+
+After N failures: lockout for LOCKOUT_SCHEDULE_SECS[min(N, len-1)] seconds
+After 5 failures: 30 seconds
+After 6 failures: 60 seconds
+After 7 failures: 120 seconds
+After 8 failures: 300 seconds (5 minutes)
+After 9+ failures: 600 seconds (10 minutes)
+
+Counter resets to 0 on any successful unlock.
+</code></pre>
+<h3>6.4 Session Management</h3>
+<p>Sessions are managed in <code>SessionStore</code>, an in-memory <code>HashMap&lt;String, Session&gt;</code> protected by a <code>RwLock</code>. No sessions are persisted to disk.</p>
+<p><strong>Session token:</strong> 64 hex characters = 32 bytes from <code>OsRng</code>. Cryptographically random, not signed.</p>
+<p><strong>Session validation checks (all must pass):</strong></p>
+<ol>
+<li>Token not in revocation list (BLAKE3 hash of token checked in <code>RwLock&lt;HashMap&lt;[u8;32], u64&gt;&gt;</code>)</li>
+<li>Token present in active session map</li>
+<li><code>now &lt; session.expires_at</code> (idle TTL, 15 minutes, slides on activity)</li>
+<li><code>now &lt; session.absolute_expires_at</code> (hard cap, 24 hours from creation)</li>
+<li><code>session.uid == connecting_uid</code> (SO_PEERCRED UID binding)</li>
+</ol>
+<p><strong>Session limits:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Idle TTL</td>
+<td>900 seconds (15 minutes)</td>
+</tr>
+<tr>
+<td>Absolute TTL</td>
+<td>86400 seconds (24 hours)</td>
+</tr>
+<tr>
+<td>Max sessions per user</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Max total sessions</td>
+<td>1000</td>
+</tr>
+<tr>
+<td>Token rotation grace window</td>
+<td>60 seconds</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Revocation:</strong> Revoked token hashes are stored in a separate <code>HashMap</code> keyed by <code>BLAKE3(token)</code>. This prevents timing-oracle information leakage (revoked tokens return the same “session expired” error as expired tokens, not “not found”).</p>
+<h3>6.5 Vault Unlock Flow</h3>
+<pre><code>unlock_existing(password, yubikey_response, uid):
+
+1. check_unlock_lockout()          &lt;- fail fast if still in lockout window
+2. read_header()                   &lt;- reads vault.db.meta (pre-auth, unauthenticated)
+3. decode argon2_salt from hex
+4. kdf::derive_kek(password, yk, salt, m_cost, t_cost, p_cost) -&gt; kek_buf[64]
+   [measured: tracing::info!(&quot;unlock_kdf={}ms&quot;)]
+5. kek = kek_buf[0..32]
+6. ct = hex_decode(header.encrypted_vmk)
+7. nonce = hex_decode(header.vmk_nonce)
+8. if nonce.len() == 12: vmk = AES-256-GCM.Decrypt(kek, ct, nonce, b&quot;vmk-aad-v1&quot;)
+   if nonce.len() == 24: vmk = XChaCha20-Poly1305.Decrypt(kek, ct, nonce, b&quot;vmk-aad-v1&quot;)
+9. sqlcipher_key = HKDF-SHA3-512(vmk, info=b&quot;vault-sqlcipher-key-v2-sha3-512&quot;)
+10. conn = SQLCipher.open(vault_path, PRAGMA key=hex(sqlcipher_key))
+11. migrate_data_to_v2(&amp;conn, vmk)  &lt;- idempotent: add blind indexes to legacy records
+12. wipe_ticket = generate_if_absent() &lt;- SHA3-512(random[32]) -&gt; stored in header
+13. *state.vmk.write() = Some(LockedKey(vmk))
+14. *state.db.lock()  = Some(conn)
+15. session = sessions.create(vault_uuid, uid, DEFAULT_TTL_SECS)
+16. return Session {token, wipe_ticket}
+</code></pre>
+<h3>6.6 Forensic Wipe</h3>
+<p>The forensic wipe capability implements NIST SP 800-88 Rev. 2 <strong>cryptographic erase</strong>. This is the primary “Purge” operation for modern flash/SSD storage. It uses a 32-byte capability token (<code>wipe_ticket</code>) whose SHA3-512 hash is stored in the sidecar. The wipe can be triggered pre-authentication (the daemon accepts it while locked).</p>
+<pre><code>forensic_wipe(presented_ticket):
+1. read_header()
+2. hash = SHA3-512(presented_ticket)
+3. ct_eq(hex(hash), header.wipe_ticket_hash)  &lt;- constant-time comparison
+4. lock()                                       &lt;- zeroize VMK, close DB, revoke sessions
+5. zeroize_sidecar_keys()                      &lt;- overwrite VMK fields in vault.db.meta
+6. unlink(vault.db.meta)                       &lt;- remove sidecar
+7. unlink(vault.db)                            &lt;- remove encrypted vault
+8. process::exit(0)
+</code></pre>
+<p>Cryptographic erase is instantaneous and renders the data unrecoverable by destroying the VMK and the SQLCipher key material. Multi-pass overwrite (7-pass) is retained only as an opt-in fallback for rotational media via <code>VAULT_WIPE_MODE=overwrite</code>.</p>
+<h3>6.7 Audit Log Chain</h3>
+<p>Every security-relevant event is appended to the <code>audit_log</code> table as a linked hash chain. No row can be deleted or modified without breaking the chain.</p>
+<p><strong>Hash algorithm selection:</strong></p>
+<pre><code>Default:
+  row_hash = BLAKE3(ts_be8 || action_bytes || resource_bytes || prev_hash[32])
+
+cnsa-strict:
+  row_hash = SHA-384(0x02 || ts_be8 || action_bytes || resource_bytes || prev_hash[48])
+  (0x02 = CNSA suite ID for self-identifying chains across migrations)
+</code></pre>
+<p>Timestamp precision is nanoseconds since Unix epoch (stored as <code>i64</code>), preventing sub-second event reordering.</p>
+<p>Chain verification (<code>VerifyAuditChain</code>): reads all rows in ascending <code>id</code> order, recomputes each <code>row_hash</code> from the stored <code>prev_hash</code>, and fails immediately on any mismatch.</p>
+<p>Nightly audit log root signing uses <code>ML-DSA-87.Sign(last_row_hash)</code>, producing a 4628-byte tagged signature stored in <code>audit_signatures</code>.</p>
+<h3>6.8 Module Inventory</h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>File</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>crypto::aes_gcm</code></td>
+<td><code>crypto/aes_gcm.rs</code></td>
+<td>AES-256-GCM AEAD, 96-bit nonce</td>
+</tr>
+<tr>
+<td><code>crypto::xchacha20</code></td>
+<td><code>crypto/xchacha20.rs</code></td>
+<td>XChaCha20-Poly1305 AEAD, 192-bit nonce</td>
+</tr>
+<tr>
+<td><code>crypto::kdf</code></td>
+<td><code>crypto/kdf.rs</code></td>
+<td>Argon2id, PBKDF2-SHA-512, unified <code>derive_kek</code> dispatch</td>
+</tr>
+<tr>
+<td><code>crypto::kdf_tune</code></td>
+<td><code>crypto/kdf_tune.rs</code></td>
+<td>Auto-tune Argon2id to 1.0 s on current hardware</td>
+</tr>
+<tr>
+<td><code>crypto::kem</code></td>
+<td><code>crypto/kem.rs</code></td>
+<td><code>KeyEncapsulator</code> trait, <code>X25519Kem</code>, <code>X448MlKem1024Kem</code></td>
+</tr>
+<tr>
+<td><code>crypto::sign</code></td>
+<td><code>crypto/sign.rs</code></td>
+<td><code>SignPair</code> (ML-DSA-87), <code>verify</code> (ML-DSA-87 + Ed25519 legacy)</td>
+</tr>
+<tr>
+<td><code>crypto::blind_index</code></td>
+<td><code>crypto/blind_index.rs</code></td>
+<td>HMAC-SHA-512 blind index computation</td>
+</tr>
+<tr>
+<td><code>crypto::hibp</code></td>
+<td><code>crypto/hibp.rs</code></td>
+<td><code>CuckooFilter</code> (load + query), SHA-1 hex helper</td>
+</tr>
+<tr>
+<td><code>crypto::secure_store</code></td>
+<td><code>crypto/secure_store.rs</code></td>
+<td><code>LockedKey</code>: mmap + mlock + PROT_NONE page guard</td>
+</tr>
+<tr>
+<td><code>crypto::policy</code></td>
+<td><code>crypto/policy.rs</code></td>
+<td>Compile-time crypto policy enforcement</td>
+</tr>
+<tr>
+<td><code>auth::session</code></td>
+<td><code>auth/session.rs</code></td>
+<td><code>SessionStore</code>, token lifecycle, revocation list</td>
+</tr>
+<tr>
+<td><code>auth::fido2</code></td>
+<td><code>auth/fido2.rs</code></td>
+<td>FIDO2/U2F hardware key operations, passkey wrap key derivation</td>
+</tr>
+<tr>
+<td><code>auth::pqc_auth</code></td>
+<td><code>auth/pqc_auth.rs</code></td>
+<td>PQC authenticator assertion verification (ML-DSA-87 + ML-KEM-1024)</td>
+</tr>
+<tr>
+<td><code>auth::totp</code></td>
+<td><code>auth/totp.rs</code></td>
+<td>TOTP secret generation, code verification, backup codes</td>
+</tr>
+<tr>
+<td><code>vault::state</code></td>
+<td><code>vault/state.rs</code></td>
+<td><code>DaemonState</code>, <code>VaultHeader</code>, unlock/lock/wipe</td>
+</tr>
+<tr>
+<td><code>vault::db</code></td>
+<td><code>vault/db.rs</code></td>
+<td>SQLCipher open, schema migration driver (v1, v2, v3)</td>
+</tr>
+<tr>
+<td><code>vault::credentials</code></td>
+<td><code>vault/credentials.rs</code></td>
+<td>DEK-per-item encrypt/decrypt CRUD + blind index writes</td>
+</tr>
+<tr>
+<td><code>vault::folders</code></td>
+<td><code>vault/folders.rs</code></td>
+<td>Folder CRUD, field-level encrypted blobs</td>
+</tr>
+<tr>
+<td><code>vault::audit</code></td>
+<td><code>vault/audit.rs</code></td>
+<td>Audit log append, chain verification, nightly signing</td>
+</tr>
+<tr>
+<td><code>vault::assets</code></td>
+<td><code>vault/assets.rs</code></td>
+<td>Asset holder encrypted blob CRUD</td>
+</tr>
+<tr>
+<td><code>vault::user_profile</code></td>
+<td><code>vault/user_profile.rs</code></td>
+<td>Profile CRUD, EXIF-stripped profile picture storage</td>
+</tr>
+<tr>
+<td><code>vault::fido2_db</code></td>
+<td><code>vault/fido2_db.rs</code></td>
+<td>FIDO2 credential rows, sign counter management</td>
+</tr>
+<tr>
+<td><code>vault::pqc_db</code></td>
+<td><code>vault/pqc_db.rs</code></td>
+<td>PQC credential rows</td>
+</tr>
+<tr>
+<td><code>vault::totp_db</code></td>
+<td><code>vault/totp_db.rs</code></td>
+<td>TOTP secret and backup code encrypted storage</td>
+</tr>
+<tr>
+<td><code>ipc::protocol</code></td>
+<td><code>ipc/protocol.rs</code></td>
+<td><code>Request</code> + <code>Response</code> enums, frame I/O</td>
+</tr>
+<tr>
+<td><code>ipc::socket</code></td>
+<td><code>ipc/socket.rs</code></td>
+<td><code>dispatch()</code>, <code>auth_then!</code>, <code>with_db!</code>, <code>with_vmk_db!</code> macros</td>
+</tr>
+<tr>
+<td><code>sync::cloudflare</code></td>
+<td><code>sync/cloudflare.rs</code></td>
+<td>Encrypted vault sync to Cloudflare R2</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>7. IPC Protocol Specification</h2>
+<div style="text-align: right"><em>Page 22</em></div>
+<h3>7.1 Wire Format</h3>
+<p>Every message (request or response) is framed as a length-prefixed binary MessagePack blob:</p>
+<pre><code>+------------------+-----------------------------------+
+| Length (4 bytes) | MessagePack Body (length bytes)   |
+| big-endian u32   | rmp_serde encoded Request/Response|
++------------------+-----------------------------------+
+
+Maximum frame body: 4,194,304 bytes (4 MiB)
+Frames exceeding this limit are rejected with VaultError::Ipc
+</code></pre>
+<p>MessagePack encoding uses <code>rmp_serde</code> with named fields. Both <code>Request</code> and <code>Response</code> enums carry <code>#[serde(deny_unknown_fields)]</code>, meaning any frame containing an unrecognized key is rejected at deserialization time. This prevents field injection attacks (D-06).</p>
+<h3>7.2 Request Enum</h3>
+<p>The <code>Request</code> enum is tagged with <code>#[serde(tag = &quot;cmd&quot;, content = &quot;payload&quot;)]</code>. A well-formed frame for <code>Lock</code> looks like:</p>
+<pre><code class="language-json">{&quot;cmd&quot;: &quot;Lock&quot;, &quot;payload&quot;: {&quot;session_token&quot;: &quot;abc123...&quot;}}
+</code></pre>
+<p><strong>Unauthenticated Requests (no session token required):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ping</code></td>
+<td>Connectivity probe</td>
+</tr>
+<tr>
+<td><code>GetStatus</code></td>
+<td>Returns <code>locked: bool</code></td>
+</tr>
+<tr>
+<td><code>GetLoginHints</code></td>
+<td>Reads sidecar; returns MFA policy, FIDO2 IDs, Quick Unlock creds</td>
+</tr>
+<tr>
+<td><code>Unlock { password, yubikey_response?, totp_code? }</code></td>
+<td>Password-based unlock</td>
+</tr>
+<tr>
+<td><code>UnlockWithPasskey { credential_id, auth_data, signature }</code></td>
+<td>Passwordless FIDO2 unlock</td>
+</tr>
+<tr>
+<td><code>UnlockWithPqc { credential_id, signature, kem_ciphertext }</code></td>
+<td>PQC Level 5 unlock</td>
+</tr>
+<tr>
+<td><code>QuickUnlock { dbk }</code></td>
+<td>Biometric Quick Unlock via PRF DBK</td>
+</tr>
+<tr>
+<td><code>GetPasskeyChallenge</code></td>
+<td>Issues a one-time 32-byte challenge for passkey assertion</td>
+</tr>
+<tr>
+<td><code>GetPqcChallenge</code></td>
+<td>Issues a one-time 32-byte challenge for PQC assertion</td>
+</tr>
+<tr>
+<td><code>ListFido2Devices</code></td>
+<td>Lists connected FIDO2/U2F hardware devices</td>
+</tr>
+<tr>
+<td><code>ForensicWipe { wipe_ticket }</code></td>
+<td>Cryptographic erase (NIST SP 800-88 Rev. 2)</td>
+</tr>
+<tr>
+<td><code>UnlockWithBackupCode { password, yubikey_response?, backup_code }</code></td>
+<td>TOTP backup code unlock</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Authenticated Requests (session_token required in payload):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Lock</code></td>
+<td>Zeroize VMK, close DB, revoke all sessions</td>
+</tr>
+<tr>
+<td><code>ListFolders</code></td>
+<td>Return all folders ordered by sort_order</td>
+</tr>
+<tr>
+<td><code>AddFolder { name, description?, icon_svg? }</code></td>
+<td>Create folder</td>
+</tr>
+<tr>
+<td><code>UpdateFolder { id, name, description?, icon_svg? }</code></td>
+<td>Update folder</td>
+</tr>
+<tr>
+<td><code>DeleteFolder { id, move_credentials_to? }</code></td>
+<td>Delete folder, optionally migrating credentials</td>
+</tr>
+<tr>
+<td><code>ReorderFolders { ordered_ids }</code></td>
+<td>Batch reorder via sort_order update</td>
+</tr>
+<tr>
+<td><code>ListCredentials { folder_id? }</code></td>
+<td>Return credential metadata (no decryption)</td>
+</tr>
+<tr>
+<td><code>GetCredential { id }</code></td>
+<td>Decrypt and return full credential blob</td>
+</tr>
+<tr>
+<td><code>AddCredential { folder_id?, blob }</code></td>
+<td>Encrypt and store new credential</td>
+</tr>
+<tr>
+<td><code>UpdateCredential { id, folder_id?, blob }</code></td>
+<td>Re-encrypt with fresh DEK</td>
+</tr>
+<tr>
+<td><code>DeleteCredential { id }</code></td>
+<td>Delete credential and its DEK</td>
+</tr>
+<tr>
+<td><code>GetAssetHolder</code></td>
+<td>Decrypt and return asset holder blob</td>
+</tr>
+<tr>
+<td><code>UpdateAssetHolder { blob }</code></td>
+<td>Encrypt and store asset holder</td>
+</tr>
+<tr>
+<td><code>GetOtpCode { credential_id }</code></td>
+<td>Generate current TOTP code (daemon-side, RFC 6238)</td>
+</tr>
+<tr>
+<td><code>CheckPasswordBreached { password_bytes }</code></td>
+<td>Query local HIBP Cuckoo filter</td>
+</tr>
+<tr>
+<td><code>GetAuditLog { limit }</code></td>
+<td>Return most recent N audit entries (max 1000)</td>
+</tr>
+<tr>
+<td><code>VerifyAuditChain</code></td>
+<td>Full chain integrity verification</td>
+</tr>
+<tr>
+<td><code>RegisterFido2 { device_path, name?, resident_key }</code></td>
+<td>Register FIDO2/Passkey</td>
+</tr>
+<tr>
+<td><code>RemoveFido2 { id }</code></td>
+<td>Remove FIDO2 credential</td>
+</tr>
+<tr>
+<td><code>RegisterPqc { name?, verifying_key, encapsulation_key }</code></td>
+<td>Register PQC authenticator</td>
+</tr>
+<tr>
+<td><code>SetupVaultTotp</code></td>
+<td>Begin TOTP setup, return secret + backup codes</td>
+</tr>
+<tr>
+<td><code>ConfirmVaultTotp { code }</code></td>
+<td>Confirm TOTP enrollment</td>
+</tr>
+<tr>
+<td><code>RemoveVaultTotp { code }</code></td>
+<td>Disable TOTP</td>
+</tr>
+<tr>
+<td><code>GetVaultTotpStatus</code></td>
+<td>Returns <code>active: bool</code></td>
+</tr>
+<tr>
+<td><code>QuickUnlockEnroll { password, dbk }</code></td>
+<td>Enroll Quick Unlock credential</td>
+</tr>
+<tr>
+<td><code>QuickUnlockRevoke</code></td>
+<td>Remove all Quick Unlock credentials</td>
+</tr>
+<tr>
+<td><code>GetProfile</code></td>
+<td>Return user profile (name, email, photo)</td>
+</tr>
+<tr>
+<td><code>UpdateProfile { first_name, last_name, email }</code></td>
+<td>Update profile</td>
+</tr>
+<tr>
+<td><code>ChangePassword { old_password, new_password }</code></td>
+<td>Re-derive KEK, REKEY SQLCipher, rotate VMK</td>
+</tr>
+<tr>
+<td><code>VerifyMasterPassword { password }</code></td>
+<td>Verify without changing anything</td>
+</tr>
+<tr>
+<td><code>UpdateLoginPolicy { password_login_enabled, totp_enabled, email_otp_enabled }</code></td>
+<td>Write policy to sidecar</td>
+</tr>
+<tr>
+<td><code>UploadProfilePicture { image_bytes }</code></td>
+<td>Validate magic bytes, strip EXIF, store encrypted</td>
+</tr>
+</tbody>
+</table>
+<h3>7.3 Response Enum</h3>
+<p>The <code>Response</code> enum is tagged with <code>#[serde(tag = &quot;status&quot;, content = &quot;data&quot;)]</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Pong</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>Status { locked: bool }</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Unlocked { session_token, wipe_ticket }</code></td>
+<td>session_token: 64-hex string; wipe_ticket: 32 raw bytes</td>
+</tr>
+<tr>
+<td><code>LoginHints { password_login_enabled, totp_enabled, email_otp_enabled, fido2_ids, quick_unlock_credentials }</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Locked</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>Folders(Vec&lt;u8&gt;)</code></td>
+<td>msgpack-serialized <code>Vec&lt;FolderRow&gt;</code></td>
+</tr>
+<tr>
+<td><code>Credentials(Vec&lt;u8&gt;)</code></td>
+<td>msgpack-serialized <code>Vec&lt;CredentialMeta&gt;</code> (no secrets)</td>
+</tr>
+<tr>
+<td><code>Credential(Vec&lt;u8&gt;)</code></td>
+<td>decrypted JSON blob</td>
+</tr>
+<tr>
+<td><code>AssetHolder(Vec&lt;u8&gt;)</code></td>
+<td>decrypted JSON blob</td>
+</tr>
+<tr>
+<td><code>OtpCode(String)</code></td>
+<td>6-digit TOTP code</td>
+</tr>
+<tr>
+<td><code>Created { id: Uuid }</code></td>
+<td>UUID of new resource</td>
+</tr>
+<tr>
+<td><code>Ok</code></td>
+<td>successful mutation with no data payload</td>
+</tr>
+<tr>
+<td><code>Fido2Devices(Vec&lt;String&gt;)</code></td>
+<td>device path strings</td>
+</tr>
+<tr>
+<td><code>Fido2Keys(Vec&lt;u8&gt;)</code></td>
+<td>msgpack-serialized <code>Vec&lt;Fido2CredRow&gt;</code></td>
+</tr>
+<tr>
+<td><code>PasskeyChallenge(Vec&lt;u8&gt;)</code></td>
+<td>32 random bytes</td>
+</tr>
+<tr>
+<td><code>TotpSetup { secret_b32, otp_uri, backup_codes }</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>VaultTotpStatus { active: bool }</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>AuditLog(Vec&lt;u8&gt;)</code></td>
+<td>JSON-serialized <code>Vec&lt;AuditEntry&gt;</code></td>
+</tr>
+<tr>
+<td><code>PwnedStatus { pwned: bool, filter_available: bool }</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Profile { first_name, last_name, email, profile_pic?, password_changed_at? }</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>WipeComplete</code></td>
+<td>daemon exits immediately after sending</td>
+</tr>
+<tr>
+<td><code>Error { code: u32, message: String }</code></td>
+<td>401=auth, 403=forbidden, 404=not found, 500=internal</td>
+</tr>
+</tbody>
+</table>
+<p>Error sanitization (MED-06): internal error codes (<code>InvalidPassword</code>, <code>VaultLocked</code>, etc.) are mapped to safe UI strings in <code>daemonClient.ts</code> (<code>SAFE_MESSAGES</code>) before exposure to the browser. Implementation details are never sent to the frontend in error messages.</p>
+<h3>7.4 Dispatch Macros</h3>
+<p>The <code>dispatch()</code> function uses two macros to reduce boilerplate:</p>
+<pre><code class="language-rust">auth_then!(state, session_token, uid, |session| {
+    // code here runs only after session_token is validated against uid
+})
+
+with_vmk_db!(state, |vmk, conn| {
+    // code here runs only when vault is unlocked
+    // vmk: &amp;[u8; 32], conn: &amp;Connection
+})
+</code></pre>
+<p>Both macros return <code>Response::Error { code: 401, ... }</code> if the precondition is not met.</p>
+<h3>7.5 DaemonClient (Browser-Side)</h3>
+<p><code>DaemonClient</code> in <code>src/utils/daemonClient.ts</code> wraps the WebSocket connection with a FIFO request queue:</p>
+<pre><code class="language-typescript">class DaemonClient {
+  #ws: WebSocket | null
+  #queue: Array&lt;{resolve, reject}&gt;  // one entry per in-flight request
+  #connected: boolean
+  #unavailableUntil: number          // 30s cooldown after failed connect
+
+  async request(cmd: object, timeoutMs = 30_000): Promise&lt;unknown&gt; {
+    // 1. Ensure connected (auto-reconnects if needed)
+    // 2. Serialize cmd to MessagePack binary
+    // 3. Push {resolve, reject} to #queue
+    // 4. Send binary frame over WebSocket
+    // 5. On message: shift from #queue, call resolve(decoded_response)
+    // 6. On timeout: close WebSocket entirely, reject all in-queue promises
+  }
+}
+</code></pre>
+<p>One-at-a-time semantics: only one request is in flight. If a request times out, the entire WebSocket is torn down because responses are matched by position in the queue. A reconnect is required before any subsequent requests.</p>
+<hr>
+<h2>8. Database Schema Reference</h2>
+<div style="text-align: right"><em>Page 27</em></div>
+<h3>8.1 SQLCipher Configuration</h3>
+<p>The vault database is a SQLite file encrypted by SQLCipher 4 using AES-256-CBC per-page encryption.</p>
+<pre><code class="language-sql">PRAGMA key = hex(sqlcipher_key);     -- 32-byte key derived via HKDF-SHA3-512 from VMK
+PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;           -- Write-Ahead Logging for concurrent reads
+PRAGMA synchronous = NORMAL;         -- fsync on checkpoint, not every commit
+</code></pre>
+<p>The SQLCipher key is derived from the VMK (never from the password directly), so changing the SQLCipher key requires possessing the VMK. The <code>REKEY</code> procedure on password change:</p>
+<ol>
+<li>Derive new VMK (random 32 bytes)</li>
+<li>Derive new SQLCipher key from new VMK via HKDF-SHA3-512</li>
+<li><code>PRAGMA rekey = hex(new_sqlcipher_key)</code> — re-encrypts all pages atomically</li>
+<li>Update <code>vault.db.meta</code> with new <code>encrypted_vmk</code> and <code>vmk_nonce</code></li>
+</ol>
+<h3>8.2 Schema Migrations</h3>
+<p>Three migrations run automatically on <code>open_vault()</code>. They are idempotent because they use <code>CREATE TABLE IF NOT EXISTS</code> and track progress in <code>vault_meta</code>.</p>
+<p><strong>Migration v1 (initial schema):</strong></p>
+<pre><code class="language-sql">CREATE TABLE vault_meta       (key TEXT PRIMARY KEY, value BLOB NOT NULL)
+CREATE TABLE users            (id TEXT PRIMARY KEY, email, first_name, last_name, profile_pic, created_at)
+CREATE TABLE fido2_credentials(id, credential_id BLOB UNIQUE, public_key_cbor BLOB,
+                                sign_count, aaguid, is_passkey, encrypted_vmk_copy,
+                                vmk_copy_nonce, name, created_at, last_used_at)
+CREATE TABLE otp_config       (id, encrypted_secret BLOB, secret_nonce BLOB,
+                                backup_codes BLOB, backup_nonce BLOB, created_at)
+CREATE TABLE folders          (id, name, description, icon_svg, sort_order, created_at, updated_at)
+CREATE TABLE credentials      (id, folder_id REFERENCES folders(id), encrypted_dek BLOB,
+                                dek_nonce BLOB, ciphertext BLOB, ct_nonce BLOB,
+                                ct_aad BLOB, schema_version, created_at, updated_at)
+CREATE TABLE asset_holder     (id, ciphertext BLOB, nonce BLOB, updated_at)
+CREATE TABLE audit_log        (id AUTOINCREMENT, ts INTEGER, action TEXT,
+                                resource TEXT, prev_hash BLOB, row_hash BLOB)
+TRIGGER enforce_max_fido2_keys: BEFORE INSERT, limit to 2 FIDO2 credentials
+</code></pre>
+<p><strong>Migration v2 (defense-in-depth, field-level encryption):</strong></p>
+<p>This migration moves all PII and plaintext field data into encrypted blobs. The <code>folders</code> and <code>users</code> tables are replaced with zero-knowledge versions.</p>
+<pre><code class="language-sql">ALTER TABLE folders RENAME TO folders_legacy
+ALTER TABLE users   RENAME TO users_legacy
+CREATE TABLE folders (id, ciphertext BLOB, nonce BLOB, sort_order, created_at, updated_at)
+CREATE TABLE users   (id, ciphertext BLOB, nonce BLOB, profile_pic BLOB, created_at)
+ALTER TABLE credentials ADD COLUMN service_hash TEXT    -- HMAC-SHA-512 blind index
+ALTER TABLE credentials ADD COLUMN url_hash     TEXT
+ALTER TABLE credentials ADD COLUMN username_hash TEXT
+ALTER TABLE credentials ADD COLUMN tags_hash    TEXT
+</code></pre>
+<p>Data migration from <code>_legacy</code> tables is performed by Rust code in <code>migrate_data_to_v2()</code> on the next vault unlock. Legacy folder and user data is re-encrypted into the new blob format. All credentials without <code>service_hash</code> are re-encrypted with fresh DEKs to populate the blind indexes.</p>
+<p><strong>Migration v3 (PQC authenticator support):</strong></p>
+<pre><code class="language-sql">CREATE TABLE pqc_credentials (
+  id TEXT PRIMARY KEY,
+  credential_id BLOB UNIQUE NOT NULL,
+  verifying_key BLOB NOT NULL,       -- ML-DSA-87 public key (2592 bytes)
+  encapsulation_key BLOB NOT NULL,   -- ML-KEM-1024 encapsulation key (1568 bytes)
+  decapsulation_seed BLOB NOT NULL,  -- 64-byte seed encrypted with VMK (AES-256-GCM)
+  dk_nonce BLOB NOT NULL,            -- 12-byte AES-GCM nonce for dk_seed
+  name TEXT,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER
+)
+TRIGGER limit_pqc_keys: BEFORE INSERT, limit to 2 PQC credentials
+</code></pre>
+<h3>8.3 Current Schema Version</h3>
+<p>Schema version 3. Read from <code>vault_meta</code> where <code>key = 'schema_version'</code>. This is the authoritative version indicator; code checks this value before each migration step.</p>
+<h3>8.4 Credential Storage Layout</h3>
+<p>Each credential row contains two independent encryption envelopes:</p>
+<pre><code>credentials table row:
+  id             TEXT    -- UUID v4 (credential identifier)
+  folder_id      TEXT    -- UUID v4 reference to folders.id (nullable)
+  encrypted_dek  BLOB    -- AES-256-GCM(key=VMK, pt=DEK[32], aad=ct_aad)
+  dek_nonce      BLOB    -- 12 bytes (AES-GCM) or 24 bytes (XChaCha20, legacy)
+  ciphertext     BLOB    -- AES-256-GCM(key=DEK, pt=credential_json, aad=ct_aad)
+  ct_nonce       BLOB    -- 12 bytes (AES-GCM) or 24 bytes (XChaCha20, legacy)
+  ct_aad         BLOB    -- vault_uuid_bytes || cred_id_bytes || schema_version_be32
+  service_hash   TEXT    -- hex(HMAC-SHA-512(blind_index_key, service)) or NULL
+  url_hash       TEXT    -- hex(HMAC-SHA-512(blind_index_key, url)) or NULL
+  username_hash  TEXT    -- hex(HMAC-SHA-512(blind_index_key, username)) or NULL
+  schema_version INTEGER -- always 1 for current write path
+  created_at     INTEGER -- Unix epoch seconds
+  updated_at     INTEGER -- Unix epoch seconds
+</code></pre>
+<p>The <code>ct_aad</code> binds the ciphertext to its position: any attempt to move a credential to a different vault or swap ciphertexts between credentials will fail authentication.</p>
+<h3>8.5 Key-Value Metadata (vault_meta)</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema_version</code></td>
+<td><code>&quot;3&quot;</code></td>
+<td>Current migration level</td>
+</tr>
+<tr>
+<td><code>password_changed_at</code></td>
+<td>Unix timestamp</td>
+<td>Set by <code>ChangePassword</code></td>
+</tr>
+<tr>
+<td><code>sync_token_enc</code></td>
+<td>AES-GCM ciphertext hex</td>
+<td>Encrypted Cloudflare API token</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>9. Layer 2: Web Layer</h2>
+<div style="text-align: right"><em>Page 32</em></div>
+<h3>9.1 Express Server (server.js)</h3>
+<p>The Express server performs four distinct functions:</p>
+<p><strong>1. Static asset serving.</strong> The production <code>dist/</code> directory (Vite build output) is served directly for content-hashed asset URLs. Nginx handles static files in front of Express in production; Express serves as fallback.</p>
+<p><strong>2. Per-request CSP nonce injection.</strong> <code>server.js</code> reads the <code>index.html</code> template once at startup, then replaces <code>RUNTIME_NONCE_PLACEHOLDER</code> with a freshly generated 16-byte base64-encoded nonce for each GET request to <code>index.html</code>. This prevents the nonce from being cached.</p>
+<pre><code class="language-javascript">const cspNonce = randomBytes(16).toString('base64');
+const html = indexHtml.replace(/RUNTIME_NONCE_PLACEHOLDER/g, cspNonce);
+res.setHeader('Content-Security-Policy',
+  `default-src 'none'; script-src 'self' 'nonce-${cspNonce}'; ...`);
+res.send(html);
+</code></pre>
+<p><strong>3. WebSocket proxy (daemon bridge).</strong> Each browser WebSocket connection (<code>/ws</code>) gets one corresponding Unix socket connection to the daemon. Binary frames are forwarded bidirectionally without inspection. The Express layer cannot read the msgpack contents (it has no VMK).</p>
+<pre><code>Browser WS Frame -&gt; Express WS handler -&gt; Unix socket write -&gt; daemon
+daemon response  -&gt; Unix socket read  -&gt; Express WS handler -&gt; Browser
+</code></pre>
+<p><strong>4. Setup API.</strong> <code>/api/setup-token</code> (localhost-only), <code>/api/setup-complete</code>, <code>/api/system-info</code>, <code>/api/ubuntu-pro/*</code>. Protected by an in-memory 32-byte <code>SETUP_TOKEN</code> (hex-encoded, 64 characters) that is generated at startup and never logged. Provided via <code>X-Setup-Token</code> header; compared using <code>timingSafeEqual</code>.</p>
+<p>Localhost detection inspects both <code>req.socket.remoteAddress</code> and <code>X-Real-IP</code> (Nginx proxy header) to prevent a remote client from accessing setup endpoints via a reverse proxy.</p>
+<h3>9.2 Authentication Server (auth.js)</h3>
+<p><code>auth.js</code> implements two categories of routes:</p>
+<p><strong><code>/api/auth/*</code> routes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/auth/register</code></td>
+<td>POST</td>
+<td>Create new server-mode user account</td>
+</tr>
+<tr>
+<td><code>/api/auth/login</code></td>
+<td>POST</td>
+<td>Step 1: validate password, return partial MFA token if MFA enrolled</td>
+</tr>
+<tr>
+<td><code>/api/auth/login/finish</code></td>
+<td>POST</td>
+<td>Step 2: consume MFA token + TOTP code, issue JWE session</td>
+</tr>
+<tr>
+<td><code>/api/auth/logout</code></td>
+<td>POST</td>
+<td>Invalidate JTI, clear cookies</td>
+</tr>
+<tr>
+<td><code>/api/auth/me</code></td>
+<td>GET</td>
+<td>Return current user profile from JWE</td>
+</tr>
+<tr>
+<td><code>/api/auth/profile</code></td>
+<td>PUT</td>
+<td>Update name, email</td>
+</tr>
+<tr>
+<td><code>/api/auth/password</code></td>
+<td>PUT</td>
+<td>Change password (scrypt verify old, PBKDF2 hash new)</td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/setup</code></td>
+<td>POST</td>
+<td>Generate TOTP secret, return QR URI</td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/verify</code></td>
+<td>POST</td>
+<td>Confirm TOTP enrollment</td>
+</tr>
+<tr>
+<td><code>/api/auth/sessions</code></td>
+<td>GET/DELETE</td>
+<td>List or invalidate sessions</td>
+</tr>
+<tr>
+<td><code>/api/auth/forgot-password</code></td>
+<td>POST</td>
+<td>Email-based reset flow</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>/api/vault/*</code> routes (server mode only):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/vault/folders</code></td>
+<td>GET / PUT</td>
+<td>Read/write encrypted folders blob</td>
+</tr>
+<tr>
+<td><code>/api/vault/credentials</code></td>
+<td>GET / PUT</td>
+<td>Read/write encrypted credentials blob</td>
+</tr>
+<tr>
+<td><code>/api/vault/asset-holder</code></td>
+<td>GET / PUT</td>
+<td>Read/write encrypted asset holder blob</td>
+</tr>
+<tr>
+<td><code>/api/vault/sessions</code></td>
+<td>GET / PUT</td>
+<td>Read/write session history blob</td>
+</tr>
+<tr>
+<td><code>/api/vault/profile</code></td>
+<td>GET / PUT</td>
+<td>Read/write profile blob</td>
+</tr>
+<tr>
+<td><code>/api/vault/mfa</code></td>
+<td>GET / PUT</td>
+<td>Read/write MFA config blob</td>
+</tr>
+</tbody>
+</table>
+<p>Each vault resource is stored as a single AES-256-GCM encrypted file. Writes use an atomic rename pattern: write to <code>&lt;file&gt;.tmp</code>, then <code>renameSync()</code> to <code>&lt;file&gt;</code>, ensuring no partial writes are ever visible.</p>
+<h3>9.3 CSRF Protection</h3>
+<p>Two-cookie CSRF pattern:</p>
+<ul>
+<li><code>_pwd_sess</code> (HttpOnly, Secure, SameSite=Strict): contains the JWE session token. Not readable by JavaScript.</li>
+<li><code>_pwd_csrf</code> (Secure, SameSite=Strict, not HttpOnly): contains a random value. Readable by JavaScript.</li>
+</ul>
+<p>All state-changing requests must include <code>X-CSRF-Token: &lt;value&gt;</code> header where the value matches the <code>_pwd_csrf</code> cookie. This relies on the same-origin restriction: a cross-origin attacker cannot read the <code>_pwd_csrf</code> cookie.</p>
+<h3>9.4 JWE Session Token Structure</h3>
+<p>Sessions are represented as JWE (JSON Web Encryption) tokens:</p>
+<pre><code>Algorithm: dir (direct key agreement)
+Encryption: A256GCM (AES-256-GCM)
+Key: HKDF-SHA-384(master_key, info=&quot;jwe/session&quot;, len=32)
+
+Payload claims:
+  sub: user UUID
+  jti: random UUID (tracked in per-user sessions.enc for invalidation)
+  iat: issued-at Unix timestamp
+  exp: iat + 86400 (24-hour absolute TTL)
+  email: user email
+  firstName, lastName: user name
+</code></pre>
+<p>Active JTIs are stored in the user’s <code>sessions.enc</code> file. On <code>logout</code> and <code>clearOtherSessions</code>, the JTI is removed from this list, invalidating the token server-side before its natural expiry.</p>
+<h3>9.5 SecureKeyStore (Browser)</h3>
+<p><code>src/crypto/keystore.ts</code> holds the daemon session token in a JavaScript private field, providing the closest browser-available equivalent to memory protection:</p>
+<pre><code class="language-typescript">class SecureKeyStore {
+  #token: string | null = null    // private field, inaccessible to external code
+  #localKey: CryptoKey | null = null
+  #signingKey: CryptoKey | null = null
+
+  setToken(token: string)  { this.#token = token; }
+  hasToken(): boolean      { return this.#token !== null; }
+  getToken(): string | null { return this.#token; }
+
+  clear(): void {
+    this.#token = null;
+    this.#localKey = null;
+    this.#signingKey = null;
+  }
+}
+</code></pre>
+<p><code>clear()</code> is called on:</p>
+<ul>
+<li><code>pagehide</code> event (user navigates away or closes tab)</li>
+<li><code>visibilitychange</code> to <code>hidden</code> (tab becomes background)</li>
+<li>Explicit logout</li>
+</ul>
+<h3>9.6 Local Crypto for Demo/Offline Mode</h3>
+<p><code>src/utils/localCrypto.ts</code> provides encrypted localStorage access for the demo and offline modes. The format is a three-segment token:</p>
+<pre><code>B64URL(header) . B64URL(iv || ciphertext+tag) . B64URL(HMAC-SHA256)
+
+header = {&quot;v&quot;:&quot;1&quot;,&quot;alg&quot;:&quot;A256GCM+HS256&quot;}
+
+Key derivation (single PBKDF2 pass, 310,000 iterations, SHA-256, 64 bytes):
+  material[64] = PBKDF2-SHA-256(password, salt, 310_000)
+  enc_key[32]  = material[0..32]   -&gt; AES-GCM-256
+  sign_key[32] = material[32..64]  -&gt; HMAC-SHA-256
+
+Encryption:
+  iv[12]     = webcrypto.getRandomValues(12)
+  ciphertext = AES-256-GCM.Encrypt(enc_key, iv, plaintext, aad=&quot;&quot;)
+  hmac       = HMAC-SHA-256(sign_key, header || &quot;.&quot; || iv_ct_b64)
+
+Legacy decryption ({&quot;enc&quot;:1,&quot;iv&quot;:&quot;...&quot;,&quot;ct&quot;:&quot;...&quot;} format) is still supported.
+</code></pre>
+<p>On plain HTTP (no SubtleCrypto available in non-secure contexts), the implementation falls back to <code>@noble/ciphers</code> (XChaCha20-Poly1305) with PBKDF2 from <code>@noble/hashes</code>.</p>
+<h3>9.7 Content Security Policy</h3>
+<p>CSP is enforced via a per-request nonce (see Section 9.1). The complete policy:</p>
+<pre><code>default-src 'none'
+script-src  'self' 'nonce-{nonce}'
+style-src   'self' 'unsafe-inline'
+font-src    'self'
+img-src     'self' blob:
+connect-src 'self' ws: wss: https://api.pwnedpasswords.com
+form-action 'self'
+frame-ancestors 'none'
+base-uri 'none'
+object-src 'none'
+require-trusted-types-for 'script'
+</code></pre>
+<p>The <code>default</code> Trusted Types policy in <code>main.tsx</code> routes all <code>innerHTML</code> assignments through <code>DOMPurify.sanitize()</code> with the <code>RETURN_TRUSTED_TYPE</code> option. Custom SVGs in folder icons are sanitized through <code>sanitizeSvg()</code> which applies DOMPurify with an SVG-specific allow-list before DOM injection.</p>
+<hr>
+<h2>10. Authentication Flows — UML Sequence Diagrams</h2>
+<div style="text-align: right"><em>Page 39</em></div>
+<h3>10.1 Standard Password Unlock (Daemon Mode)</h3>
+<div class="mermaid">sequenceDiagram
+    participant B as Browser
+    participant E as Express (WS Proxy)
+    participant D as vault-daemon
+
+    B-&gt;&gt;E: WebSocket connect /ws
+    E-&gt;&gt;D: Unix socket connect
+    E--&gt;&gt;B: WS open
+
+    B-&gt;&gt;E: [msgpack] Ping
+    E-&gt;&gt;D: forward frame
+    D--&gt;&gt;E: Pong
+    E--&gt;&gt;B: [msgpack] Pong
+
+    B-&gt;&gt;E: [msgpack] GetLoginHints
+    E-&gt;&gt;D: forward
+    D-&gt;&gt;D: read vault.db.meta (pre-auth)
+    D--&gt;&gt;E: LoginHints{password_login_enabled, totp_enabled, fido2_ids, ...}
+    E--&gt;&gt;B: LoginHints
+
+    B-&gt;&gt;E: [msgpack] Unlock{password, yubikey_response?, totp_code?}
+    E-&gt;&gt;D: forward
+    D-&gt;&gt;D: check_unlock_lockout()
+    D-&gt;&gt;D: Argon2id(password||yk, salt, m=1GiB, t=4, p=2) -&gt; KEK[64]
+    D-&gt;&gt;D: AES-256-GCM.Decrypt(KEK[0..32], encrypted_vmk) -&gt; VMK[32]
+    D-&gt;&gt;D: HKDF-SHA3-512(VMK) -&gt; sqlcipher_key[32]
+    D-&gt;&gt;D: SQLCipher.open(vault.db, sqlcipher_key)
+    D-&gt;&gt;D: sessions.create(vault_uuid, uid, 900s)
+    D--&gt;&gt;E: Unlocked{session_token, wipe_ticket}
+    E--&gt;&gt;B: Unlocked{session_token, wipe_ticket}
+
+    B-&gt;&gt;B: keyStore.setToken(session_token)
+    B-&gt;&gt;B: localStorage[WIPE_TICKET_KEY] = hex(wipe_ticket)
+</div>
+<h3>10.2 Passkey (Passwordless) Unlock</h3>
+<div class="mermaid">sequenceDiagram
+    participant B as Browser
+    participant E as Express
+    participant D as vault-daemon
+    participant A as FIDO2 Authenticator
+
+    B-&gt;&gt;E: [msgpack] GetLoginHints
+    E-&gt;&gt;D: forward
+    D--&gt;&gt;E: LoginHints{fido2_ids: [[cred_id_bytes...]]}
+    E--&gt;&gt;B: LoginHints
+
+    B-&gt;&gt;E: [msgpack] GetPasskeyChallenge
+    E-&gt;&gt;D: forward
+    D-&gt;&gt;D: challenge = OsRng[32]; store in passkey_challenge
+    D--&gt;&gt;E: PasskeyChallenge([32 bytes])
+    E--&gt;&gt;B: PasskeyChallenge
+
+    B-&gt;&gt;A: navigator.credentials.get({challenge, allowCredentials})
+    A--&gt;&gt;B: assertion{credential_id, auth_data, signature}
+
+    B-&gt;&gt;E: [msgpack] UnlockWithPasskey{credential_id, auth_data, signature}
+    E-&gt;&gt;D: forward
+    D-&gt;&gt;D: consume passkey_challenge (single-use)
+    D-&gt;&gt;D: lookup entry in sidecar by credential_id_hex
+    D-&gt;&gt;D: wrap_key = HKDF-SHA256(auth_data[0..33] || credential_id)
+    D-&gt;&gt;D: VMK = AES-256-GCM.Decrypt(wrap_key, encrypted_vmk_copy)
+    D-&gt;&gt;D: SQLCipher.open(vault.db, HKDF-SHA3-512(VMK))
+    D-&gt;&gt;D: sessions.create(vault_uuid, uid, 900s)
+    D--&gt;&gt;E: Unlocked{session_token, wipe_ticket}
+    E--&gt;&gt;B: Unlocked
+</div>
+<h3>10.3 PQC Level 5 Authenticator Unlock</h3>
+<div class="mermaid">sequenceDiagram
+    participant B as Browser
+    participant D as vault-daemon
+    participant P as PQC Authenticator Device
+
+    B-&gt;&gt;D: [msgpack] GetPqcChallenge
+    D-&gt;&gt;D: challenge = OsRng[32]; store in pqc_challenge
+    D--&gt;&gt;B: challenge[32]
+
+    B-&gt;&gt;P: sign(challenge) using ML-DSA-87 private key
+    B-&gt;&gt;P: encapsulate(daemon_ml_kem_ek) using ML-KEM-1024
+    P--&gt;&gt;B: {signature[4628], kem_ciphertext[1568]}
+
+    B-&gt;&gt;D: [msgpack] UnlockWithPqc{credential_id, signature, kem_ciphertext}
+    D-&gt;&gt;D: consume pqc_challenge (single-use)
+    D-&gt;&gt;D: lookup PQC entry by credential_id
+    D-&gt;&gt;D: ML-DSA-87.Verify(verifying_key, challenge, signature[1..])
+    D-&gt;&gt;D: ml_ss = ML-KEM-1024.Decapsulate(dk_seed, kem_ciphertext)
+    D-&gt;&gt;D: VMK = AES-256-GCM.Decrypt(ml_ss[0..32], vmk_copy)
+    D--&gt;&gt;B: Unlocked{session_token}
+</div>
+<h3>10.4 Server-Mode Login (Two-Step with TOTP MFA)</h3>
+<div class="mermaid">sequenceDiagram
+    participant B as Browser
+    participant E as Express (auth.js)
+
+    B-&gt;&gt;E: POST /api/auth/login {email, password}
+    E-&gt;&gt;E: lookup user by email
+    E-&gt;&gt;E: PBKDF2-SHA-512 verify (or scrypt legacy verify)
+    E-&gt;&gt;E: check MFA enrollment
+    alt No MFA enrolled
+        E-&gt;&gt;E: issue full JWE session
+        E--&gt;&gt;B: 200 {success:true} + _pwd_sess + _pwd_csrf cookies
+    else MFA enrolled
+        E-&gt;&gt;E: partial_token = randomBytes(32)
+        E-&gt;&gt;E: pendingMfaTokens.set(SHA-256(partial_token), {userId, expiresAt})
+        E--&gt;&gt;B: 200 {mfaRequired:true, mfaToken: partial_token}
+    end
+
+    B-&gt;&gt;E: POST /api/auth/login/finish {mfaToken, totpCode}
+    E-&gt;&gt;E: userId = consumeMfaToken(mfaToken)  [single-use, 5-min TTL]
+    E-&gt;&gt;E: verifyTotpCode(secret, totpCode)
+    E-&gt;&gt;E: timingSafeEqual(computed_otp, presented_code) x3 windows
+    E-&gt;&gt;E: issue full JWE session, set cookies
+    E--&gt;&gt;B: 200 {success:true} + _pwd_sess + _pwd_csrf
+</div>
+<h3>10.5 Quick Unlock Enrollment and Use</h3>
+<div class="mermaid">sequenceDiagram
+    participant B as Browser
+    participant A as Platform Authenticator (Touch ID / Windows Hello)
+    participant D as vault-daemon
+
+    Note over B,D: Enrollment (requires active session)
+    B-&gt;&gt;A: navigator.credentials.create({extensions:{prf:{eval:{first:seed}}}})
+    A--&gt;&gt;B: credential + prf_output (DBK[32])
+    B-&gt;&gt;D: [msgpack] QuickUnlockEnroll{session_token, password, dbk}
+    D-&gt;&gt;D: derive KEK from password (Argon2id)
+    D-&gt;&gt;D: enc_kek = AES-256-GCM.Encrypt(DBK, KEK, b&quot;quick-unlock-v1&quot;)
+    D-&gt;&gt;D: append QuickUnlockCred{enc_kek, nonce} to sidecar
+    D--&gt;&gt;B: Ok
+
+    Note over B,D: Subsequent unlock
+    B-&gt;&gt;D: [msgpack] GetLoginHints
+    D--&gt;&gt;B: LoginHints{quick_unlock_credentials: [{enc_kek, nonce}]}
+    B-&gt;&gt;A: navigator.credentials.get({extensions:{prf:{eval:{first:seed}}}})
+    A--&gt;&gt;B: assertion + prf_output (DBK[32])
+    B-&gt;&gt;D: [msgpack] QuickUnlock{dbk}
+    D-&gt;&gt;D: for each cred: AES-256-GCM.Decrypt(DBK, enc_kek) -&gt; KEK
+    D-&gt;&gt;D: AES-256-GCM.Decrypt(KEK, encrypted_vmk) -&gt; VMK
+    D-&gt;&gt;D: SQLCipher.open(vault.db)
+    D--&gt;&gt;B: Unlocked{session_token}
+</div>
+<h3>10.6 Credential Write Flow</h3>
+<div class="mermaid">sequenceDiagram
+    participant B as Browser
+    participant D as vault-daemon
+
+    B-&gt;&gt;D: [msgpack] AddCredential{session_token, folder_id?, blob}
+    Note right of D: blob = plaintext JSON credential
+    D-&gt;&gt;D: auth_then! -&gt; validate session_token against uid
+    D-&gt;&gt;D: with_vmk_db! -&gt; access VMK and DB
+    D-&gt;&gt;D: id = Uuid::new_v4()
+    D-&gt;&gt;D: dek = OsRng[32]
+    D-&gt;&gt;D: aad = vault_uuid_bytes || id_bytes || schema_version_be32
+    D-&gt;&gt;D: enc_dek = AES-256-GCM.Encrypt(VMK, dek, aad)
+    D-&gt;&gt;D: ciphertext = AES-256-GCM.Encrypt(dek, blob, aad)
+    D-&gt;&gt;D: service_hash = HMAC-SHA-512(blind_index_key, blob.service)
+    D-&gt;&gt;D: url_hash = HMAC-SHA-512(blind_index_key, blob.url)
+    D-&gt;&gt;D: username_hash = HMAC-SHA-512(blind_index_key, blob.username)
+    D-&gt;&gt;D: dek.zeroize()
+    D-&gt;&gt;D: INSERT INTO credentials (id, enc_dek, dek_nonce, ciphertext, ...)
+    D-&gt;&gt;D: audit::log(conn, &quot;CRED_ADD&quot;, Some(id))
+    D--&gt;&gt;B: [msgpack] Created{id}
+</div>
+<hr>
+<h2>11. The P2W Encrypted File Storage System</h2>
+<div style="text-align: right"><em>Page 46</em></div>
+<h3>11.1 Overview</h3>
+<p>The PWDnow (P2W) Encrypted File Storage System is the server-mode persistence layer implemented in <code>auth.js</code>. It provides an encrypted, per-user file system that mirrors the daemon’s SQLCipher database in terms of security posture, without requiring the Rust daemon to be installed.</p>
+<p>The P2W filesystem is centered on the <code>auth_data/</code> directory and uses a master key file plus per-resource HKDF-derived keys to encrypt individual JSON data files. Each file is an independent encryption unit; compromise of one file’s key does not compromise others.</p>
+<h3>11.2 Directory Structure</h3>
+<pre><code>auth_data/
+├── .master_key           32-byte CSPRNG master key (mode 0400, written once)
+├── .ip_policy.json       IP intelligence policy configuration (plaintext)
+├── users.enc             AES-256-GCM encrypted array of user registration records
+└── vault/
+    └── &lt;uid&gt;/            Directory per user (uid = UUID v4 assigned at registration)
+        ├── credentials.enc     Encrypted credential array
+        ├── folders.enc         Encrypted folder array
+        ├── asset_holder.enc    Encrypted asset holder JSON
+        ├── sessions.enc        Encrypted active JTI list
+        ├── profile.enc         Encrypted user profile
+        ├── mfa_config.enc      Encrypted MFA configuration
+        └── audit_log.enc       Encrypted audit event list (optional)
+</code></pre>
+<h3>11.3 Master Key</h3>
+<p>The master key is a 32-byte value generated by <code>crypto.randomBytes(32)</code> on first startup of the Express server. It is written to <code>auth_data/.master_key</code> with file mode <code>0400</code> (owner read-only) using <code>writeFileSync(keyPath, key, { mode: 0o400, flag: 'wx' })</code>. The <code>wx</code> flag causes an error if the file already exists, preventing overwrite.</p>
+<p>On subsequent startups, the master key is read from this file and verified to be exactly 32 bytes. If it is not 32 bytes, the server throws and refuses to start.</p>
+<p>The master key is held in the <code>MASTER_KEY</code> module-level variable. It never appears in logs, HTTP responses, or session tokens.</p>
+<h3>11.4 Key Derivation</h3>
+<p>All encryption keys are derived from <code>MASTER_KEY</code> using <code>HKDF-SHA-384</code> (CNSA 2.0 compliant, replacing the earlier HKDF-SHA-256). The derivation is:</p>
+<pre><code class="language-javascript">function derivedKey(info, length = 32) {
+    // HKDF-SHA-384 (NIST SP 800-56C, NSA CSI-CNSA-2.0)
+    return hkdfSync('sha384', MASTER_KEY, Buffer.alloc(0), Buffer.from(info), length);
+}
+</code></pre>
+<p>Derived keys are cached in <code>_derivedKeyCache</code> (a <code>Map</code>) keyed by <code>&quot;${info}:${length}&quot;</code>. This cache is safe because <code>MASTER_KEY</code> is constant after <code>initAuth()</code> completes.</p>
+<table>
+<thead>
+<tr>
+<th>info string</th>
+<th>length</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&quot;jwe/session&quot;</code></td>
+<td>32</td>
+<td>JWE session token encryption key</td>
+</tr>
+<tr>
+<td><code>&quot;users/enc&quot;</code></td>
+<td>32</td>
+<td><code>users.enc</code> file encryption key</td>
+</tr>
+<tr>
+<td><code>&quot;&lt;resource&gt;/enc&quot;</code></td>
+<td>32</td>
+<td>Per-resource file encryption key (<code>credentials/enc</code>, <code>folders/enc</code>, etc.)</td>
+</tr>
+</tbody>
+</table>
+<h3>11.5 File Encryption Format</h3>
+<p>Each <code>.enc</code> file is encrypted using Node.js <code>crypto.createCipheriv('aes-256-gcm', key, iv)</code>:</p>
+<pre><code>File format (binary):
+
++----------+-------------------+---------------------------+
+| IV[12]   | Ciphertext        | Auth Tag[16]              |
+| random   | AES-256-GCM body  | GCM authentication tag    |
++----------+-------------------+---------------------------+
+
+Total overhead per file: 28 bytes (12-byte IV + 16-byte GCM tag)
+</code></pre>
+<p>The plaintext is a JSON-serialized JavaScript object (array or map, depending on resource type). Serialization uses <code>JSON.stringify()</code>. On read, <code>JSON.parse()</code> deserializes after decryption.</p>
+<p><strong>Atomic write pattern:</strong></p>
+<pre><code class="language-javascript">function writeEncryptedFile(filePath, derivationInfo, data) {
+    const key = derivedKey(derivationInfo);
+    const iv  = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const ct  = Buffer.concat([cipher.update(JSON.stringify(data)), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const payload = Buffer.concat([iv, ct, tag]);
+
+    const tmp = filePath + '.tmp.' + randomBytes(4).toString('hex');
+    writeFileSync(tmp, payload);
+    renameSync(tmp, filePath);    // atomic on POSIX filesystems
+}
+</code></pre>
+<p>The <code>renameSync</code> ensures that readers never see a partially written file. If the process crashes between <code>writeFileSync(tmp)</code> and <code>renameSync</code>, the old version of the file remains intact.</p>
+<h3>11.6 User Registry (users.enc)</h3>
+<p>The <code>users.enc</code> file stores an array of user records. Each record:</p>
+<pre><code class="language-json">{
+    &quot;id&quot;: &quot;uuid-v4&quot;,
+    &quot;email&quot;: &quot;user@example.com&quot;,
+    &quot;firstName&quot;: &quot;Alice&quot;,
+    &quot;lastName&quot;: &quot;Smith&quot;,
+    &quot;passwordHash&quot;: &quot;$argon2id$v=19$m=131072,t=3,p=1$&lt;salt_hex&gt;$&lt;hash_hex&gt;&quot;,
+    &quot;legacyHash&quot;: &quot;$pbkdf2sha512$&lt;legacy_pbkdf2_hash&gt;&quot;,
+    &quot;totpSecret&quot;: &quot;&lt;base32&gt;&quot;,
+    &quot;totpConfirmed&quot;: true,
+    &quot;createdAt&quot;: 1746835200,
+    &quot;updatedAt&quot;: 1746835200
+}
+</code></pre>
+<p>Password hashes use Argon2id for new accounts (prefix <code>$argon2id$</code>). Legacy accounts created before the Argon2id migration carry a <code>legacyHash</code> field containing the PBKDF2 or scrypt hash. On first successful login with the legacy hash, the password is re-hashed using Argon2id and stored in <code>passwordHash</code>.</p>
+<h3>11.7 Vault Resource Files</h3>
+<p>Each resource file (<code>credentials.enc</code>, <code>folders.enc</code>, etc.) stores the complete array of that resource type for a single user. This means a write operation for any change to the resource array requires re-encrypting the entire file. This design prioritizes simplicity and atomicity over granularity; it is appropriate for the scale of a personal password manager (typically hundreds to low thousands of items).</p>
+<h3>11.8 PWDnow Export Format (P2W Archive)</h3>
+<p>The import/export system in <code>src/utils/importExport.ts</code> defines a native PWDnow JSON format for vault backup and migration:</p>
+<pre><code class="language-json">{
+    &quot;format&quot;: &quot;pwdnow&quot;,
+    &quot;version&quot;: &quot;1&quot;,
+    &quot;exported_at&quot;: &quot;2026-05-10T00:00:00Z&quot;,
+    &quot;folders&quot;: [
+        { &quot;id&quot;: &quot;uuid&quot;, &quot;name&quot;: &quot;...&quot;, &quot;description&quot;: &quot;...&quot;, &quot;icon_svg&quot;: &quot;...&quot; }
+    ],
+    &quot;credentials&quot;: [
+        {
+            &quot;id&quot;: &quot;uuid&quot;,
+            &quot;folder_id&quot;: &quot;uuid&quot;,
+            &quot;service&quot;: &quot;github.com&quot;,
+            &quot;username&quot;: &quot;alice&quot;,
+            &quot;password&quot;: &quot;...&quot;,
+            &quot;url&quot;: &quot;https://github.com&quot;,
+            &quot;notes&quot;: &quot;...&quot;,
+            &quot;totp_secret&quot;: &quot;...&quot;,
+            &quot;tags&quot;: [&quot;dev&quot;, &quot;work&quot;],
+            &quot;created_at&quot;: 1746835200,
+            &quot;updated_at&quot;: 1746835200
+        }
+    ]
+}
+</code></pre>
+<p>This export is plaintext JSON and must be treated with the same security as a plaintext password file. It is provided for migration purposes only, not for storage.</p>
+<p>Supported import formats: <code>pwdnow</code> (native JSON), <code>bitwarden</code> (CSV), <code>1password</code> (CSV), <code>nordpass</code> (CSV). Format is autodetected by inspecting headers and field names.</p>
+<hr>
+<h2>12. Security Modes</h2>
+<div style="text-align: right"><em>Page 51</em></div>
+<h3>12.1 Duress Mode</h3>
+<p>Duress mode arms an alternate password that triggers forensic wipe after N consecutive failed login attempts using that password.</p>
+<p><strong>Arm:</strong> <code>armDuressMode(duressPassword, maxAttempts)</code> in <code>securityModes.ts</code></p>
+<pre><code>config = {
+    armed: true,
+    duressHash: PBKDF2-SHA-256(duressPassword, random_salt, 120_000)[32],
+    maxAttempts: N,
+    currentAttempts: 0
+}
+localStorage['duress_mode_config'] = JSON.stringify(config)  [plaintext]
+</code></pre>
+<p><strong>On each login attempt:</strong></p>
+<pre><code>if (PBKDF2-SHA-256(entered_password, salt) == duressHash):
+    config.currentAttempts++
+    if config.currentAttempts &gt;= config.maxAttempts:
+        wipeVaultData(daemon)
+</code></pre>
+<p><strong>Forensic wipe (Daemon Cryptographic Erase + Browser Sanitization):</strong></p>
+<p>Layer 1 (daemon): <code>ForensicWipe</code> IPC command with <code>wipe_ticket</code>. Daemon performs NIST SP 800-88 Rev. 2 cryptographic erase (zeroizing sidecar keys and unlinking database files), then exits.</p>
+<p>Layer 2 (browser, <code>wipeVaultData()</code>):</p>
+<pre><code>Pass 1: write random bytes to every localStorage key (CSPRNG)
+Pass 2: write 0x00 bytes to every localStorage key
+Pass 3: write 0xFF bytes to every localStorage key
+localStorage.clear()
+
+IndexedDB: open all databases, delete all object stores, delete databases
+Cache API: caches.keys() -&gt; delete all named caches
+
+sessionStorage.clear()
+keyStore.clear()
+</code></pre>
+<p>Cryptographic erase is the primary “Purge” method for the encrypted vault. Multi-pass overwrite for the daemon is an opt-in fallback for rotational media.</p>
+<h3>12.2 Travel Mode</h3>
+<p>Travel mode hides a configurable subset of credential folders behind a separate travel password. When enabled, only non-hidden folders are visible in the main vault view.</p>
+<p><strong>Enable:</strong></p>
+<pre><code>travel_key = PBKDF2-SHA-256(travelPassword, random_salt, 120_000)[32]
+hidden_data = {credentials: [...], folders: [...]}  // subset to hide
+encrypted_cache = AES-256-GCM.Encrypt(travel_key, JSON(hidden_data))
+localStorage['_cache_local_xvc'] = base64(encrypted_cache)
+
+config = {
+    enabled: true,
+    travelHash: hex(travel_key),
+    hiddenFolderIds: [...]
+}
+localStorage['travel_mode_config'] = JSON.stringify(config)
+</code></pre>
+<p><strong>Unlock:</strong></p>
+<pre><code>entered_key = PBKDF2-SHA-256(entered_travelPassword, stored_salt, 120_000)
+if ct_eq(entered_key, travelHash):
+    hidden_data = AES-256-GCM.Decrypt(entered_key, encrypted_cache)
+    merge hidden credentials and folders into active vault view
+</code></pre>
+<p>Travel mode uses WebCrypto <code>SubtleCrypto.deriveBits</code> (PBKDF2-SHA-256, 120,000 iterations) when available over HTTPS, with <code>@noble/ciphers</code> as a fallback on plain HTTP.</p>
+<h3>12.3 Login Lockout</h3>
+<p>Separate from the daemon’s brute-force lockout, the browser client maintains its own lockout state in <code>localStorage['login_lockout_config']</code>:</p>
+<pre><code class="language-json">{
+    &quot;attempts&quot;: 3,
+    &quot;lockedUntil&quot;: 1746835800,
+    &quot;maxAttempts&quot;: 5,
+    &quot;lockoutDurationMins&quot;: 15
+}
+</code></pre>
+<p>This is a client-side control. It is complementary to, not a replacement for, the daemon’s <code>LOCKOUT_SCHEDULE_SECS</code> enforcement.</p>
+<hr>
+<h2>13. Offline HIBP Breach Detection</h2>
+<div style="text-align: right"><em>Page 54</em></div>
+<h3>13.1 Architecture</h3>
+<p>PWDnow implements Have I Been Pwned (HIBP) breach checking entirely offline, with no network requests and no password data leaving the device. The approach uses a Cuckoo filter data structure loaded from a pre-built binary file.</p>
+<p>The filter file contains approximately 900 million SHA-1 hashes from the HIBP v8 dataset, occupying approximately 8 GiB on disk. This file is built by <code>hibp/build-filter.sh</code> and must be placed in a daemon-accessible path before the feature is operational.</p>
+<p><strong>Data flow:</strong></p>
+<pre><code>User enters password in browser
+Browser: [msgpack] CheckPasswordBreached{session_token, password_bytes}
+Daemon: SHA-1(password_bytes) -&gt; fingerprint + two bucket indices
+Daemon: CuckooFilter.might_be_pwned(password_bytes) -&gt; bool
+Daemon: [msgpack] PwnedStatus{pwned: bool, filter_available: bool}
+Browser: display breach warning if pwned == true
+</code></pre>
+<p>The plaintext password is sent from browser to daemon over the authenticated Unix socket connection. The daemon never logs or stores the password bytes. The SHA-1 computation happens inside the daemon process.</p>
+<h3>13.2 Cuckoo Filter Specification</h3>
+<pre><code>File format:
++------------------+---------------------+
+| Header (24 bytes)| Fingerprint Data    |
++------------------+---------------------+
+
+Header:
+  [0..8]   Magic: &quot;HIBPCF01&quot;  (8 bytes)
+  [8..16]  Buckets: u64 LE   (number of buckets)
+  [16]     Slots/bucket: u8  (4 in this implementation)
+  [17]     FP bits: u8       (16 = 2 bytes per fingerprint)
+  [18..24] Reserved: 6 bytes
+
+Fingerprint data:
+  buckets * 4 slots * 2 bytes = (buckets * 8) bytes
+  All fingerprints packed contiguously: bucket0_slot0 | bucket0_slot1 | ...
+</code></pre>
+<p>Fingerprint computation from password:</p>
+<pre><code>hash = SHA-1(password)
+fp   = u16_from_be(hash[0..2]) max 1     // 16-bit fingerprint, non-zero
+i1   = u64_from_be(hash[2..10]) mod buckets
+fp_hash = SHA-1(fp_be[2]) as u64_from_be
+i2   = (i1 XOR (fp_hash mod buckets)) mod buckets
+</code></pre>
+<p>A password is considered present if <code>fp</code> appears in any slot of bucket <code>i1</code> OR bucket <code>i2</code>. False positive rate: approximately 0.1% (1 in 1000 clean passwords will be incorrectly flagged as breached). False negatives: none (all known-breached passwords are correctly identified).</p>
+<h3>13.3 Integrity Verification</h3>
+<p>The filter file is accompanied by a SHA-256 sidecar (<code>&lt;filter&gt;.sha256</code>). The daemon streams the filter file through a SHA-256 hasher while reading it (single I/O pass), then compares to the stored digest before returning a filter instance. A mismatch causes <code>CuckooFilter::load()</code> to return an error; the daemon responds with <code>PwnedStatus{pwned: false, filter_available: false}</code>.</p>
+<hr>
+<h2>14. Vault Sync Architecture</h2>
+<div style="text-align: right"><em>Page 56</em></div>
+<h3>14.1 Sync Model</h3>
+<p>The sync layer in <code>daemon/src/sync/cloudflare.rs</code> enables encrypted vault backup and multi-device access using Cloudflare R2 (or any S3-compatible object store). The sync layer operates on the opaque encrypted vault file; it never decrypts any content.</p>
+<p><strong>Sync protocol:</strong></p>
+<pre><code>1. Compute BLAKE3(vault.db) locally
+2. HEAD request to object store: get ETag (remote hash)
+3. Compare local hash to remote ETag:
+   - local newer: compress vault.db with zstd, upload; update remote ETag
+   - remote newer: download, verify BLAKE3, replace local vault.db
+   - both changed: conflict — download remote as vault.db.conflict, report to UI
+   - equal: no action (UpToDate)
+</code></pre>
+<p><strong>Sync credentials storage:</strong> The Cloudflare API token is stored encrypted in <code>vault_meta</code> under key <code>sync_token_enc</code>. The daemon decrypts it with the VMK during a sync operation; the token never appears in plaintext in any file.</p>
+<h3>14.2 Conflict Resolution</h3>
+<p>When both the local and remote copies have changed since the last sync (i.e., they have diverged), the daemon downloads the remote copy as <code>vault.db.conflict</code> alongside the local <code>vault.db</code>. The UI reports this to the user and asks which version to keep. There is no automatic merge; vault merge is a manual operation.</p>
+<hr>
+<h2>15. Deployment Architecture</h2>
+<div style="text-align: right"><em>Page 58</em></div>
+<h3>15.1 Production Stack</h3>
+<pre><code>Internet
+    |
+    | HTTPS (TLS 1.3 only)
+    |
+Nginx (vault.conf)
+    |  TLS termination
+    |  HSTS: max-age=31536000; includeSubDomains; preload
+    |  Rate limiting: 5 req/min (auth), 300 req/min (general)
+    |  Security headers: X-Frame-Options, X-Content-Type-Options, COEP, COOP
+    |  No CSP header set here (nonce injection is Express responsibility)
+    |
+    +-- /assets/* -&gt; serve from web/dist/assets/ (1y cache, immutable)
+    +-- /ws       -&gt; proxy to Express :1234 (WS upgrade)
+    +-- /api/auth/(login|register|...) -&gt; proxy :1234 (rate-limited 5r/m)
+    +-- /         -&gt; try_files $uri @node -&gt; proxy :1234
+    |
+Express :1234 (PM2 cluster, all CPUs, 1 GiB memory ceiling)
+    |  CSP nonce injection into index.html
+    |  WebSocket proxy /ws -&gt; Unix socket
+    |  Auth routes /api/auth/*
+    |  Vault routes /api/vault/*
+    |  Setup API (localhost-only)
+    |
+    +-- Static assets from web/dist/
+    |
+    +-- Unix socket /run/vault-daemon/vault.sock
+            |
+        vault-daemon (systemd, user=vault)
+            |  CAP_IPC_LOCK (mlock)
+            |  MemorySwapMax=0
+            |  NoNewPrivileges
+            |  PrivateTmp
+            |  AppArmor confinement
+            |
+            +-- vault.db (SQLCipher, AES-256-CBC)
+            +-- vault.db.meta (VaultHeader JSON, plaintext)
+            +-- hibp.cuckoo (optional, ~8 GiB)
+</code></pre>
+<h3>15.2 TLS Configuration (Nginx)</h3>
+<pre><code class="language-nginx">ssl_protocols TLSv1.3;                         # TLS 1.3 only (CNSA 2.0 §3)
+ssl_ciphers TLS_AES_256_GCM_SHA384;            # CNSA 2.0 mandatory cipher
+ssl_conf_command Groups secp384r1mlkem1024:mlkem1024;  # P-384+ML-KEM-1024 hybrid KEX
+ssl_session_tickets off;                       # forward secrecy: no ticket resumption
+ssl_stapling on;                               # OCSP stapling
+</code></pre>
+<p>CNSA 2.0 requires AES-256-GCM-SHA384 as the TLS cipher suite. The <code>secp384r1mlkem1024</code> key group provides hybrid classical+post-quantum key exchange at the TLS layer, complementing the application-layer ML-KEM-1024 KEM for the vault VMK.</p>
+<h3>15.3 Rate Limiting</h3>
+<p>Two nginx <code>limit_req_zone</code> directives are configured:</p>
+<table>
+<thead>
+<tr>
+<th>Zone</th>
+<th>Rate</th>
+<th>Apply to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auth_limit</code></td>
+<td>5 req/min per IP</td>
+<td>`/api/auth/(login</td>
+</tr>
+<tr>
+<td><code>general_limit</code></td>
+<td>300 req/min per IP</td>
+<td>All other paths</td>
+</tr>
+</tbody>
+</table>
+<p>Auth endpoints additionally use <code>burst=3 nodelay</code>, allowing short bursts while enforcing the overall rate.</p>
+<hr>
+<h2>16. UML Component and Class Diagrams</h2>
+<div style="text-align: right"><em>Page 61</em></div>
+<h3>16.1 System Component Diagram</h3>
+<div class="mermaid">graph TB
+    subgraph Browser[&quot;Browser (React 19 SPA)&quot;]
+        KC[SecureKeyStore&lt;br/&gt;session token in #token]
+        DC[DaemonClient&lt;br/&gt;msgpack WebSocket FIFO]
+        VC[VaultContext&lt;br/&gt;mode routing]
+        LC[localCrypto&lt;br/&gt;AES-GCM localStorage]
+        MFA[mfa.ts&lt;br/&gt;WebAuthn / TOTP / Email]
+        SM[securityModes.ts&lt;br/&gt;Duress / Travel / Wipe]
+    end
+
+    subgraph Express[&quot;Express Server (Node.js)&quot;]
+        WS[WebSocket Proxy&lt;br/&gt;/ws]
+        AUTH[auth.js&lt;br/&gt;JWE sessions / scrypt]
+        CSP[CSP Nonce Injector]
+        P2W[P2W Filesystem&lt;br/&gt;auth_data/ AES-256-GCM]
+    end
+
+    subgraph Daemon[&quot;vault-daemon (Rust + Tokio)&quot;]
+        DISP[dispatch()&lt;br/&gt;ipc/socket.rs]
+        STATE[DaemonState&lt;br/&gt;vault/state.rs]
+        CRYPTO[crypto/&lt;br/&gt;AES-GCM XChaCha20&lt;br/&gt;KDF KEM Sign]
+        DB[SQLCipher DB&lt;br/&gt;vault.db]
+        META[VaultHeader&lt;br/&gt;vault.db.meta]
+        HIBP[CuckooFilter&lt;br/&gt;hibp.cuckoo]
+        AUDIT[Audit Log&lt;br/&gt;BLAKE3 chain]
+    end
+
+    DC -- &quot;binary msgpack over WS&quot; --&gt; WS
+    WS -- &quot;Unix socket frames&quot; --&gt; DISP
+    AUTH -- &quot;reads/writes&quot; --&gt; P2W
+    KC -- &quot;token&quot; --&gt; DC
+    VC -- &quot;daemon mode&quot; --&gt; DC
+    VC -- &quot;server mode&quot; --&gt; AUTH
+    MFA -- &quot;WebAuthn&quot; --&gt; DC
+    DISP --&gt; STATE
+    STATE --&gt; CRYPTO
+    STATE --&gt; DB
+    STATE --&gt; META
+    DB --&gt; AUDIT
+    DB --&gt; HIBP
+</div>
+<h3>16.2 DaemonState Class Diagram</h3>
+<div class="mermaid">classDiagram
+    class DaemonState {
+        +sessions: SessionStore
+        +db: Mutex~Option~Connection~~
+        -vmk: RwLock~Option~LockedKey~~
+        +vault_uuid: Mutex~Option~String~~
+        -wipe_ticket: Mutex~Option~Vec~u8~~~
+        +vault_path: PathBuf
+        +last_activity: Arc~AtomicU64~
+        -passkey_challenge: Mutex~Option~[u8;32]~~
+        -pqc_challenge: Mutex~Option~[u8;32]~~
+        -failed_unlock_attempts: AtomicU32
+        -unlock_locked_until: Mutex~Option~Instant~~
+        -pending_audit: Mutex~Vec~(String, Option~String~)~~
+        +new(vault_path) DaemonState
+        +is_locked() bool
+        +unlock(pw, yk, uid) Result~Session~
+        +unlock_with_passkey(cid, auth_data, sig, uid) Result~Session~
+        +unlock_with_pqc(uid, cid, sig, ct) Result~Session~
+        +quick_unlock(dbk, uid) Result~Session~
+        +quick_unlock_enroll(password, dbk) Result
+        +lock()
+        +forensic_wipe(ticket) Result
+        +change_password(old, new, yk) Result
+        +with_vmk(fn) Result~T~
+        +touch()
+        +idle_secs() u64
+        +read_header() Result~VaultHeader~
+        +write_header(header) Result
+    }
+
+    class SessionStore {
+        -sessions: RwLock~HashMap~String, Session~~
+        -revoked: RwLock~HashMap~[u8;32], u64~~
+        +create(user_id, uid, ttl) Session
+        +validate(token, uid) Result~Session~
+        +touch(token, ttl) bool
+        +rotate(old_token, uid) Option~String~
+        +revoke(token)
+        +revoke_all_for_user(user_id)
+        +revoke_all()
+        +purge_expired()
+        +active_count() usize
+    }
+
+    class LockedKey {
+        -ptr: NonNull~c_void~
+        -len: usize
+        +new(len) Result~LockedKey~
+        +as_bytes() LockedKeyGuard
+        +as_bytes_mut() LockedKeyMutGuard
+    }
+
+    class VaultHeader {
+        +vault_uuid: String
+        +argon2_salt: String
+        +argon2_m_cost: u32
+        +argon2_t_cost: u32
+        +argon2_p_cost: u32
+        +kem_suite: u8
+        +encrypted_vmk: String
+        +vmk_nonce: String
+        +password_login_enabled: bool
+        +totp_enabled: bool
+        +email_otp_enabled: bool
+        +strict_pqc_mode: bool
+        +passkey_credentials: Vec~PasskeySidecarEntry~
+        +pqc_credentials: Vec~PqcSidecarEntry~
+        +quick_unlock_credentials: Vec~QuickUnlockCred~
+        +wipe_ticket_hash: String
+    }
+
+    DaemonState &quot;1&quot; --&gt; &quot;1&quot; SessionStore
+    DaemonState &quot;1&quot; --&gt; &quot;0..1&quot; LockedKey : vmk
+    DaemonState &quot;1&quot; --&gt; &quot;1&quot; VaultHeader : read/write sidecar
+</div>
+<h3>16.3 Crypto Module Relationships</h3>
+<div class="mermaid">graph LR
+    KDF[kdf.rs&lt;br/&gt;Argon2id / PBKDF2-SHA-512]
+    KEM[kem.rs&lt;br/&gt;X25519 / X448+ML-KEM-1024]
+    AES[aes_gcm.rs&lt;br/&gt;AES-256-GCM]
+    XCC[xchacha20.rs&lt;br/&gt;XChaCha20-Poly1305]
+    SIGN[sign.rs&lt;br/&gt;ML-DSA-87]
+    BI[blind_index.rs&lt;br/&gt;HMAC-SHA-512]
+    SS[secure_store.rs&lt;br/&gt;LockedKey mlock+PROT_NONE]
+    HIBP[hibp.rs&lt;br/&gt;CuckooFilter SHA-1]
+
+    KDF --&gt; SS : &quot;64-byte mlock'd output&quot;
+    SS --&gt; AES : &quot;KEK or VMK access window&quot;
+    SS --&gt; XCC : &quot;KEK or VMK access window&quot;
+    AES --&gt; KEM : &quot;wrap shared secret&quot;
+    KEM --&gt; AES : &quot;encapsulated key -&gt; AES key&quot;
+    SIGN --&gt; HIBP
+    BI --&gt; AES : &quot;indexing independent of plaintext&quot;
+</div>
+<h3>16.4 Request Dispatch Activity Diagram</h3>
+<div class="mermaid">flowchart TD
+    A([Incoming Unix Socket Frame]) --&gt; B[read_frame: 4-byte len + body]
+    B --&gt; C{frame &gt; 4 MiB?}
+    C -- Yes --&gt; D[Return Error: frame too large]
+    C -- No --&gt; E[rmp_serde::from_slice: Request]
+    E --&gt; F{Deserialization OK?}
+    F -- No --&gt; G[Return Error 400: invalid frame]
+    F -- Yes --&gt; H{Unauthenticated?}
+    H -- Yes --&gt; I[Ping / GetStatus / GetLoginHints&lt;br/&gt;Unlock / ForensicWipe / etc.]
+    H -- No --&gt; J[Extract session_token from payload]
+    J --&gt; K[sessions.validate(token, uid)]
+    K --&gt; L{Valid?}
+    L -- No --&gt; M[Return Error 401: session expired]
+    L -- Yes --&gt; N{Vault unlocked?}
+    N -- No --&gt; O[Return Error 401: vault locked]
+    N -- Yes --&gt; P[Execute authenticated handler]
+    P --&gt; Q[audit::log(action, resource)]
+    Q --&gt; R[write_frame: Response]
+    I --&gt; R
+    M --&gt; R
+    O --&gt; R
+</div>
+<hr>
+<h2>17. Standards Compliance Matrix</h2>
+<div style="text-align: right"><em>Page 67</em></div>
+<table>
+<thead>
+<tr>
+<th>Standard</th>
+<th>Version / Date</th>
+<th>Requirement</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NIST FIPS 140-3</td>
+<td>2019</td>
+<td>Module self-tests, key zeroization, cryptographic boundary</td>
+<td>POST in <code>crypto/self_test.rs</code> (daemon exits 42 on failure); <code>LockedKey</code> provides PROT_NONE memory boundary; <code>zeroize</code> crate on drop. <strong>Note:</strong> PWDnow is not currently FIPS 140-3 validated (no CMVP submission). The module is <em>FIPS 140-3-aligned</em> — built using validated primitives and following §AS04/§AS09/§AS11 requirements.</td>
+</tr>
+<tr>
+<td>NIST FIPS 197</td>
+<td>2001</td>
+<td>AES</td>
+<td><code>aes-gcm</code> crate, AES-256-GCM for all AEAD operations</td>
+</tr>
+<tr>
+<td>NIST SP 800-38D</td>
+<td>2007</td>
+<td>GCM mode</td>
+<td>Random 96-bit nonce, 128-bit tag, AAD bound to context. Monitoring SP 800-38D Rev. 1 (draft); current 96-bit random IV remains compliant under both.</td>
+</tr>
+<tr>
+<td>NIST FIPS 202</td>
+<td>2015</td>
+<td>SHA-3 family</td>
+<td><code>sha3</code> crate, SHA3-512 for HKDF and blind index key derivation</td>
+</tr>
+<tr>
+<td>NIST SP 800-132</td>
+<td>2010</td>
+<td>Salt construction for PBKDF</td>
+<td>Applied as input to PBKDF2-HMAC-SHA-512</td>
+</tr>
+<tr>
+<td>NSA CSI-CNSA-2.0</td>
+<td>Sept 2022</td>
+<td>PBKDF2 ≥ 1,000,000 iters</td>
+<td>Enforced in <a href="http://kdf.rs">kdf.rs</a>::PBKDF2_ITERATIONS_CNSA</td>
+</tr>
+<tr>
+<td>NIST SP 800-63B-4</td>
+<td>2024</td>
+<td>Authentication, AAL3 memory-hard KDF</td>
+<td>Argon2id (1 GiB, t=4, p=2) satisfies AAL3 §5.1.1.2; scrypt legacy fallback</td>
+</tr>
+<tr>
+<td>NIST SP 800-56C</td>
+<td>2020</td>
+<td>HKDF</td>
+<td>HKDF-SHA-384 (server), HKDF-SHA3-512 (daemon SQLCipher/BI)</td>
+</tr>
+<tr>
+<td>NIST FIPS 203</td>
+<td>2024</td>
+<td>ML-KEM (Kyber)</td>
+<td><code>ml-kem</code> crate v0.3.0, ML-KEM-1024 (Level 5). <strong>Hybrid combiner</strong> (X448+ML-KEM-1024) is transitional (IETF draft, not finalised); planned replacement with pure ML-KEM-1024 post-2030.</td>
+</tr>
+<tr>
+<td>NIST FIPS 204</td>
+<td>2024</td>
+<td>ML-DSA (Dilithium)</td>
+<td><code>ml-dsa</code> crate, ML-DSA-87 (Level 5)</td>
+</tr>
+<tr>
+<td>NSA CNSA 2.0</td>
+<td>2022</td>
+<td>Post-quantum algorithms</td>
+<td>ML-KEM-1024 + ML-DSA-87; AES-256-GCM; SHA-384; P-384 floor</td>
+</tr>
+<tr>
+<td>RFC 8446</td>
+<td>2018</td>
+<td>TLS 1.3</td>
+<td>Nginx: <code>ssl_protocols TLSv1.3</code> only</td>
+</tr>
+<tr>
+<td>RFC 5869</td>
+<td>2010</td>
+<td>HKDF</td>
+<td>Three HKDF instances (SHA-256, SHA-384, SHA3-512)</td>
+</tr>
+<tr>
+<td>RFC 6238</td>
+<td>2011</td>
+<td>TOTP</td>
+<td><code>totp-rs</code> crate (daemon), <code>totp-generator</code> (server); 30-second windows</td>
+</tr>
+<tr>
+<td>RFC 4226</td>
+<td>2005</td>
+<td>HOTP</td>
+<td>Browser <code>mfa.ts</code>, lookahead=10</td>
+</tr>
+<tr>
+<td>RFC 8032</td>
+<td>2017</td>
+<td>Ed25519</td>
+<td><code>ed25519-dalek</code> crate, legacy verification only</td>
+</tr>
+<tr>
+<td>RFC 7516/7518 + RFC 8725 BCP</td>
+<td>2015 + 2020</td>
+<td>JWE &amp; JOSE BCP</td>
+<td><code>jose</code> npm, <code>A256GCM</code> direct encryption (<code>alg: &quot;dir&quot;</code>), 24h TTL, JTI tracked. <code>alg</code> pinned — no algorithm confusion possible per RFC 8725 §3.</td>
+</tr>
+<tr>
+<td>FIDO2 / W3C WebAuthn</td>
+<td>Level 3 (2025), tracking</td>
+<td>Passkey / hardware key</td>
+<td>CTAP2, attestation, <code>navigator.credentials</code>, libfido2; forward-compatible with Level 3</td>
+</tr>
+<tr>
+<td>OWASP ASVS 5.0 (2024)</td>
+<td>L2/L3</td>
+<td>Application security</td>
+<td>CSRF double-submit (V3), CSP nonce (V14), Trusted Types (V50), HSTS (V14)</td>
+</tr>
+<tr>
+<td>NIST SP 800-38A</td>
+<td>2001</td>
+<td>Block cipher modes</td>
+<td>SQLCipher: AES-256-CBC per page. Planned migration to SQLCipher 5+ AEAD pages when upstream releases.</td>
+</tr>
+<tr>
+<td>NIST SP 800-88 Rev. 2</td>
+<td>2025</td>
+<td>Media sanitization</td>
+<td>Cryptographic erase: zero key-material fields in header, then unlink (<code>vault/wipe.rs</code>). Multi-pass overwrite retained as opt-in fallback for rotational media (<code>VAULT_WIPE_MODE=overwrite</code>).</td>
+</tr>
+<tr>
+<td>IEEE 2883-2022</td>
+<td>2022</td>
+<td>Storage device sanitization</td>
+<td>Technique-level companion to SP 800-88 Rev. 2; cryptographic erase satisfies §5.3 “Purge” for flash.</td>
+</tr>
+<tr>
+<td>NIST SP 800-53 Rev. 5</td>
+<td>2020</td>
+<td>Security control catalogue</td>
+<td>Underpins SP 800-88 Rev. 2 sanitization controls (MP-6); referenced for policy defence-in-depth.</td>
+</tr>
+<tr>
+<td>NSA CNSA 2.0 §3</td>
+<td>2022</td>
+<td>TLS / named groups</td>
+<td>TLS 1.3 only; named group <code>secp384r1mlkem1024</code> is IETF draft — monitoring final IANA codepoint assignment for nginx swap.</td>
+</tr>
+</tbody>
+</table>
+<h3>17.1 CNSA 2.0 Compliance Status</h3>
+<p>CNSA 2.0 specifies that by 2030, NSS (National Security Systems) must exclusively use the following algorithms:</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>CNSA 2.0 Requirement</th>
+<th>PWDnow Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Symmetric encryption</td>
+<td>AES-256</td>
+<td>Compliant. AES-256-GCM everywhere in <code>cnsa-strict</code> mode</td>
+</tr>
+<tr>
+<td>Key establishment</td>
+<td>ML-KEM-1024</td>
+<td>Compliant. X448+ML-KEM-1024 hybrid (default on, pure ML-KEM planned)</td>
+</tr>
+<tr>
+<td>Digital signature</td>
+<td>ML-DSA-87</td>
+<td>Compliant. ML-DSA-87 for PQC authenticator and audit log signing</td>
+</tr>
+<tr>
+<td>Hashing</td>
+<td>SHA-384</td>
+<td>Compliant in <code>cnsa-strict</code>. SHA3-512 retained for SQLCipher key (non-NSS path)</td>
+</tr>
+<tr>
+<td>TLS</td>
+<td>TLS 1.3, AES-256-GCM-SHA384</td>
+<td>Compliant. Nginx config enforces this</td>
+</tr>
+<tr>
+<td>Key size floor (classical)</td>
+<td>P-384 / 3072-bit RSA</td>
+<td>Compliant. P-384 (secp384r1) in TLS hybrid; X448 exceeds P-521</td>
+</tr>
+</tbody>
+</table>
+<p>In <code>cnsa-strict</code> compilation mode, BLAKE3, SHA3, XChaCha20-Poly1305, Ed25519, and X25519 are removed from all active code paths via Rust feature gates. The audit log hash switches from BLAKE3-32 to SHA-384-48.</p>
+<hr>
+<h2>18. Threat Model and Mitigations</h2>
+<div style="text-align: right"><em>Page 70</em></div>
+<h3>18.1 Threat Actors</h3>
+<table>
+<thead>
+<tr>
+<th>Actor</th>
+<th>Capability</th>
+<th>Primary Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Network adversary</td>
+<td>MITM on network traffic</td>
+<td>TLS channel</td>
+</tr>
+<tr>
+<td>Quantum-capable adversary</td>
+<td>Break RSA/ECC/DH in polynomial time</td>
+<td>VMK KEX, session tokens</td>
+</tr>
+<tr>
+<td>Malicious web content</td>
+<td>XSS in browser</td>
+<td>Session token, clipboard data</td>
+</tr>
+<tr>
+<td>Local process (same user)</td>
+<td><code>/proc/mem</code>, ptrace</td>
+<td>VMK in daemon memory</td>
+</tr>
+<tr>
+<td>Local process (different user)</td>
+<td>Limited, SO_PEERCRED fails</td>
+<td>IPC socket</td>
+</tr>
+<tr>
+<td>Stolen device (at rest)</td>
+<td>Direct disk read</td>
+<td>vault.db, auth_data/</td>
+</tr>
+<tr>
+<td>Coercion</td>
+<td>Physical threat</td>
+<td>Vault contents</td>
+</tr>
+</tbody>
+</table>
+<h3>18.2 Mitigations by Layer</h3>
+<p><strong>Network layer:</strong></p>
+<ul>
+<li>TLS 1.3 only (no downgrade to TLS 1.2 or earlier)</li>
+<li>TLS_AES_256_GCM_SHA384 cipher suite enforced</li>
+<li>HSTS with <code>includeSubDomains; preload</code> (1-year max-age)</li>
+<li>OCSP stapling</li>
+<li>X448+ML-KEM-1024 hybrid key exchange (quantum-resistant)</li>
+</ul>
+<p><strong>Cryptographic layer:</strong></p>
+<ul>
+<li>All keys derived from master password via Argon2id (1 GiB RAM, intentional slowness)</li>
+<li>VMK held in mlock’d PROT_NONE page (kernel-enforced no-access between operations)</li>
+<li>DEK-per-credential: compromise of one credential does not compromise others</li>
+<li>AES-GCM AAD binds ciphertext to its position (vault UUID + credential UUID + schema version)</li>
+<li>HMAC-SHA-512 blind indexes: searchable without decryption, no field value leakage</li>
+</ul>
+<p><strong>Application layer:</strong></p>
+<ul>
+<li>SO_PEERCRED UID check on every IPC request: cross-user session replay impossible</li>
+<li><code>deny_unknown_fields</code> on msgpack Request/Response: injection via unknown fields rejected</li>
+<li>Exponential brute-force lockout: 600-second lockout after 9+ failures</li>
+<li>Session token BLAKE3 revocation list: revoked tokens rejected even if somehow reintroduced</li>
+<li>TOTP drift window ±1 step (90 seconds total): replay protection via <code>_usedTotpPeriods</code> map</li>
+<li>ForensicWipe: NIST SP 800-88 Rev. 2 cryptographic erase triggered by capability token</li>
+<li>Partial MFA tokens: SHA-256 hashed in memory, single-use, 5-minute TTL</li>
+</ul>
+<p><strong>Browser layer:</strong></p>
+<ul>
+<li>CSP with per-request nonce: no inline script execution without nonce</li>
+<li>Trusted Types: all <code>innerHTML</code> through DOMPurify <code>default</code> policy</li>
+<li><code>SecureKeyStore</code> JS private field: token inaccessible from DevTools or extensions</li>
+<li><code>pagehide</code>/<code>visibilitychange</code> clear: token wiped when tab becomes invisible</li>
+<li>CSRF double-submit cookie: <code>X-CSRF-Token</code> must match <code>_pwd_csrf</code> cookie</li>
+<li>Clipboard auto-clear: passwords cleared from clipboard after 10 seconds</li>
+</ul>
+<p><strong>Coercion:</strong></p>
+<ul>
+<li>Duress mode: alternate password triggers forensic wipe after N attempts</li>
+<li>Travel mode: subset of credentials hidden behind separate password</li>
+<li>Forensic wipe: NIST SP 800-88 Rev. 2 cryptographic erase (daemon) + 3-pass sanitization (browser)</li>
+</ul>
+<h3>18.3 Known Limitations</h3>
+<p><strong>Blind index leakage:</strong> The blind indexes (<code>service_hash</code>, <code>url_hash</code>, <code>username_hash</code>) are HMAC-SHA-512 values. An adversary who obtains the database AND the blind index key (derived from the VMK) can test candidate values by computing <code>HMAC-SHA-512(key, candidate)</code> and comparing. This is an inherent tradeoff of searchable encryption. The blind index key is not stored in the database; it requires the VMK.</p>
+<p><strong>Session token entropy:</strong> Session tokens are 32 bytes (256 bits) from <code>OsRng</code>. They are not signed. Their security relies on secrecy and the 15-minute idle TTL. The daemon cannot distinguish a legitimate client from a token-stealing client once the token is issued.</p>
+<p><strong>Browser memory:</strong> The session token in <code>SecureKeyStore.#token</code> is a JavaScript string, subject to V8 garbage collection and potentially visible in heap dumps. This is an inherent browser limitation; there is no <code>mlock</code> equivalent in JavaScript. The token is cleared as aggressively as possible (pagehide, visibilitychange) to minimize exposure.</p>
+<p><strong>Server-mode key material:</strong> In server mode, <code>MASTER_KEY</code> is a module-level variable in the Express process. A process memory dump would expose it. This is weaker than the daemon’s <code>LockedKey</code> protection. Server mode is recommended only for deployments where the Rust daemon cannot be installed.</p>
+<hr>
+<p><em>End of PWDnow Technical Reference — Revision 1.0.0 — May 10, 2026</em></p>
+<div style="text-align: right"><em>Page 73</em></div>
+
+  </main>
+
+  <!-- Mermaid Rendering Engine -->
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ 
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      fontFamily: 'Segoe UI, Arial'
+    });
+  </script>
+</body>
+</html>

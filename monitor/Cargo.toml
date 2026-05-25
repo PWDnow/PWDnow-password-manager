@@ -1,0 +1,47 @@
+[package]
+name        = "pwdnow-monitor"
+version     = "0.1.0"
+edition     = "2021"
+description = "PWDnowMonitoringENV — lightweight watchdog & predictive health monitor for PWDnow"
+
+[[bin]]
+name = "pwdnow-monitor"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime — same version pin as vault-daemon for reproducibility
+tokio          = { version = "=1.51.1", features = ["full"] }
+
+# Serialization — PM2 JSON parsing + config + structured logging
+serde          = { version = "1.0", features = ["derive"] }
+serde_json     = "1.0"
+toml           = "0.8"
+
+# Low-level OS access (statvfs, UnixStream)
+nix            = { version = "0.29", features = ["fs", "socket"] }
+
+# Structured logging to journal
+tracing              = "0.1"
+tracing-subscriber   = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Timestamps
+chrono         = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow         = "1.0"
+
+# systemd readiness notification (same as daemon)
+sd-notify      = "0.4"
+
+# Low-level C stdlib — for statvfs() disk space query
+libc           = "0.2"
+
+# For HTTP /health ping (raw TCP, no heavy HTTP client)
+# We do it manually over TcpStream to keep binary tiny.
+
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+strip         = true
+panic         = "abort"

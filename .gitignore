@@ -1,0 +1,86 @@
+# PWDnow root gitignore
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ── Rust ──────────────────────────────────────────────────────────────────────
+target/
+**/*.rs.bk
+
+# ── Vault data (SENSITIVE — never commit) ─────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.db.meta
+*.meta
+*.tmp
+*.wipe_tmp
+*.lock
+.master_key
+auth_data/
+/vault/
+daemon_data/
+
+# ── Build artifacts ───────────────────────────────────────────────────────────
+dist/
+build/
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ── Python ────────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+
+# ── Agent / AI tooling artifacts ──────────────────────────────────────────────
+.claude/
+.claude-flow/
+web/.claude-flow/
+.swarm/
+.gemini/
+.mcp.json
+
+# ── SSL certs (dev-only, never commit) ────────────────────────────────────────
+web/ssl/
+
+# ── Test results & coverage ───────────────────────────────────────────────────
+web/test-results/
+web/coverage/
+*.tsbuildinfo
+
+# ── Scratch/debug scripts (one-off, not production) ──────────────────────────
+add_logger_imports.mjs
+find_a11y.js
+fix_a11y.js
+fix_a11y_target.js
+fix_settings.py
+fix_settings_v2.py
+fix_settings_v3.py
+refactor_fetch.py
+web/fix*.mjs
+web/find_remaining_a11y.cjs
+web/migrate_*.mjs
+web/refactor_fetch.py
+web/debug_*.cjs
+web/debug_*.mjs
+web/debug_*.js
+
+# ── Obsidian ──────────────────────────────────────────────────────────────────
+*.AppImage

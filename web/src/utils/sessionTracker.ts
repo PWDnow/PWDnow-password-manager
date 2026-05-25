@@ -1,5 +1,7 @@
 import { generateUUID } from './crypto';
 import { writeEncryptedLocal, readDecryptedLocal } from './localCrypto';
+import { getCsrfToken, apiFetch, hasServerSession } from './api';
+import { isBraveBrowser } from './browser';
 
 export interface LoginSession {
   id: string;
@@ -24,7 +26,7 @@ function detectOSFromUA(ua: string): string {
 
 async function detectBrowserFromUA(ua: string): Promise<string> {
   try {
-    if ((navigator as any).brave && typeof (navigator as any).brave.isBrave === 'function' && await (navigator as any).brave.isBrave()) {
+    if (await isBraveBrowser()) {
       return 'Brave';
     }
   } catch { /* ignore */ }
@@ -48,9 +50,6 @@ async function readSessions(): Promise<LoginSession[]> {
 // and is the only half readable from JS. Its presence means a valid server-side
 // session was established via /api/auth/login or /api/auth/register.
 // Daemon-authenticated users never receive this cookie and must use local sessions.
-function hasServerSession(): boolean {
-  return document.cookie.split(';').some(c => c.trim().startsWith('_pwd_csrf='));
-}
 
 export async function getSessions(): Promise<LoginSession[]> {
   // 1. Try server-side audit log - only when a server session cookie is present.
@@ -58,12 +57,9 @@ export async function getSessions(): Promise<LoginSession[]> {
   //    for daemon-mode and legacy localStorage users.
   if (hasServerSession()) {
     try {
-      const res = await fetch('/api/auth/sessions', { credentials: 'same-origin' });
-      if (res.ok) {
-        const serverSessions = await res.json();
-        if (Array.isArray(serverSessions) && serverSessions.length > 0) {
-          return serverSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        }
+      const serverSessions = await apiFetch<LoginSession[]>('/api/auth/sessions');
+      if (Array.isArray(serverSessions) && serverSessions.length > 0) {
+        return serverSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       }
     } catch { /* fallback to local */ }
   }
@@ -83,11 +79,8 @@ export async function recordSession(): Promise<void> {
 
   // Proxy through our own server to avoid CSP restrictions on external fetches.
   try {
-    const res = await fetch('/api/my-ip', { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.ip) ip = data.ip;
-    }
+    const data = await apiFetch<{ ip?: string }>('/api/my-ip');
+    if (data.ip) ip = data.ip;
   } catch { /* fallback to hostname */ }
 
   if (!ip || ip === 'localhost' || ip === '::1') ip = '127.0.0.1';
@@ -109,17 +102,8 @@ export async function recordSession(): Promise<void> {
 export async function clearOtherSessions(): Promise<void> {
   // Revoke other sessions server-side when a server session is active.
   if (hasServerSession()) {
-    const csrfToken = document.cookie
-      .split(';')
-      .map(c => c.trim())
-      .find(c => c.startsWith('_pwd_csrf='))
-      ?.split('=')[1] ?? '';
     try {
-      await fetch('/api/auth/sessions/revoke-others', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'X-CSRF-Token': csrfToken },
-      });
+      await apiFetch('/api/auth/sessions/revoke-others', { method: 'POST' });
     } catch { /* non-fatal */ }
   }
 

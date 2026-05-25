@@ -1,0 +1,95 @@
+[Unit]
+# SLA G1 fix: system-level supervisor for the Express web tier.
+#
+# Until this unit existed the chain was: kernel → systemd → ??? → PM2 → node.
+# If PM2's god-daemon died (OOM kill, op error, package upgrade), nothing
+# restarted it — full web outage with no auto-recovery.
+#
+# This unit runs `node server.js` directly under systemd with Type=notify so
+# systemd owns the supervision contract end-to-end. PM2 remains supported for
+# operator-driven workflows (logs, restarts) by leaving ecosystem.config.cjs
+# in place; production hosts should choose ONE of:
+#   (a) systemctl enable --now pwdnow-web        ← recommended
+#   (b) pm2 start ecosystem.config.cjs && pm2 startup
+#
+# Both must NOT run simultaneously (they'd race for port 1234).
+Description=PWDnow Web — Express front-door & WebSocket proxy
+Documentation=https://github.com/your-org/vault-manager
+After=network-online.target vault-daemon.service
+Wants=network-online.target
+# Soft dependency — the web tier returns 503 cleanly if the daemon is absent,
+# so we don't `Requires=` and force a hard failure cascade.
+Wants=vault-daemon.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=pwdnow
+Group=pwdnow
+WorkingDirectory=/opt/pwdnow/web
+ExecStart=/usr/bin/node server.js
+Environment=NODE_ENV=production
+Environment=PORT=1234
+Environment=BIND_HOST=127.0.0.1
+Environment=VAULT_SOCKET=/run/vault-daemon/vault.sock
+Environment=VAULT_DATA_DIR=/var/lib/vault-server
+
+# ── Watchdog ─────────────────────────────────────────────────────────────────
+# server.js pings sd_notify("WATCHDOG=1") at WATCHDOG_USEC/3. Worst-case hung
+# server recovery: 30 s (matches daemon).
+WatchdogSec=30s
+
+# ── Restart policy ───────────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3s
+# Restart even on clean exit if it wasn't requested (defends against bad deploys
+# where the process exits 0 silently).
+SuccessExitStatus=0
+# Bound restart storms — 5 restarts in 60 s → enter failed state and alert.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+# Coordinate with server.js DRAIN_TIMEOUT_MS (25 s).
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+
+# ── Sandboxing ───────────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+MemoryDenyWriteExecute=false   # Node's JIT needs W^X-violating pages
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @reboot @swap @raw-io @keyring @clock
+
+# Read static assets + write logs + reach the daemon socket
+ReadWritePaths=/var/log/pwdnow /var/lib/vault-server /run/vault-daemon
+ReadOnlyPaths=/opt/pwdnow
+
+# ── Resource limits ──────────────────────────────────────────────────────────
+MemoryMax=1G
+TasksMax=256
+LimitNOFILE=65536
+LimitCORE=0
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pwdnow-web
+
+# ── Alert on failure ─────────────────────────────────────────────────────────
+OnFailure=pwdnow-alert@%n.service
+
+[Install]
+WantedBy=multi-user.target

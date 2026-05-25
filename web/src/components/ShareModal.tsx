@@ -1,6 +1,8 @@
+import { getCsrfToken, apiFetch } from '../utils/api';
 import React, { useState } from 'react';
 import { X, Share2, Clock, Check, Copy, Eye, EyeOff, Loader2, Link, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import type { Credential } from '../types';
 
 interface Props {
@@ -9,12 +11,6 @@ interface Props {
 }
 
 type TTL = '1h' | '24h' | '7d';
-
-const TTL_LABELS: Record<TTL, string> = { '1h': '1 hour', '24h': '24 hours', '7d': '7 days' };
-
-function getCsrfToken(): string {
-  return document.cookie.split(';').find(c => c.trim().startsWith('_pwd_csrf='))?.split('=')[1]?.trim() ?? '';
-}
 
 // Encrypt the credential object with a freshly generated AES-256-GCM key.
 // Returns { encryptedBlob, iv, keyBase64 } - key never leaves the browser.
@@ -32,6 +28,7 @@ async function encryptCredential(cred: Credential): Promise<{ encryptedBlob: str
 }
 
 export default function ShareModal({ credential, onClose }: Props) {
+  const { t } = useTranslation();
   const [ttl, setTtl] = useState<TTL>('24h');
   const [singleView, setSingleView] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -39,18 +36,22 @@ export default function ShareModal({ credential, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
+  const TTL_LABELS: Record<TTL, string> = {
+    '1h': t('share.ttl1h', '1 hour'),
+    '24h': t('share.ttl24h', '24 hours'),
+    '7d': t('share.ttl7d', '7 days'),
+  };
+
   async function createShare() {
     setBusy(true);
     setError('');
     try {
       const { encryptedBlob, iv, keyBase64 } = await encryptCredential(credential);
-      const res = await fetch('/api/vault/shares', {
+      const data = await apiFetch<{ ok: boolean; shareId: string; error?: string }>('/api/vault/shares', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ encryptedBlob, iv, ttl, singleView, label: credential.service }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? 'Failed to create share');
+      if (!data.ok) throw new Error(data.error ?? 'Failed to create share');
       const url = `${window.location.origin}/share/${data.shareId}#${encodeURIComponent(keyBase64)}`;
       setShareUrl(url);
     } catch (e: any) {
@@ -81,7 +82,7 @@ export default function ShareModal({ credential, onClose }: Props) {
               <Share2 size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="font-bold text-lg text-black dark:text-white">Share Credential</h2>
+              <h2 className="font-bold text-lg text-black dark:text-white">{t('share.shareCredential', 'Share Credential')}</h2>
               <p className="text-xs text-on-surface-variant truncate max-w-[200px]">{credential.service}</p>
             </div>
           </div>
@@ -97,14 +98,14 @@ export default function ShareModal({ credential, onClose }: Props) {
               <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50">
                 <AlertTriangle size={16} className="text-blue-600 shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-                  Credentials are encrypted in your browser before upload. The decryption key lives only in the URL fragment - the server never sees it.
+                  {t('share.securityNotice', 'Credentials are encrypted in your browser before upload. The decryption key lives only in the URL fragment — the server never sees it.')}
                 </p>
               </div>
 
               {/* TTL picker */}
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant block mb-2">
-                  <Clock size={10} className="inline mr-1" /> Link Expires In
+                  <Clock size={10} className="inline mr-1" /> {t('share.linkExpiresIn', 'Link Expires In')}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {(Object.entries(TTL_LABELS) as [TTL, string][]).map(([key, label]) => (
@@ -128,8 +129,8 @@ export default function ShareModal({ credential, onClose }: Props) {
                 <div className="flex items-center gap-3">
                   {singleView ? <EyeOff size={16} className="text-on-surface-variant" /> : <Eye size={16} className="text-on-surface-variant" />}
                   <div>
-                    <p className="font-bold text-sm text-black dark:text-white">Single View</p>
-                    <p className="text-xs text-on-surface-variant">Link self-destructs after first view</p>
+                    <p className="font-bold text-sm text-black dark:text-white">{t('share.singleView', 'Single View')}</p>
+                    <p className="text-xs text-on-surface-variant">{t('share.singleViewDesc', 'Link self-destructs after first view')}</p>
                   </div>
                 </div>
                 <button
@@ -148,18 +149,18 @@ export default function ShareModal({ credential, onClose }: Props) {
                 className="w-full py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
-                Generate Share Link
+                {t('share.generateShareLink', 'Generate Share Link')}
               </button>
             </>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50">
                 <Check size={18} className="text-green-600 shrink-0" />
-                <p className="text-sm font-semibold text-green-800 dark:text-green-200">Share link created!</p>
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200">{t('share.linkCreated', 'Share link created!')}</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant block mb-2">Share Link</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant block mb-2">{t('share.shareLink', 'Share Link')}</label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-surface-container-high rounded-xl px-4 py-3 text-xs font-mono text-on-surface-variant truncate border border-outline-variant/20">
                     {shareUrl}
@@ -174,16 +175,16 @@ export default function ShareModal({ credential, onClose }: Props) {
               </div>
 
               <div className="p-4 rounded-xl bg-surface-container-high text-xs text-on-surface-variant space-y-1">
-                <p>• Expires: {TTL_LABELS[ttl]}</p>
-                {singleView && <p>• Self-destructs after first view</p>}
-                <p>• The decryption key is in the URL fragment - never transmitted to the server</p>
+                <p>• {t('share.expiresNote', 'Expires: {{ttl}}', { ttl: TTL_LABELS[ttl] })}</p>
+                {singleView && <p>• {t('share.selfDestructNote', 'Self-destructs after first view')}</p>}
+                <p>• {t('share.keyNote', 'The decryption key is in the URL fragment — never transmitted to the server')}</p>
               </div>
 
               <button
                 onClick={() => { setShareUrl(''); setSingleView(false); }}
                 className="w-full py-2.5 border border-outline-variant/30 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
               >
-                Create Another Share
+                {t('share.createAnother', 'Create Another Share')}
               </button>
             </div>
           )}

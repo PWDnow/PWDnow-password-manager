@@ -1,0 +1,34 @@
+#!/sbin/openrc-run
+# OpenRC init script for vault-daemon (Alpine Linux / Gentoo / Devuan)
+#
+# Install:
+#   sudo cp vault-daemon /etc/init.d/vault-daemon
+#   sudo chmod 755 /etc/init.d/vault-daemon
+#   sudo rc-update add vault-daemon default
+#   sudo rc-service vault-daemon start
+#
+# Logs: /var/log/vault-daemon.log
+
+name="vault-daemon"
+description="PWDnow vault daemon — local encrypted credential store"
+
+command="/usr/local/bin/vault-daemon"
+command_args="--socket /var/run/vault-daemon/vault.sock --vault /var/lib/vault-daemon/vault.db"
+command_user="vault:vault"
+
+pidfile="/var/run/vault-daemon/${RC_SVCNAME}.pid"
+command_background="yes"
+
+# Mirrors systemd RestartSec=5s
+retry="SIGTERM/10/SIGKILL/5"
+
+# Pre-start: create run and data directories with correct permissions
+start_pre() {
+    checkpath --directory --owner vault:vault --mode 0700 /var/run/vault-daemon
+    checkpath --directory --owner vault:vault --mode 0700 /var/lib/vault-daemon
+    checkpath --directory --owner vault:vault --mode 0750 /var/log
+}
+
+# Log to file (OpenRC's logger integration)
+output_log="/var/log/vault-daemon.log"
+error_log="/var/log/vault-daemon.log"

@@ -1,0 +1,11 @@
+[toolchain]
+# Pinned to the version verified during development.
+# Update this intentionally when testing a new compiler release.
+channel = "1.94.1"
+components = ["clippy", "rustfmt"]
+targets   = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+]

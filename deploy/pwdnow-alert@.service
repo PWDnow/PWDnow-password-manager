@@ -1,0 +1,22 @@
+[Unit]
+# SLA G4 fix: template alert unit. Any failing service can do:
+#   [Unit]
+#   OnFailure=pwdnow-alert@%n.service
+# and this unit fires a webhook + journal entry describing the failure.
+#
+# %i = instance name passed in (typically the failing unit's name)
+#
+# Lives as a template so we have one place to change alert routing.
+Description=PWDnow alert dispatch for failed unit %i
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+# Read webhook URL from the same config the monitor uses, falling back to
+# journal-only if PWDNOW_ALERT_WEBHOOK is unset.
+EnvironmentFile=-/etc/default/pwdnow-alert
+ExecStart=/usr/local/sbin/pwdnow-alert "%i"
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

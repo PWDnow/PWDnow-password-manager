@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchDaemon for vault-daemon.
+
+  Install (requires root — runs as a system daemon):
+    sudo cp com.pwdnow.vault-daemon.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/com.pwdnow.vault-daemon.plist
+    sudo chmod 644 /Library/LaunchDaemons/com.pwdnow.vault-daemon.plist
+    sudo launchctl load -w /Library/LaunchDaemons/com.pwdnow.vault-daemon.plist
+
+  Stop / uninstall:
+    sudo launchctl unload /Library/LaunchDaemons/com.pwdnow.vault-daemon.plist
+    sudo rm /Library/LaunchDaemons/com.pwdnow.vault-daemon.plist
+
+  Logs:
+    /var/log/vault-daemon.log   (stdout)
+    /var/log/vault-daemon.err   (stderr)
+
+  Notes:
+    - macOS has no AppArmor; sandbox relies on launchd sandbox-exec + Gatekeeper.
+    - IPC_LOCK (mlock) is not available as a launchd primitive; the daemon will
+      still call mlock() but it may be ignored without a privileged entitlement.
+      For production use, sign the binary with the com.apple.security.get-task-allow
+      entitlement or run under a dedicated user with sufficient mlock limits.
+    - WatchdogSec equivalent: ExitTimeout (10 s) + KeepAlive ensures restart.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.pwdnow.vault-daemon</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/vault-daemon</string>
+    <string>--socket</string>
+    <string>/var/run/vault-daemon/vault.sock</string>
+    <string>--vault</string>
+    <string>/var/lib/vault-daemon/vault.db</string>
+  </array>
+
+  <!-- Restart automatically on any exit -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Wait 5 s before restarting on failure (mirrors systemd RestartSec=5s) -->
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <!-- Kill within 10 s of SIGTERM to match TimeoutStopSec=15s  -->
+  <key>ExitTimeout</key>
+  <integer>10</integer>
+
+  <!-- Run as root so mlock() can succeed and the socket dir can be created -->
+  <key>UserName</key>
+  <string>root</string>
+
+  <!-- Redirect stdout/stderr to persistent log files -->
+  <key>StandardOutPath</key>
+  <string>/var/log/vault-daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/vault-daemon.err</string>
+
+  <!-- Create the socket directory before the daemon starts -->
+  <key>LaunchOnlyOnce</key>
+  <false/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Environment: disable core dumps (mirrors M-51 fix in main.rs) -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>RUST_LOG</key>
+    <string>info</string>
+  </dict>
+
+  <!-- Soft resource limits -->
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>65536</integer>
+  </dict>
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>65536</integer>
+  </dict>
+</dict>
+</plist>

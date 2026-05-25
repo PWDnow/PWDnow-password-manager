@@ -17,7 +17,14 @@
     "close": "Cerrar",
     "copy": "Copiar",
     "on": "ACTIVO",
-    "off": "INACTIVO"
+    "off": "INACTIVO",
+    "remove": "Eliminar",
+    "done": "Listo",
+    "verify": "Verificar",
+    "enabled": "Habilitado",
+    "disabled": "Deshabilitado",
+    "searchCountries": "Buscar países...",
+    "or": "o"
   },
   "pwa": {
     "installTitle": "Instalar PWDnow",
@@ -35,7 +42,9 @@
     "createFolder": "Crear carpeta",
     "folders": "Carpetas",
     "brand": "PWDnow",
-    "status": "Bastión Digital Activo"
+    "status": "Bastión Digital Activo",
+    "health": "Salud del cofre",
+    "assetHolder": "Mis activos"
   },
   "header": {
     "searchPlaceholder": "Buscar en su santuario...",
@@ -45,6 +54,8 @@
     "suggestFeature": "Sugerir funcionalidad"
   },
   "vault": {
+    "noteBadge": "Note",
+    "templates": "Templates",
     "title": "Su Caja Fuerte",
     "subtitle": "Gestione sus credenciales y activos sensibles de forma segura.",
     "addCredential": "Añadir credencial",
@@ -613,6 +624,7 @@
     "subtitle": "Inicie sesión para acceder a su caja fuerte segura.",
     "continue": "Continuar",
     "invalidCredentials": "Contraseña maestra inválida.",
+    "serviceUnavailable": "Un servicio no está disponible en este momento. Intente de nuevo o contacte a su administrador.",
     "heroTitle": "Asegure sus activos digitales empresariales.",
     "heroSubtitle": "Cifrado de grado militar, control de acceso fluido y registros de auditoría completos para equipos modernos.",
     "feature1": "Arquitectura Zero-Knowledge",
@@ -647,7 +659,17 @@
     "methodPasswordTotp": "Contraseña + Aplicación Autenticadora",
     "methodPasswordEmail": "Contraseña + OTP por correo electrónico",
     "methodPasswordOnly": "Solo contraseña",
-    "methodPasswordOnlyDesc": "Inicie sesión con su contraseña (sin segundo factor)"
+    "methodPasswordOnlyDesc": "Inicie sesión con su contraseña (sin segundo factor)",
+    "quickUnlockFailed": "El desbloqueo rápido falló o fue cancelado. Use su contraseña maestra.",
+    "signInAs": "Iniciar sesión como",
+    "backToOptions": "Volver a las opciones",
+    "quickUnlockTitle": "Desbloquear con Touch ID / Windows Hello",
+    "quickUnlockDesc": "Desbloquear este dispositivo rápidamente",
+    "passkeyCard": "Passkey / Touch ID / Windows Hello",
+    "passkeyDesc": "Use su huella digital, rostro o PIN del dispositivo",
+    "simEmailPreview": "Vista previa de correo electrónico simulado",
+    "simEmailCode": "Su código de un solo uso:",
+    "simEmailNote": "Válido por 5 minutos. No lo comparta."
   },
   "register": {
     "title": "Crear una cuenta",
@@ -756,5 +778,50 @@
     "goodShapeTitle": "¡Cuenta en buen estado!",
     "goodShapeMessage": "Contraseña de {{service}} actualizada con seguimiento de expiración. ¡Excelente higiene de seguridad!",
     "update": "Actualizar"
+  },
+  "assetHolder": {
+    "subtitle": "Guarda tus identificadores comunes una vez. Se auto-sugieren en el formulario de credenciales.",
+    "howItWorks": "Al agregar o editar una credencial, los campos sugieren automáticamente tus correos, teléfonos y claves de seguridad.",
+    "add": "Agregar",
+    "emailTitle": "Correos electrónicos",
+    "emailDesc": "Se usan como usuario/correo al agregar credenciales de inicio de sesión.",
+    "phoneTitle": "Números de teléfono",
+    "phoneDesc": "Para 2FA (SMS / autenticador). Se sugiere cuando la etiqueta 2FA está activa.",
+    "u2fTitle": "Claves de seguridad (U2F)",
+    "u2fDesc": "Nombres de llaves físicas (YubiKey, etc.). Se sugiere cuando la etiqueta U2F está activa.",
+    "u2fPlaceholder": "ej. YubiKey 5C NFC",
+    "u2fMax": "Máximo 2 claves",
+    "save": "Guardar plantillas"
+  },
+  "vaultHealth": {
+    "title": "Salud del cofre",
+    "subtitle": "Una auditoría en tiempo real de tus contraseñas — débiles, reutilizadas y comprometidas.",
+    "basedOn": "Basado en {{count}} contraseñas",
+    "scoreExcellent": "Excelente",
+    "scoreGood": "Bueno",
+    "scoreFair": "Regular",
+    "scorePoor": "Malo",
+    "statCompromised": "Comprometidas",
+    "statCompromisedDesc": "Encontradas en listas de filtraciones conocidas",
+    "statWeak": "Débiles",
+    "statWeakDesc": "Contraseñas cortas o simples",
+    "statReused": "Reutilizadas",
+    "statReusedDesc": "Misma contraseña en varias cuentas",
+    "statHealthy": "Seguras",
+    "statHealthyDesc": "Sin problemas detectados",
+    "issuesFound": "Problemas encontrados ({{count}})",
+    "goToVault": "Ir al cofre",
+    "issueBreached": "Comprometida",
+    "issueWeak": "Débil",
+    "issueReused": "Reutilizada",
+    "allClearTitle": "Todo en orden",
+    "allClearDesc": "No se detectaron contraseñas débiles, reutilizadas o comprometidas.",
+    "emptyState": "No se encontraron credenciales con contraseñas.",
+    "checkCompromisedTitle": "Verificación de compromiso",
+    "checkCompromisedDesc": "Comparación con 500+ contraseñas de rockyou.txt e investigación HIBP. Usa el Monitor de Filtraciones para un análisis completo con los 900M+ registros HIBP.",
+    "checkStrengthTitle": "Análisis de fortaleza",
+    "checkStrengthDesc": "Evalúa longitud y diversidad de caracteres (mayúsculas, minúsculas, números, símbolos). Las contraseñas con puntuación ≤ 1/5 se marcan como débiles.",
+    "checkReuseTitle": "Detección de reutilización",
+    "checkReuseDesc": "Identifica contraseñas compartidas entre varias cuentas. Todas las comparaciones son locales — tus contraseñas nunca salen de esta página."
   }
 }
