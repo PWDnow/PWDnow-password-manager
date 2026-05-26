@@ -1,0 +1,39 @@
+name: Graphify Pages
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  graphify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Graphify
+        run: |
+          pip install git+https://github.com/safishamsi/graphify.git
+
+      - name: Generate Graphify Output
+        run: |
+          mkdir -p web/graphify-out
+          graphify -d . -o web/graphify-out
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'web/graphify-out'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
