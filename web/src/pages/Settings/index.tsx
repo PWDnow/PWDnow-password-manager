@@ -88,7 +88,7 @@ export default function Settings() {
   // Handlers (to be moved to hooks or components)
   const handleGenerateRecovery = async () => {
     // simplified for now
-    addNotification({ title: 'Recovery Key', message: 'Generating new key...', type: 'info' });
+    addNotification({ title: t('settings.recoveryKey', 'Recovery Key'), message: t('settings.generatingKey', 'Generating new key...'), type: 'info' });
   };
 
   return (

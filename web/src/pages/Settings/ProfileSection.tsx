@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Camera, ChevronDown, Check, RefreshCw, CheckCircle } from 'lucide-react';
 
 const FbUserCircle = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
@@ -146,7 +146,7 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
                   onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
                   className="w-full px-5 py-3.5 bg-white dark:bg-surface-container-high rounded-xl border border-on-surface-variant/50 dark:border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/10 dark:focus:ring-white/10 outline-none transition-all flex items-center justify-between"
                 >
-                  <span>{localProfile.country}</span>
+                  <span>{localProfile.country ? t(`countries.${localProfile.country}`, localProfile.country) : ''}</span>
                   <ChevronDown size={18} className={`transition-transform duration-300 ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <AnimatePresence>
@@ -169,7 +169,7 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
                       </div>
                       <div className="max-h-52 overflow-y-auto custom-scrollbar">
                         {COUNTRY_LIST.entities
-                          .filter(c => c.toLowerCase().includes(countrySearch.toLowerCase()))
+                          .filter(c => t(`countries.${c}`, c).toLowerCase().includes(countrySearch.toLowerCase()))
                           .map((country) => (
                             <button
                               key={country}
@@ -181,7 +181,7 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
                               }}
                               className={`w-full text-left px-5 py-3 text-sm font-bold hover:bg-surface-container-low transition-colors ${localProfile.country === country ? 'bg-black text-white' : 'text-black dark:text-white'}`}
                             >
-                              {country}
+                              {t(`countries.${country}`, country)}
                             </button>
                           ))}
                       </div>

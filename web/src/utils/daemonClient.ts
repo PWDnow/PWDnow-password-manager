@@ -2,6 +2,7 @@ import { logger } from './logger';
 import { encode, decode } from '@msgpack/msgpack';
 import { keyStore } from '../crypto/keystore';
 import type { Folder, Credential, AssetHolder } from '../types';
+import i18n from '../i18n';
 
 // ── Wire types (mirror the Rust protocol.rs enums) ───────────────────────────
 
@@ -111,7 +112,7 @@ export class DaemonClient {
     if (this.#connected) return Promise.resolve();
     if (this.#connectPromise) return this.#connectPromise;
     if (Date.now() < this.#unavailableUntil) {
-      return Promise.reject(new Error('daemon not reachable'));
+      return Promise.reject(new Error(i18n.t('common.daemonNotReachable', 'Vault daemon is not reachable.')));
     }
     
     this.#connectPromise = new Promise<void>((resolve, reject) => {
@@ -131,10 +132,10 @@ export class DaemonClient {
       };
 
       const timer = setTimeout(() => {
-        settle(() => { ws.close(); rejectWithCooldown(new Error('daemon connect timeout')); });
+        settle(() => { ws.close(); rejectWithCooldown(new Error(i18n.t('common.daemonConnectTimeout', 'Vault daemon connection timed out.'))); });
       }, 5000);
 
-      ws.onerror = () => rejectWithCooldown(new Error('daemon WebSocket error'));
+      ws.onerror = () => rejectWithCooldown(new Error(i18n.t('common.daemonConnectionError', 'Vault daemon connection error.')));
 
       ws.onclose = () => {
         this.#connected = false;
@@ -142,7 +143,7 @@ export class DaemonClient {
           rejectWithCooldown(new Error('daemon not reachable'));
         }
         for (const pending of this.#queue) {
-          pending.reject(new Error('daemon connection closed'));
+          pending.reject(new Error(i18n.t('common.daemonConnectionClosed', 'Vault daemon connection closed.')));
         }
         this.#queue = [];
       };
@@ -161,15 +162,15 @@ export class DaemonClient {
             logger.warn('[Daemon Error]', { code, msg });
             
             const SAFE_MESSAGES: Record<string, string> = {
-              'InvalidPassword': 'Authentication failed.',
-              'VaultLocked':     'Vault is locked. Please unlock first.',
-              'SessionExpired':  'Session expired. Please unlock again.',
-              'NotFound':        'Item not found.',
-              'AlreadyExists':   'Item already exists.',
-              'InvalidInput':    'Invalid input provided.',
-              '401':             'Session expired. Please unlock again.',
+              'InvalidPassword': i18n.t('common.daemonAuthFailed',       'Authentication failed.'),
+              'VaultLocked':     i18n.t('common.daemonVaultLocked',      'Vault is locked. Please unlock first.'),
+              'SessionExpired':  i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
+              'NotFound':        i18n.t('common.daemonNotFound',         'Item not found.'),
+              'AlreadyExists':   i18n.t('common.daemonAlreadyExists',    'Item already exists.'),
+              'InvalidInput':    i18n.t('common.daemonInvalidInput',     'Invalid input provided.'),
+              '401':             i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
             };
-            const safeMsg = SAFE_MESSAGES[code] ?? 'Operation failed. Please try again.';
+            const safeMsg = SAFE_MESSAGES[code] ?? i18n.t('common.daemonOperationFailed', 'Operation failed. Please try again.');
             next.reject(new Error(safeMsg));
           } else {
             next.resolve(resp);

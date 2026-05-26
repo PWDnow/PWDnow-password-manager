@@ -356,12 +356,12 @@ export default function SecurityModesSection({
               <HistoryIcon size={20} />
             </div>
             <div>
-              <h4 className="font-bold text-base mb-0.5">Sessions & Events</h4>
-              <p className="text-xs text-on-surface-variant">Review account activity log</p>
+              <h4 className="font-bold text-base mb-0.5">{t('settings.auditLog', 'Security Audit Log')}</h4>
+              <p className="text-xs text-on-surface-variant">{t('settings.auditLogDesc', 'Review login events, MFA changes, and account activity.')}</p>
             </div>
           </div>
           <button onClick={() => setIsAuditLogOpen(true)} className="px-5 py-2.5 bg-white dark:bg-surface-container-high border border-outline-variant/30 rounded-lg text-xs font-black uppercase tracking-widest hover:border-black transition-all">
-            View Log
+            {t('settings.viewLog', 'View Log')}
           </button>
         </div>
         <div className="bg-surface-container-low p-8 rounded-2xl border border-outline-variant/10 flex items-center justify-between">
@@ -370,12 +370,12 @@ export default function SecurityModesSection({
               <Share2 size={20} />
             </div>
             <div>
-              <h4 className="font-bold text-base mb-0.5">Active Shares</h4>
-              <p className="text-xs text-on-surface-variant">Manage active credential links</p>
+              <h4 className="font-bold text-base mb-0.5">{t('settings.activeShares', 'Active Share Links')}</h4>
+              <p className="text-xs text-on-surface-variant">{t('settings.sharesDesc2', 'View and revoke active one-time share links.')}</p>
             </div>
           </div>
           <button onClick={() => setIsSharesOpen(true)} className="px-5 py-2.5 bg-white dark:bg-surface-container-high border border-outline-variant/30 rounded-lg text-xs font-black uppercase tracking-widest hover:border-black transition-all">
-            Manage Shares
+            {t('settings.manageSharesBtn', 'Manage')}
           </button>
         </div>
       </div>

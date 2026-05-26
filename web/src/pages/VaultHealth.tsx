@@ -158,10 +158,10 @@ export default function VaultHealth() {
 
       <div className="mb-10">
         <h1 className="text-4xl font-headline font-black tracking-tighter text-black dark:text-white mb-2">
-          Vault Health
+          {t('health.title', 'Vault Health')}
         </h1>
         <p className="text-on-surface-variant">
-          A real-time audit of your vault passwords - weak, reused, and known-compromised passwords.
+          {t('health.subtitle', 'A real-time audit of your vault passwords - weak, reused, and known-compromised passwords.')}
         </p>
       </div>
 
@@ -170,24 +170,24 @@ export default function VaultHealth() {
         {/* Score gauge */}
         <div className="md:col-span-1 bg-surface-container-low rounded-2xl p-8 flex flex-col items-center justify-center border border-outline-variant/20">
           <ScoreGauge score={healthScore} />
-          <p className={`font-headline font-black text-lg mt-3 ${scoreColor}`}>{scoreLabel}</p>
+          <p className={`font-headline font-black text-lg mt-3 ${scoreColor}`}>{t(`health.${scoreLabel.toLowerCase()}`, scoreLabel)}</p>
           <p className="text-xs text-on-surface-variant mt-1 text-center">
-            Based on {entries.length} credential{entries.length !== 1 ? 's' : ''} with passwords
+            {t('health.basedOn', { count: entries.length, defaultValue: `Based on ${entries.length} credential${entries.length !== 1 ? 's' : ''} with passwords` })}
           </p>
         </div>
 
         {/* Stats */}
         <div className="md:col-span-2 grid grid-cols-2 gap-4">
           {[
-            { label: 'Compromised', value: commonCount,  color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-950/20',    border: 'border-red-200 dark:border-red-900/50',    desc: 'Found in known breach lists' },
-            { label: 'Weak',        value: weakCount,    color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/20', border: 'border-orange-200 dark:border-orange-900/50', desc: 'Short or simple passwords' },
-            { label: 'Reused',      value: reusedCount,  color: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-950/20',  border: 'border-amber-200 dark:border-amber-900/50',  desc: 'Same password across accounts' },
-            { label: 'Healthy',     value: cleanCount,   color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-950/20',  border: 'border-green-200 dark:border-green-900/50',  desc: 'No issues detected' },
-          ].map(({ label, value, color, bg, border, desc }) => (
+            { labelKey: 'compromised', label: 'Compromised', value: commonCount,  color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-950/20',    border: 'border-red-200 dark:border-red-900/50',    descKey: 'compromisedDesc', desc: 'Found in known breach lists' },
+            { labelKey: 'weak',        label: 'Weak',        value: weakCount,    color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/20', border: 'border-orange-200 dark:border-orange-900/50', descKey: 'weakDesc', desc: 'Short or simple passwords' },
+            { labelKey: 'reused',      label: 'Reused',      value: reusedCount,  color: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-950/20',  border: 'border-amber-200 dark:border-amber-900/50',  descKey: 'reusedDesc', desc: 'Same password across accounts' },
+            { labelKey: 'healthy',     label: 'Healthy',     value: cleanCount,   color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-950/20',  border: 'border-green-200 dark:border-green-900/50',  descKey: 'healthyDesc', desc: 'No issues detected' },
+          ].map(({ labelKey, label, value, color, bg, border, descKey, desc }) => (
             <div key={label} className={`rounded-2xl p-5 border ${bg} ${border}`}>
               <p className={`text-3xl font-black font-headline ${color}`}>{value}</p>
-              <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant mt-0.5">{label}</p>
-              <p className="text-xs text-on-surface-variant mt-1 opacity-70">{desc}</p>
+              <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant mt-0.5">{t(`health.${labelKey}`, label)}</p>
+              <p className="text-xs text-on-surface-variant mt-1 opacity-70">{t(`health.${descKey}`, desc)}</p>
             </div>
           ))}
         </div>
@@ -198,13 +198,13 @@ export default function VaultHealth() {
         <section className="mb-12">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-xl font-headline font-extrabold tracking-tight">
-              Issues Found ({issueEntries.length})
+              {t('health.issuesFound', { count: issueEntries.length, defaultValue: `Issues Found (${issueEntries.length})` })}
             </h2>
             <button
               onClick={() => navigate('/vault')}
               className="flex items-center gap-2 text-xs font-bold text-on-surface-variant hover:text-black dark:hover:text-white transition-colors"
             >
-              Go to Vault <ArrowRight size={14} />
+              {t('health.goToVault', 'Go to Vault')} <ArrowRight size={14} />
             </button>
           </div>
           <div className="space-y-3">
@@ -219,30 +219,30 @@ export default function VaultHealth() {
             <CheckCircle2 size={32} className="text-green-600" />
           </div>
           <div>
-            <h2 className="font-headline font-black text-2xl text-black dark:text-white mb-2">All Clear</h2>
-            <p className="text-on-surface-variant text-sm">No weak, reused, or compromised passwords detected.</p>
+            <h2 className="font-headline font-black text-2xl text-black dark:text-white mb-2">{t('health.allClear', 'All Clear')}</h2>
+            <p className="text-on-surface-variant text-sm">{t('health.allClearDesc', 'No weak, reused, or compromised passwords detected.')}</p>
           </div>
         </section>
       ) : (
         <section className="mb-12 flex flex-col items-center py-16 text-center gap-3 text-on-surface-variant">
           <Shield size={40} className="opacity-30" />
-          <p className="font-bold text-sm">No credentials with passwords found.</p>
+          <p className="font-bold text-sm">{t('health.noCredentials', 'No credentials with passwords found.')}</p>
         </section>
       )}
 
       {/* ── What we check ──────────────────────────────────────────────────── */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface-container-low/50 rounded-2xl p-8 border border-outline-variant/10">
         <div>
-          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">Compromised Check</h3>
-          <p className="text-xs text-on-surface-variant">Matches against 500+ passwords from the rockyou.txt top entries and HIBP research. Run the Breach Monitor for a deeper scan using the full 900M+ HIBP dataset.</p>
+          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.compromisedCheck', 'Compromised Check')}</h3>
+          <p className="text-xs text-on-surface-variant">{t('health.compromisedCheckDesc', 'Matches against 500+ passwords from the rockyou.txt top entries and HIBP research. Run the Breach Monitor for a deeper scan using the full 900M+ HIBP dataset.')}</p>
         </div>
         <div>
-          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">Strength Analysis</h3>
-          <p className="text-xs text-on-surface-variant">Evaluates length, character diversity (uppercase, lowercase, numbers, symbols). Passwords scoring ≤ 1/5 are flagged as weak.</p>
+          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.strengthAnalysis', 'Strength Analysis')}</h3>
+          <p className="text-xs text-on-surface-variant">{t('health.strengthAnalysisDesc', 'Evaluates length, character diversity (uppercase, lowercase, numbers, symbols). Passwords scoring ≤ 1/5 are flagged as weak.')}</p>
         </div>
         <div>
-          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">Reuse Detection</h3>
-          <p className="text-xs text-on-surface-variant">Identifies passwords shared across multiple accounts. All comparisons happen locally - your passwords never leave this page.</p>
+          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.reuseDetection', 'Reuse Detection')}</h3>
+          <p className="text-xs text-on-surface-variant">{t('health.reuseDetectionDesc', 'Identifies passwords shared across multiple accounts. All comparisons happen locally - your passwords never leave this page.')}</p>
         </div>
       </section>
     </div>

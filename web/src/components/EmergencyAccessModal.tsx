@@ -26,10 +26,10 @@ interface Props {
 }
 
 const WAIT_OPTIONS = [
-  { hours: 24,  label: '24 h' },
-  { hours: 48,  label: '48 h' },
-  { hours: 72,  label: '3 days' },
-  { hours: 168, label: '7 days' },
+  { hours: 24,  key: 'wait24h', fallback: '24 h' },
+  { hours: 48,  key: 'wait48h', fallback: '48 h' },
+  { hours: 72,  key: 'wait3d',  fallback: '3 days' },
+  { hours: 168, key: 'wait7d',  fallback: '7 days' },
 ];
 
 
@@ -215,7 +215,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                       <Clock size={12} /> {t('emergency.securityWaitPeriod', 'Security Wait Period')}
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                      {WAIT_OPTIONS.map(({ hours, label }) => (
+                      {WAIT_OPTIONS.map(({ hours, key, fallback }) => (
                         <button
                           key={hours}
                           onClick={() => setWaitHours(hours)}
@@ -225,7 +225,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                               : 'border-outline-variant/10 text-on-surface-variant hover:border-outline-variant/30 bg-surface-container-low'
                           }`}
                         >
-                          <span className="text-sm font-black uppercase tracking-widest">{label}</span>
+                          <span className="text-sm font-black uppercase tracking-widest">{t(`emergency.${key}`, fallback)}</span>
                           {waitHours === hours && <Check size={16} />}
                         </button>
                       ))}
@@ -275,7 +275,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                       <div className="min-w-0">
                         <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('emergency.waitPeriod', 'Wait Period')}</p>
                         <p className="font-bold text-black dark:text-white">
-                          {WAIT_OPTIONS.find(o => o.hours === config.waitPeriodHours)?.label.replace('h', ' Hours')}
+                          {(() => { const o = WAIT_OPTIONS.find(x => x.hours === config.waitPeriodHours); return o ? t(`emergency.${o.key}`, o.fallback) : ''; })()}
                         </p>
                       </div>
                     </div>
@@ -316,7 +316,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                     <button
                       onClick={copyLink}
                       className="shrink-0 w-14 h-14 flex items-center justify-center rounded-2xl bg-black dark:bg-white text-white dark:text-black hover:scale-[1.05] transition-all shadow-lg active:scale-95"
-                      title="Copy URL"
+                      title={t('emergency.copyUrl', 'Copy URL')}
                     >
                       {copied ? <Check size={18} /> : <Copy size={18} />}
                     </button>
@@ -389,7 +389,7 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                               : 'bg-neutral-100 dark:bg-neutral-800 text-on-surface-variant'
                           }`}>
-                            {req.status}
+                            {t(`emergency.status_${req.status}`, req.status)}
                           </span>
                         </div>
 

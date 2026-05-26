@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface Country {
   name: string;
@@ -19,10 +20,12 @@ function isoToFlag(iso: string): string {
 }
 
 export default function PhoneCountrySelect({ value, onChange, countries }: PhoneCountrySelectProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 260 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = countries.find(c => c.iso === value) ?? countries[0];
@@ -30,7 +33,10 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current && !containerRef.current.contains(e.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
         setSearch('');
       }
@@ -56,7 +62,7 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
 
   const filtered = search.trim()
     ? countries.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        t(`countries.${c.name}`, c.name).toLowerCase().includes(search.toLowerCase()) ||
         c.code.includes(search) ||
         c.iso.toLowerCase().includes(search.toLowerCase())
       )
@@ -64,6 +70,7 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
 
   const dropdown = open ? (
     <div
+      ref={dropdownRef}
       role="listbox"
       onKeyDown={(e) => { if (e.key === 'Escape') { setOpen(false); setSearch(''); } }}
       style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
@@ -77,14 +84,14 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search…"
+            placeholder={t('common.searchCountries', 'Search countries...')}
             className="flex-1 bg-transparent text-xs text-black dark:text-white placeholder:text-on-surface-variant outline-none"
           />
         </div>
       </div>
       <ul className="max-h-52 overflow-y-auto [scrollbar-width:thin]">
         {filtered.length === 0 ? (
-          <li className="px-4 py-3 text-xs text-on-surface-variant text-center">No results</li>
+          <li className="px-4 py-3 text-xs text-on-surface-variant text-center">{t('common.noResults', 'No results')}</li>
         ) : filtered.map(c => (
           <li key={c.iso}>
             <button
@@ -95,7 +102,7 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs hover:bg-surface-container-low transition-colors ${c.iso === value ? 'bg-surface-container-low font-bold text-black dark:text-white' : 'text-on-surface-variant'}`}
             >
               <span className="text-base leading-none shrink-0">{isoToFlag(c.iso)}</span>
-              <span className="truncate flex-1 text-left">{c.name}</span>
+              <span className="truncate flex-1 text-left">{t(`countries.${c.name}`, c.name)}</span>
               <span className="shrink-0 font-mono opacity-60">{c.code}</span>
             </button>
           </li>

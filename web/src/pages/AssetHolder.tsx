@@ -42,7 +42,7 @@ export default function AssetHolder() {
     setEmails(emails.map(item => {
       if (item.id === id) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const error = value && !emailRegex.test(value) ? 'Invalid email format' : null;
+        const error = value && !emailRegex.test(value) ? t('assetHolder.invalidEmail', 'Invalid email format') : null;
         return { ...item, value, error };
       }
       return item;
@@ -77,14 +77,11 @@ export default function AssetHolder() {
     let result = '';
     let digitIndex = 0;
     for (let i = 0; i < country.format.length && digitIndex < digits.length; i++) {
-      if (country.format[i] === 'x') {
+      if (country.format[i].toLowerCase() === 'x') {
         result += digits[digitIndex++];
       } else {
         result += country.format[i];
       }
-    }
-    if (digitIndex < digits.length) {
-      result += digits.slice(digitIndex);
     }
     return result;
   };
@@ -138,14 +135,14 @@ export default function AssetHolder() {
     <div className="max-w-4xl mx-auto pb-24">
       <div className="mb-12">
         <h1 className="text-3xl md:text-4xl font-headline font-black tracking-tighter mb-4">{t('sidebar.assetHolder', 'Asset holder')}</h1>
-        <p className="text-base md:text-lg text-on-surface-variant font-medium">Configure template values for credentials.</p>
+        <p className="text-base md:text-lg text-on-surface-variant font-medium">{t('assetHolder.configureTemplates', 'Configure template values for credentials.')}</p>
       </div>
 
       <div className="space-y-8">
         {/* Emails Section */}
         <div className="bg-white dark:bg-surface-container-low rounded-3xl p-8 border border-outline-variant/10 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-headline font-black tracking-tight">Email Addresses</h2>
+            <h2 className="text-xl font-headline font-black tracking-tight">{t('assetHolder.emailAddresses', 'Email Addresses')}</h2>
             <button
               onClick={addEmail}
               className="p-2 bg-surface-container-low hover:bg-surface-container-high rounded-lg transition-colors text-black dark:text-white"
@@ -162,7 +159,7 @@ export default function AssetHolder() {
                     value={item.value}
                     onChange={(e) => updateEmail(item.id, e.target.value)}
                     onBlur={() => cleanEmail(item.id)}
-                    placeholder="name@example.com"
+                    placeholder={t('assetHolder.emailPlaceholder', 'name@example.com')}
                     className={`flex-1 px-6 py-4 bg-surface-container-low rounded-xl border-none text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 ${item.error ? 'focus:ring-red-500/20 ring-1 ring-red-500' : 'focus:ring-on-primary-container/20'} transition-all outline-none`}
                   />
                   {emails.length > 1 && (
@@ -191,7 +188,7 @@ export default function AssetHolder() {
         {/* Phone Numbers Section */}
         <div className="bg-white dark:bg-surface-container-low rounded-3xl p-8 border border-outline-variant/10 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-headline font-black tracking-tight">Phone Numbers</h2>
+            <h2 className="text-xl font-headline font-black tracking-tight">{t('assetHolder.phoneNumbers', 'Phone Numbers')}</h2>
             <button
               onClick={addPhoneNumber}
               className="p-2 bg-surface-container-low hover:bg-surface-container-high rounded-lg transition-colors text-black dark:text-white"
@@ -212,7 +209,7 @@ export default function AssetHolder() {
                     type="tel"
                     value={item.value}
                     onChange={(e) => updatePhoneNumber(item.id, 'value', e.target.value)}
-                    placeholder={COUNTRIES.find(c => c.iso === item.iso)?.format || "0000000000"}
+                    placeholder={COUNTRIES.find(c => c.iso === item.iso)?.format?.toLowerCase() || "0000000000"}
                     className="flex-1 px-6 py-4 bg-surface-container-low rounded-xl border-none text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 transition-all outline-none"
                   />
                 </div>
@@ -232,7 +229,7 @@ export default function AssetHolder() {
         {/* U2F Keys Section */}
         <div className="bg-white dark:bg-surface-container-low rounded-3xl p-8 border border-outline-variant/10 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-headline font-black tracking-tight">Security Keys (U2F)</h2>
+            <h2 className="text-xl font-headline font-black tracking-tight">{t('assetHolder.securityKeys', 'Security Keys (U2F)')}</h2>
             {u2fKeys.length < 2 && (
               <button
                 onClick={addU2fKey}
@@ -249,7 +246,7 @@ export default function AssetHolder() {
                   type="text"
                   value={item.value}
                   onChange={(e) => updateU2fKey(item.id, e.target.value)}
-                  placeholder="Security Key Name"
+                  placeholder={t('assetHolder.securityKeyName', 'Security Key Name')}
                   className="flex-1 px-6 py-4 bg-surface-container-low rounded-xl border-none text-black placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 transition-all outline-none"
                 />
                 {u2fKeys.length > 1 && (
@@ -271,7 +268,7 @@ export default function AssetHolder() {
             className="px-8 py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-black/80 transition-all flex items-center gap-2"
           >
             <Save size={16} />
-            Save Templates
+            {t('assetHolder.saveTemplates', 'Save Templates')}
           </button>
         </div>
       </div>

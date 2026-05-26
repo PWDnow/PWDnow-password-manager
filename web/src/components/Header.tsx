@@ -25,6 +25,15 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [displayLang, setDisplayLang] = useState(
+    (i18n.resolvedLanguage ?? i18n.language).slice(0, 2).toUpperCase()
+  );
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => setDisplayLang(lng.slice(0, 2).toUpperCase());
+    i18n.on('languageChanged', handleLangChange);
+    return () => { i18n.off('languageChanged', handleLangChange); };
+  }, [i18n]);
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +100,7 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
               className="font-bold text-[10px] sm:text-xs uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white transition-colors px-1 sm:px-2"
               aria-label="Select Language"
             >
-              {i18n.language === 'fr' ? 'FR' : 'EN'}
+              {displayLang}
             </button>
             <div 
               className={`relative p-1 rounded-2xl transition-all duration-500 ${

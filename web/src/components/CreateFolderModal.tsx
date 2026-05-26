@@ -139,7 +139,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Gaming"
+                  placeholder={t('manageFolders.folderNamePlaceholder', 'e.g. Personal, Gaming, Crypto')}
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
                   required
                 />
@@ -171,7 +171,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   id="folder-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Manage sensitive credentials with high-precision security protocols."
+                  placeholder={t('manageFolders.descriptionPlaceholder', "What's inside this folder?")}
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all resize-none h-24"
                 />
               </div>
