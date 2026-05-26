@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useReducer } from 'react';
 import { ChevronRight, RefreshCw, Copy, Info, Lock, Briefcase, User, Wallet, MoreHorizontal, Check, X, Wand2, Hash, Type, Globe, Plus, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, CreditCard, Key, Clock, Eye, EyeOff, Smartphone, HelpCircle, Shield, Bold, Italic, Underline, List, Eraser, ToggleLeft, ToggleRight, FileText, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useTranslation, Trans } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
+import { TOTP } from 'totp-generator';
 import { useNavigate } from 'react-router-dom';
 import { Folder, Credential, type CredentialType } from '../types';
 import { useVault } from '../context/VaultContext';
@@ -160,6 +161,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [otpSecretError, setOtpSecretError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const { addNotification } = useNotification();
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -368,14 +370,11 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     let result = '';
     let digitIndex = 0;
     for (let i = 0; i < country.format.length && digitIndex < digits.length; i++) {
-      if (country.format[i] === 'x') {
+      if (country.format[i].toLowerCase() === 'x') {
         result += digits[digitIndex++];
       } else {
         result += country.format[i];
       }
-    }
-    if (digitIndex < digits.length) {
-      result += digits.slice(digitIndex);
     }
     return result;
   };
@@ -661,7 +660,20 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
               setUrlError(null);
             }
 
-              const credData = {
+            if (tags.includes('OTP') && otpSecret) {
+              try {
+                await TOTP.generate(otpSecret);
+                setOtpSecretError(null);
+              } catch (err) {
+                setOtpSecretError(t('vault.invalidOtpSecret', 'Invalid OTP secret key'));
+                // scroll to OTP section
+                const otpEl = document.getElementById('otp-secret');
+                otpEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+              }
+            }
+
+            const credData = {
                 id: initialData?.id || generateUUID(),
                 service: title,
                 url: formattedUrl,
@@ -904,7 +916,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       if (cleaned !== username) dispatch({ type: 'setField', field: 'username', value: cleaned });
                     }
                   }}
-                  placeholder="name@example.com" 
+                  placeholder={t('assetHolder.emailPlaceholder', 'name@example.com')} 
                   aria-label="Username or Email"
                   className={`w-full px-6 py-4 bg-surface-container-low rounded-xl text-black dark:text-white placeholder:text-outline-variant focus:ring-2 transition-all outline-none ${usernameError ? 'border border-red-500 focus:ring-red-500/20' : 'border border-black/15 dark:border-white/15 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30'}`}
                 />
@@ -1119,15 +1131,15 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.tags', 'Tags')}</label>
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.tagsLabel', 'Tags')}</label>
                 <p className="text-[10px] text-on-surface-variant/60 mt-1">Select all security features stored with this credential.</p>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {([
-                  { tag: '2FA',  Icon: Smartphone,  title: 'Two-Factor Auth',     desc: 'Phone number for SMS / app verification' },
-                  { tag: 'OTP',  Icon: Clock,        title: 'One-Time Password',   desc: 'TOTP secret for authenticator apps' },
-                  { tag: 'KBA',  Icon: HelpCircle,   title: 'Security Questions',  desc: 'Knowledge-based security answers' },
-                  { tag: 'U2F',  Icon: Key,           title: 'Hardware Key',        desc: 'Physical security key (YubiKey etc.)' },
+                  { tag: '2FA',  Icon: Smartphone,  title: t('addCredential.tags.2fa', 'Two-Factor Auth'),     desc: t('addCredential.tags.2faDesc', 'Phone number for SMS / app verification') },
+                  { tag: 'OTP',  Icon: Clock,        title: t('addCredential.tags.otp', 'One-Time Password'),   desc: t('addCredential.tags.otpDesc', 'TOTP secret for authenticator apps') },
+                  { tag: 'KBA',  Icon: HelpCircle,   title: t('addCredential.tags.kba', 'Security Questions'),  desc: t('addCredential.tags.kbaDesc', 'Knowledge-based security answers') },
+                  { tag: 'U2F',  Icon: Key,           title: t('addCredential.tags.u2f', 'Hardware Key'),        desc: t('addCredential.tags.u2fDesc', 'Physical security key (YubiKey etc.)') },
                 ] as const).map(({ tag, Icon, title, desc }) => {
                   const active = tags.includes(tag);
                   return (
@@ -1173,22 +1185,34 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       <Clock size={13} className="text-white dark:text-black" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">One-Time Password (OTP)</h4>
-                      <p className="text-[10px] text-on-surface-variant mt-0.5">TOTP secret for authenticator apps</p>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">{t('addCredential.otpTitle', 'One-Time Password (OTP)')}</h4>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('addCredential.otpDesc', 'TOTP secret for authenticator apps')}</p>
                     </div>
                   </div>
                   <label htmlFor="otp-secret" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
                     {t('vault.otpSecretLabel', 'Secret Key')}
                   </label>
-                  <input 
+                  <input
                     id="otp-secret"
                     type="text" 
                     value={otpSecret}
-                    onChange={(e) => dispatch({ type: 'setField', field: 'otpSecret', value: e.target.value.replace(/\s+/g, '').toUpperCase() })}
-                    placeholder="JBSWY3DPEHPK3PXP" 
-                    className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
+                    onChange={(e) => {
+                      dispatch({ type: 'setField', field: 'otpSecret', value: e.target.value.replace(/\s+/g, '').toUpperCase() });
+                      if (otpSecretError) setOtpSecretError(null);
+                    }}
+                    placeholder="JBSWY3DPEHPK3PXP"
+                    className={`w-full px-6 py-4 bg-surface-container-low rounded-xl border text-black dark:text-white placeholder:text-outline-variant font-mono focus:ring-2 transition-all outline-none ${otpSecretError ? 'border-red-500 focus:ring-red-500/20' : 'border-black/15 dark:border-white/15 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30'}`}
                   />
-                </motion.div>
+                  {otpSecretError && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-red-500 font-bold flex items-center gap-1.5 mt-2 ml-1"
+                    >
+                      <AlertTriangle size={12} />
+                      {otpSecretError}
+                    </motion.p>
+                  )}                </motion.div>
               )}
             </AnimatePresence>
 
@@ -1205,8 +1229,8 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       <Smartphone size={13} className="text-white dark:text-black" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">Two-Factor Auth</h4>
-                      <p className="text-[10px] text-on-surface-variant mt-0.5">Phone number for SMS / app verification</p>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">{t('addCredential.mfaTitle', 'Two-Factor Auth')}</h4>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('addCredential.mfaDesc', 'Phone number for SMS / app verification')}</p>
                     </div>
                   </div>
                   {phoneNumbers.map((item, index) => (
@@ -1216,12 +1240,12 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           type="button"
                           onClick={() => removePhoneNumber(item.id)}
                           className="absolute top-4 right-4 p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                          title="Remove Phone Number"
+                          title={t('addCredential.removePhoneNumber', 'Remove Phone Number')}
                         >
                           <X size={16} />
                         </button>
                       )}
-                      <h5 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white mb-4">Phone Number {index + 1}</h5>
+                      <h5 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white mb-4">{t('addCredential.phoneNumberN', { n: index + 1, defaultValue: `Phone Number ${index + 1}` })}</h5>
                       <label htmlFor={`phone-number-${item.id}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.phoneNumber', 'Phone Number')}</label>
                       <div className="flex gap-3">
                         <PhoneCountrySelect
@@ -1237,7 +1261,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                             onChange={(e) => updatePhoneNumber(item.id, 'value', e.target.value)}
                             onFocus={() => setShowPhoneSuggestions(item.id)}
                             onBlur={() => setTimeout(() => setShowPhoneSuggestions(null), 200)}
-                            placeholder={COUNTRIES.find(c => c.iso === item.iso)?.format || "0000000000"} 
+                            placeholder={COUNTRIES.find(c => c.iso === item.iso)?.format?.toLowerCase() || "0000000000"} 
                             className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                           />
                           <AnimatePresence>
@@ -1275,7 +1299,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       className="w-full py-4 border-2 border-dashed border-outline-variant/30 text-on-surface-variant hover:text-black dark:hover:text-white hover:border-black dark:hover:border-white hover:bg-surface-container-low rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
                     >
                       <Plus size={16} />
-                      Add Another Phone Number
+                      {t('addCredential.addPhoneNumber', 'Add Another Phone Number')}
                     </button>
                   )}
                 </motion.div>
@@ -1293,8 +1317,8 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       <HelpCircle size={13} className="text-white dark:text-black" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">Security Questions (KBA)</h4>
-                      <p className="text-[10px] text-on-surface-variant mt-0.5">Knowledge-based security answers</p>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">{t('addCredential.kbaTitle', 'Security Questions (KBA)')}</h4>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('addCredential.kbaDesc', 'Knowledge-based security answers')}</p>
                     </div>
                   </div>
                   {kba.map((item, index) => (
@@ -1310,7 +1334,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                         </button>
                       )}
                       
-                      <h5 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white mb-4">Question {index + 1}</h5>
+                      <h5 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white mb-4">{t('addCredential.questionN', { n: index + 1, defaultValue: `Question ${index + 1}` })}</h5>
 
                       <div className="space-y-3">
                         <label htmlFor={`kba-question-${item.id}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
@@ -1321,7 +1345,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           type="text" 
                           value={item.question}
                           onChange={(e) => updateKba(item.id, 'question', e.target.value)}
-                          placeholder="What was the name of your first pet?" 
+                          placeholder={t('addCredential.kbaQuestionPlaceholder', 'What was the name of your first pet?')} 
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                         />
                       </div>
@@ -1332,7 +1356,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           type="text" 
                           value={item.answer}
                           onChange={(e) => updateKba(item.id, 'answer', e.target.value)}
-                          placeholder="Your answer" 
+                          placeholder={t('addCredential.kbaAnswerPlaceholder', 'Your answer')} 
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                         />
                       </div>
@@ -1345,7 +1369,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     className="w-full py-4 border-2 border-dashed border-outline-variant/30 text-on-surface-variant hover:text-black dark:hover:text-white hover:border-black dark:hover:border-white hover:bg-surface-container-low rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
                   >
                     <Plus size={16} />
-                    Add Another Question
+                    {t('addCredential.addQuestion', 'Add Another Question')}
                   </button>
                 </motion.div>
               )}
@@ -1362,8 +1386,8 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       <Key size={13} className="text-white dark:text-black" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">Hardware Key (U2F)</h4>
-                      <p className="text-[10px] text-on-surface-variant mt-0.5">Physical security key (YubiKey etc.)</p>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-black dark:text-white">{t('addCredential.u2fTitle', 'Hardware Key (U2F)')}</h4>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('addCredential.u2fDesc', 'Physical security key (YubiKey etc.)')}</p>
                     </div>
                   </div>
                   {u2fKeys.map((item, index) => (
@@ -1373,12 +1397,12 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           type="button"
                           onClick={() => removeU2fKey(item.id)}
                           className="absolute top-4 right-4 p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                          title="Remove Security Key"
+                          title={t('addCredential.removeU2fKey', 'Remove Security Key')}
                         >
                           <X size={16} />
                         </button>
                       )}
-                      <h5 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white mb-4">Security Key {index + 1}</h5>
+                      <h5 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white mb-4">{t('addCredential.u2fKeyN', { n: index + 1, defaultValue: `Security Key ${index + 1}` })}</h5>
                       <label htmlFor={`u2f-key-name-${item.id}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.u2fKeyName', 'Key Name')}</label>
                       <div className="relative">
                         <input 
@@ -1388,7 +1412,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           onChange={(e) => updateU2fKey(item.id, e.target.value)}
                           onFocus={() => setShowU2fSuggestions(item.id)}
                           onBlur={() => setTimeout(() => setShowU2fSuggestions(null), 200)}
-                          placeholder="e.g. YubiKey 5" 
+                          placeholder={t('addCredential.u2fPlaceholder', 'e.g. YubiKey 5')} 
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                         />
                         <AnimatePresence>
@@ -1425,7 +1449,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       className="w-full py-4 border-2 border-dashed border-outline-variant/30 text-on-surface-variant hover:text-black dark:hover:text-white hover:border-black dark:hover:border-white hover:bg-surface-container-low rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2"
                     >
                       <Plus size={16} />
-                      Add Another Security Key
+                      {t('addCredential.addU2fKey', 'Add Another Security Key')}
                     </button>
                   )}
                 </motion.div>
@@ -1503,17 +1527,17 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-surface-container-low border-b border-black/8 dark:border-white/8">
                   <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleWrap('**'); }}
                     className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
-                    title="Bold - toggle **text**">
+                    title={t('addCredential.toolbar.bold', 'Bold - toggle **text**')}>
                     <Bold size={13} strokeWidth={2.5} />
                   </button>
                   <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleWrap('*'); }}
                     className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
-                    title="Italic - toggle *text*">
+                    title={t('addCredential.toolbar.italic', 'Italic - toggle *text*')}>
                     <Italic size={13} strokeWidth={2} />
                   </button>
                   <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleWrap('__'); }}
                     className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
-                    title="Underline - toggle __text__">
+                    title={t('addCredential.toolbar.underline', 'Underline - toggle __text__')}>
                     <Underline size={13} strokeWidth={2} />
                   </button>
 
@@ -1521,7 +1545,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
                   <button type="button" onMouseDown={(e) => { e.preventDefault(); toggleBulletList(); }}
                     className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
-                    title="Bullet list">
+                    title={t('addCredential.toolbar.bulletList', 'Bullet list')}>
                     <List size={13} strokeWidth={2} />
                   </button>
 
@@ -1529,7 +1553,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
                   <button type="button" onMouseDown={(e) => { e.preventDefault(); clearMarkdown(); }}
                     className="w-7 h-6 rounded flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-high hover:text-black dark:hover:text-white transition-all"
-                    title="Remove formatting from selection">
+                    title={t('addCredential.toolbar.clear', 'Remove formatting from selection')}>
                     <Eraser size={12} strokeWidth={2} />
                   </button>
                 </div>

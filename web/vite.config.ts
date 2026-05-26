@@ -43,6 +43,7 @@ export default defineConfig(({mode}) => {
       // Never ship sourcemaps in production — they expose original source to anyone
       // who can reach the server.
       sourcemap: mode !== 'production',
+      chunkSizeWarningLimit: 1500,
       rollupOptions: {
         // Suppress the expected kdbxweb/crypto externalization warning — kdbxweb is
         // designed for browsers and uses SubtleCrypto via its CryptoEngine internally.

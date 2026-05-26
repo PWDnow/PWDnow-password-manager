@@ -17,6 +17,7 @@ import { readDecryptedLocal } from '../utils/localCrypto';
 const ShareModal = lazy(() => import('../components/ShareModal'));
 
 const SecurityBadge = ({ status, statusColor }: { status: string, statusColor: string }) => {
+  const { t } = useTranslation();
   const [showText, setShowText] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -41,11 +42,14 @@ const SecurityBadge = ({ status, statusColor }: { status: string, statusColor: s
   const colorParts = statusColor.split(' ');
   const dotColor = colorParts.length >= 4 ? colorParts[3] : (isGood ? 'bg-green-500' : 'bg-orange-500');
 
+  const statusKey = status.charAt(0).toLowerCase() + status.slice(1).replace(/\s+/g, '');
+  const translatedStatus = t(`vault.strength.${statusKey}`, status);
+
   return (
-    <div 
+    <div
       className={`flex items-center rounded-full cursor-default transition-all duration-700 border ${
-        showText 
-          ? `${colorParts.slice(0, 3).join(' ')} shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] scale-105` 
+        showText
+          ? `${colorParts.slice(0, 3).join(' ')} shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] scale-105`
           : 'border-outline-variant/5 bg-surface-container-low/30 p-1.5'
       }`}
       onMouseEnter={handleMouseEnter}
@@ -57,20 +61,19 @@ const SecurityBadge = ({ status, statusColor }: { status: string, statusColor: s
       </div>
       <AnimatePresence>
         {showText && (
-          <motion.span 
+          <motion.span
             initial={{ width: 0, opacity: 0, marginLeft: 0 }}
             animate={{ width: 'auto', opacity: 1, marginLeft: 10, marginRight: 10 }}
             exit={{ width: 0, opacity: 0, marginLeft: 0, marginRight: 0 }}
             className="text-[11px] font-black uppercase tracking-[0.2em] whitespace-nowrap overflow-hidden text-black/90"
           >
-            {status}
+            {translatedStatus}
           </motion.span>
         )}
       </AnimatePresence>
     </div>
   );
 };
-
 const SERVICE_COLORS: Record<string, { bg: string, text: string, border: string, glow: string }> = {
   'Google': { bg: 'bg-red-50/50', text: 'text-red-600', border: 'border-red-100/50', glow: 'shadow-red-500/20' },
   'GitHub': { bg: 'bg-neutral-100/50', text: 'text-neutral-800', border: 'border-neutral-200/50', glow: 'shadow-neutral-500/20' },
@@ -153,6 +156,7 @@ export default function Vault() {
   const [otpRemoveItem, setOtpRemoveItem] = useState<Credential | null>(null);
   const [otpShowItem, setOtpShowItem] = useState<Credential | null>(null);
   const [otpSecretInput, setOtpSecretInput] = useState('');
+  const [otpSecretError, setOtpSecretError] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpProgress, setOtpProgress] = useState(100);
 
@@ -661,11 +665,11 @@ export default function Vault() {
                                 <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">{item.rpId || item.authenticatorName || 'Passkey'}</div>
                               )}
                               {item.credentialType === 'secure_note' && (
-                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">Secure Note</div>
+                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">{t('vault.secureNote', 'Secure Note')}</div>
                               )}
                               {item.credentialType === 'payment_card' && (
                                 <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">
-                                  {item.cardType ? item.cardType.toUpperCase() : 'Card'}{item.cardNumber ? ` ···· ${item.cardNumber.slice(-4)}` : ''}
+                                  {item.cardType ? item.cardType.toUpperCase() : t('vault.card', 'Card')}{item.cardNumber ? ` ···· ${item.cardNumber.slice(-4)}` : ''}
                                 </div>
                               )}
                               {(!item.credentialType || item.credentialType === 'login') && <>
@@ -743,7 +747,7 @@ export default function Vault() {
                               <span className="text-[10px] px-3 py-1.5 bg-purple-500/10 text-purple-600 rounded-lg font-bold uppercase tracking-widest">{t('vault.noteBadge', 'Note')}</span>
                             )}
                             {item.credentialType === 'payment_card' && (
-                              <span className="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg font-bold uppercase tracking-widest">{item.cardExpiry || 'Card'}</span>
+                              <span className="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg font-bold uppercase tracking-widest">{item.cardExpiry || t('vault.card', 'Card')}</span>
                             )}
                           </div>
                         </div>
@@ -794,7 +798,8 @@ export default function Vault() {
                                 >
                                   <button
                                     className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setActiveDropdown(null);
                                       setItemToEdit(item);
                                     }}
@@ -807,7 +812,8 @@ export default function Vault() {
 
                                   <button
                                     className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setActiveDropdown(null);
                                       setShareItem(item);
                                     }}
@@ -821,7 +827,8 @@ export default function Vault() {
                                   {!item.otpSecret ? (
                                     <button 
                                       className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         setActiveDropdown(null);
                                         setOtpSetupItem(item);
                                         setOtpSecretInput('');
@@ -836,7 +843,8 @@ export default function Vault() {
                                     <>
                                       <button 
                                         className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setActiveDropdown(null);
                                           setOtpShowItem(item);
                                         }}
@@ -848,7 +856,8 @@ export default function Vault() {
                                       </button>
                                       <button 
                                         className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-low rounded-xl transition-all flex items-center gap-4"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setActiveDropdown(null);
                                           setOtpSetupItem(item);
                                           setOtpSecretInput(item.otpSecret || '');
@@ -861,7 +870,8 @@ export default function Vault() {
                                       </button>
                                       <button 
                                         className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 rounded-xl transition-all flex items-center gap-4"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setActiveDropdown(null);
                                           setOtpRemoveItem(item);
                                         }}
@@ -876,7 +886,8 @@ export default function Vault() {
 
                                   <button 
                                     className="w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 rounded-xl transition-all flex items-center gap-4"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setActiveDropdown(null);
                                       setItemToDelete(item);
                                     }}
@@ -1060,10 +1071,16 @@ export default function Vault() {
                     id="otp-secret"
                     type="text" 
                     value={otpSecretInput}
-                    onChange={(e) => setOtpSecretInput(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                    onChange={(e) => {
+                      setOtpSecretInput(e.target.value.replace(/\s+/g, '').toUpperCase());
+                      setOtpSecretError('');
+                    }}
                     placeholder="JBSWY3DPEHPK3PXP"
-                    className="w-full px-4 py-3 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-mono focus:ring-2 focus:ring-black/20 dark:focus:ring-white/20 outline-none transition-all"
+                    className={`w-full px-4 py-3 bg-surface-container-low rounded-xl border font-mono focus:ring-2 outline-none transition-all ${otpSecretError ? 'border-red-500/50 text-red-600 focus:ring-red-500/20' : 'border-outline-variant/10 text-black dark:text-white focus:ring-black/20 dark:focus:ring-white/20'}`}
                   />
+                  {otpSecretError && (
+                    <p className="text-xs text-red-600 font-medium mt-1.5">{otpSecretError}</p>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -1071,6 +1088,7 @@ export default function Vault() {
                     onClick={() => {
                       setOtpSetupItem(null);
                       setOtpSecretInput('');
+                      setOtpSecretError('');
                     }}
                     className="flex-1 px-4 py-3 rounded-xl font-bold text-sm text-black dark:text-white bg-surface-container-low hover:bg-surface-container-high transition-colors"
                   >
@@ -1078,10 +1096,16 @@ export default function Vault() {
                   </button>
                   <button 
                     disabled={!otpSecretInput}
-                    onClick={() => {
-                      updateCredential({ ...otpSetupItem, otpSecret: otpSecretInput });
-                      setOtpSetupItem(null);
-                      setOtpSecretInput('');
+                    onClick={async () => {
+                      try {
+                        await TOTP.generate(otpSecretInput);
+                        updateCredential({ ...otpSetupItem, otpSecret: otpSecretInput });
+                        setOtpSetupItem(null);
+                        setOtpSecretInput('');
+                        setOtpSecretError('');
+                      } catch (err) {
+                        setOtpSecretError(t('vault.invalidOtpSecret', 'Invalid OTP secret key'));
+                      }
                     }}
                     className="flex-1 px-4 py-3 rounded-xl font-bold text-sm text-white bg-black hover:bg-black/80 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1187,7 +1211,7 @@ export default function Vault() {
                 
                 <div className="mb-8">
                   <div className="text-3xl md:text-4xl font-mono font-black tracking-[0.2em] text-black dark:text-white mb-4">
-                    {otpCode ? `${otpCode.slice(0, 3)} ${otpCode.slice(3)}` : '------'}
+                    {otpCode === 'Error' ? t('vault.otpError', 'Error') : (otpCode ? `${otpCode.slice(0, 3)} ${otpCode.slice(3)}` : '------')}
                   </div>
                   
                   {/* Progress Bar */}

@@ -1,4 +1,5 @@
 import { getCsrfToken, apiFetch } from './api';
+import i18n from '../i18n';
 /**
  * Multi-Factor Authentication utilities
  *
@@ -443,36 +444,39 @@ export function describeWebAuthnError(err: unknown, type: 'securitykey' | 'passk
   // NotAllowedError covers: operation cancelled, no authenticator found, OS denied access.
   if (e.name === 'NotAllowedError') {
     if (type === 'platform' || type === 'passkey') {
-      return (
-        'Platform authenticator not available. ' +
-        'Touch ID, Windows Hello, and Face ID require biometric hardware that is not accessible ' +
-        'inside a virtual machine. Run the app directly on macOS/Windows to use these features.'
+      return i18n.t('mfa.platformNotAvailable',
+        'Platform authenticator not available. Touch ID, Windows Hello, and Face ID require biometric hardware that is not accessible inside a virtual machine. Run the app directly on macOS/Windows to use these features.'
       );
     }
     if (type === 'securitykey' && isLinux) {
-      return (
-        'Security key access denied. Three common causes on Linux:\n' +
-        '1. Key not connected to this VM - in Parallels: Devices → USB → [YubiKey] → Connect to Ubuntu\n' +
-        '2. Missing udev permissions - run the setup commands shown above\n' +
-        '3. Not in plugdev group - run: sudo adduser $USER plugdev  (then log out/in)'
+      return i18n.t('mfa.securityKeyLinuxDenied',
+        'Security key access denied. Three common causes on Linux:\n1. Key not connected to this VM - in Parallels: Devices → USB → [YubiKey] → Connect to Ubuntu\n2. Missing udev permissions - run the setup commands shown above\n3. Not in plugdev group - run: sudo adduser $USER plugdev  (then log out/in)'
       );
     }
-    return 'The operation was cancelled or no compatible authenticator was found. Make sure your key is plugged in and try again.';
+    return i18n.t('mfa.operationCancelled',
+      'The operation was cancelled or no compatible authenticator was found. Make sure your key is plugged in and try again.'
+    );
   }
 
   if (e.name === 'TimeoutError' || e.message.toLowerCase().includes('timed out')) {
-    return 'The operation timed out. Plug in your security key before clicking the button, then respond promptly to the browser prompt.';
+    return i18n.t('mfa.operationTimedOut',
+      'The operation timed out. Plug in your security key before clicking the button, then respond promptly to the browser prompt.'
+    );
   }
 
   if (e.name === 'InvalidStateError') {
-    return 'This credential is already registered. Remove the existing entry and try again.';
+    return i18n.t('mfa.credentialAlreadyRegistered',
+      'This credential is already registered. Remove the existing entry and try again.'
+    );
   }
 
   if (e.name === 'NotSupportedError') {
-    return 'This authenticator type is not supported in the current browser or environment.';
+    return i18n.t('mfa.authenticatorTypeNotSupported',
+      'This authenticator type is not supported in the current browser or environment.'
+    );
   }
 
-  return e.message || 'Registration failed. Check your authenticator and try again.';
+  return e.message || i18n.t('mfa.registrationFailed', 'Registration failed. Check your authenticator and try again.');
 }
 
 export function isSecureContext(): boolean {

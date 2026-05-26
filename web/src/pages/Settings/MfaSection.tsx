@@ -136,7 +136,7 @@ export default function MfaSection({ profile }: Props) {
                         type="button"
                         onClick={e => { e.stopPropagation(); handleTotpRemove(); }}
                         className="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                        title="Remove authenticator app"
+                        title={t('settings.removeAuthApp', 'Remove authenticator app')}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -208,7 +208,7 @@ export default function MfaSection({ profile }: Props) {
                         type="button"
                         onClick={e => { e.stopPropagation(); handleEmailRemove(); }}
                         className="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                        title="Remove email OTP"
+                        title={t('settings.removeEmailOtp', 'Remove email OTP')}
                       >
                         <Trash2 size={15} />
                       </button>

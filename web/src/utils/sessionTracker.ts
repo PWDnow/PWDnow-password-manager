@@ -2,6 +2,7 @@ import { generateUUID } from './crypto';
 import { writeEncryptedLocal, readDecryptedLocal } from './localCrypto';
 import { getCsrfToken, apiFetch, hasServerSession } from './api';
 import { isBraveBrowser } from './browser';
+import i18n from '../i18n';
 
 export interface LoginSession {
   id: string;
@@ -121,8 +122,8 @@ export function formatSessionTime(timestamp: number): string {
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  if (mins < 1) return 'Active Now';
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+  if (mins < 1) return i18n.t('common.sessionActiveNow', 'Active Now');
+  if (mins < 60) return i18n.t('common.sessionMinsAgo', '{{count}} min ago', { count: mins });
+  if (hours < 24) return i18n.t('common.sessionHoursAgo', '{{count}} h ago', { count: hours });
+  return i18n.t('common.sessionDaysAgo', '{{count}} day(s) ago', { count: days });
 }

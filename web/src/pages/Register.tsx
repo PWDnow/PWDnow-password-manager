@@ -212,12 +212,12 @@ export default function Register() {
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
               <Building2 className="text-blue-400 mb-4" size={28} />
               <div className="text-2xl font-bold text-white mb-1">100%</div>
-              <div className="text-sm text-slate-400 font-medium">Open Source</div>
+              <div className="text-sm text-slate-400 font-medium">{t('register.openSourceLabel', 'Open Source')}</div>
             </div>
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
               <Users className="text-indigo-400 mb-4" size={28} />
-              <div className="text-2xl font-bold text-white mb-1">Community</div>
-              <div className="text-sm text-slate-400 font-medium">Driven</div>
+              <div className="text-2xl font-bold text-white mb-1">{t('register.communityValue', 'Community')}</div>
+              <div className="text-sm text-slate-400 font-medium">{t('register.communityLabel', 'Driven')}</div>
             </div>
           </div>
         </div>
@@ -270,7 +270,7 @@ export default function Register() {
                   value={formData.firstName}
                   onChange={handleChange}
                   className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#141414] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-base"
-                  placeholder="Jane"
+                  placeholder={t('register.firstNamePlaceholder', 'Jane')}
                   required
                   autoComplete="off"
                 />
@@ -287,7 +287,7 @@ export default function Register() {
                   value={formData.lastName}
                   onChange={handleChange}
                   className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#141414] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-base"
-                  placeholder="Doe"
+                  placeholder={t('register.lastNamePlaceholder', 'Doe')}
                   required
                   autoComplete="off"
                 />
@@ -308,7 +308,7 @@ export default function Register() {
                 value={formData.company}
                 onChange={handleChange}
                 className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#141414] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-base"
-                placeholder="Acme Corp"
+                placeholder={t('register.companyPlaceholder', 'Acme Corp')}
                 autoComplete="off"
               />
             </div>
@@ -324,7 +324,7 @@ export default function Register() {
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#141414] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-base"
-                placeholder="jane@acme.com"
+                placeholder={t('register.emailPlaceholder', 'jane@example.com')}
                 required
                 autoComplete="off"
                 aria-invalid={!!error}

@@ -232,6 +232,7 @@ function ActionRow({ icon, title, desc, btnLabel, onClick }: {
 function DnsRow({ label, ok, detail, required, optional }: {
   label: string; ok: boolean; detail?: string; required?: boolean; optional?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 text-xs">
       {ok
@@ -239,7 +240,7 @@ function DnsRow({ label, ok, detail, required, optional }: {
         : <X size={12} className={optional ? 'text-neutral-400 shrink-0' : 'text-red-500 shrink-0'} />
       }
       <span className={`font-medium ${!ok && required ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-300'}`}>{label}</span>
-      {optional && !ok && <span className="text-neutral-600 dark:text-neutral-400 text-[10px]">(optional)</span>}
+      {optional && !ok && <span className="text-neutral-600 dark:text-neutral-400 text-[10px]">{t('common.optional', '(optional)')}</span>}
       {detail && <span className="text-neutral-600 dark:text-neutral-400 truncate">{detail}</span>}
     </div>
   );
@@ -303,7 +304,7 @@ export default function Settings() {
       addNotification({ title: t('settings.recoveryKey', 'Recovery Key'), message: t('settings.keyGenerated', 'New recovery key generated successfully.'), type: 'success' });
       setRecoveryAuthPassword('');
     } catch (e: any) {
-      setRecoveryAuthError(e.message || 'Failed to generate recovery key.');
+      setRecoveryAuthError(e.message || t('settings.recoveryKeyError', 'Failed to generate recovery key.'));
     } finally {
       setIsGeneratingRecovery(false);
     }
@@ -333,7 +334,7 @@ export default function Settings() {
   const handleDnsCheck = useCallback(async () => {
     if (!emailServerForm) return;
     const domain = extractSmtpDomain(emailServerForm.host.trim(), emailServerForm.user.trim());
-    if (!domain) { setEmailServerError('Cannot determine domain to check.'); return; }
+    if (!domain) { setEmailServerError(t('settings.cannotDetermineDomain', 'Cannot determine domain to check.')); return; }
     setIsDnsChecking(true); setDnsCheckResult(null); setEmailServerError('');
     try {
       const res = await fetch(`/api/system/dns-check?domain=${encodeURIComponent(domain)}`);
@@ -486,9 +487,10 @@ export default function Settings() {
       if (importMode === 'replace') {
         for (const cred of credentials) await deleteCredential(cred.id);
       }
-      let importFolderId = folders.find(f => f.label === 'Imported')?.id;
+      const importedLabel = t('settings.importedFolderLabel', 'Imported');
+      let importFolderId = folders.find(f => f.label === importedLabel || f.label === 'Imported')?.id;
       if (!importFolderId) {
-        const newFolder = { id: generateUUID(), label: 'Imported', description: 'Credentials imported from an external source', iconName: 'Download' };
+        const newFolder = { id: generateUUID(), label: importedLabel, description: t('settings.importedFolderDesc', 'Credentials imported from an external source'), iconName: 'Download' };
         await addFolder(newFolder);
         importFolderId = newFolder.id;
       }
@@ -745,7 +747,7 @@ export default function Settings() {
                                 : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
                             }`}
                           >
-                            {gLabel.split(' ')[0]}
+                            {t(`settings.formatGroup_${gId}`, gLabel.split(' ')[0])}
                           </button>
                         );
                       })}
