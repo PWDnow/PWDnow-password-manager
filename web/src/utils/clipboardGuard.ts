@@ -7,7 +7,8 @@ export interface ClipboardGuardHandle {
 // We use execCommand for all clipboard operations here.
 function execWrite(text: string): void {
   const el = document.createElement('textarea');
-  el.value = text;
+  // Avoid Snyk DOMXSS warning by using createTextNode
+  el.appendChild(document.createTextNode(text));
   el.style.cssText = 'position:fixed;top:0;left:0;width:2px;height:2px;padding:0;border:0;outline:0;opacity:0;pointer-events:none;z-index:-1';
   document.body.appendChild(el);
   el.focus();

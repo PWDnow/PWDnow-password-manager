@@ -164,9 +164,16 @@
     "cardDisclaimer": "Solo archivio di riferimento personale — non certificato PCI-DSS.",
     "cardholderName": "Nome del titolare",
     "cardNumber": "Numero della carta",
-    "cardExpiry": "Scadenza (MM/AAAA)",
+    "cardExpiry": "Data di scadenza",
     "cardCvv": "CVV",
     "cardBillingAddress": "Indirizzo di fatturazione (opzionale)",
+    "cardExpiryPick": "MM / AAAA",
+    "cardCvv4Hint": "Amex utilizza un codice di sicurezza a 4 cifre",
+    "cardLuhnError": "Numero carta non valido. Controlla le cifre.",
+    "cardLuhnValid": "Numero carta valido",
+    "cardExpired": "Questa carta è già scaduta",
+    "cardExpiringSoon": "Scade tra {{days}} giorni. Verifica prima di salvare.",
+    "cardNetworkHint": "{{network}}, {{length}} cifre attese",
     "editTitle": "Modifica credenziale",
     "addTitle": "Nuova credenziale",
     "description": "Memorizza in modo sicuro le tue informazioni di accesso con crittografia di livello aziendale e protocolli di sicurezza avanzati.",
@@ -252,7 +259,8 @@
       "bulletList": "Elenco",
       "clear": "Cancella formattazione"
     },
-    "tagsLabel": "Tag"
+    "tagsLabel": "Tag",
+    "cardBillingPlaceholder": "Via Roma 123, Città"
   },
   "manageFolders": {
     "title": "Gestisci cartelle",
@@ -846,7 +854,8 @@
     "passkeyDesc": "Usa la tua impronta digitale, il viso o il PIN del dispositivo",
     "simEmailPreview": "Anteprima e-mail simulata",
     "simEmailCode": "Il tuo codice monouso:",
-    "simEmailNote": "Valido per 5 minuti. Non condividere."
+    "simEmailNote": "Valido per 5 minuti. Non condividere.",
+    "emailPlaceholder": "nome@azienda.com"
   },
   "register": {
     "title": "Crea un account",
@@ -1130,7 +1139,10 @@
     "operationTimedOut": "Operazione scaduta. Inserisci la chiave di sicurezza prima di cliccare e rispondi prontamente.",
     "credentialAlreadyRegistered": "Questa credenziale è già registrata. Rimuovi la voce esistente e riprova.",
     "authenticatorTypeNotSupported": "Questo tipo di autenticatore non è supportato nel browser o nell'ambiente corrente.",
-    "registrationFailed": "Registrazione fallita. Controlla il tuo autenticatore e riprova."
+    "registrationFailed": "Registrazione fallita. Controlla il tuo autenticatore e riprova.",
+    "defaultKeyName": "Mia chiave di sicurezza",
+    "defaultDeviceName": "Mio dispositivo",
+    "defaultThisDevice": "Questo dispositivo"
   },
   "audit": {
     "activeSessions": "Sessioni Attive",

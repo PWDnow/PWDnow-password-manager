@@ -92,7 +92,7 @@ const _localRead = async (key: string): Promise<string | null> => {
       if (e.status === 401) {
         // Session cookie was cleared or expired - notify AppLayout to redirect.
         keyStore.clear();
-        document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; Secure; SameSite=Strict;";
         window.dispatchEvent(new CustomEvent('sessionInvalid'));
       }
       return null;
@@ -137,7 +137,7 @@ const _localWrite = (key: string, value: string): Promise<void> => serializedWri
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         keyStore.clear();
-        document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "_pwd_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; Secure; SameSite=Strict;";
         window.dispatchEvent(new CustomEvent('sessionInvalid'));
         throw new Error('session expired');
       }

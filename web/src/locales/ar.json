@@ -164,9 +164,16 @@
     "cardDisclaimer": "تخزين مرجعي شخصي فقط — غير معتمد PCI-DSS.",
     "cardholderName": "اسم حامل البطاقة",
     "cardNumber": "رقم البطاقة",
-    "cardExpiry": "تاريخ الانتهاء (شهر/سنة)",
+    "cardExpiry": "تاريخ الانتهاء",
     "cardCvv": "CVV",
     "cardBillingAddress": "عنوان الفوترة (اختياري)",
+    "cardExpiryPick": "شهر / سنة",
+    "cardCvv4Hint": "أمريكان إكسبريس تستخدم رمز أمان مكون من 4 أرقام",
+    "cardLuhnError": "رقم البطاقة غير صالح. تحقق من الأرقام.",
+    "cardLuhnValid": "رقم البطاقة صالح",
+    "cardExpired": "انتهت صلاحية هذه البطاقة بالفعل",
+    "cardExpiringSoon": "تنتهي الصلاحية خلال {{days}} يوم. تحقق قبل الحفظ.",
+    "cardNetworkHint": "{{network}}، {{length}} رقماً متوقعاً",
     "editTitle": "تعديل بيانات الدخول",
     "addTitle": "بيانات دخول جديدة",
     "description": "تخزين آمن لمعلومات تسجيل الدخول الخاصة بك باستخدام تشفير على مستوى المؤسسات وبروتوكولات أمان متقدمة.",
@@ -252,7 +259,8 @@
       "bulletList": "Bullet list",
       "clear": "Remove formatting from selection"
     },
-    "tagsLabel": "الوسوم"
+    "tagsLabel": "الوسوم",
+    "cardBillingPlaceholder": "123 شارع الرئيسي، المدينة"
   },
   "manageFolders": {
     "title": "إدارة المجلدات",
@@ -846,7 +854,8 @@
     "passkeyDesc": "استخدم بصمة إصبعك أو وجهك أو رمز PIN للجهاز",
     "simEmailPreview": "معاينة البريد الإلكتروني المحاكى",
     "simEmailCode": "رمزك لمرة واحدة:",
-    "simEmailNote": "صالح لمدة 5 دقائق. لا تشاركه."
+    "simEmailNote": "صالح لمدة 5 دقائق. لا تشاركه.",
+    "emailPlaceholder": "الاسم@الشركة.com"
   },
   "register": {
     "title": "إنشاء حساب",
@@ -1089,7 +1098,10 @@
     "operationTimedOut": "انتهت مهلة العملية. قم بتوصيل مفتاح الأمان قبل النقر على الزر ثم استجب سريعاً للمطالبة.",
     "credentialAlreadyRegistered": "هذه البيانات مسجلة بالفعل. أزل الإدخال الموجود وحاول مرة أخرى.",
     "authenticatorTypeNotSupported": "نوع المصادق هذا غير مدعوم في المتصفح أو البيئة الحالية.",
-    "registrationFailed": "فشل التسجيل. تحقق من المصادق وحاول مرة أخرى."
+    "registrationFailed": "فشل التسجيل. تحقق من المصادق وحاول مرة أخرى.",
+    "defaultKeyName": "مفتاح الأمان الخاص بي",
+    "defaultDeviceName": "جهازي",
+    "defaultThisDevice": "هذا الجهاز"
   },
   "audit": {
     "activeSessions": "الجلسات النشطة",

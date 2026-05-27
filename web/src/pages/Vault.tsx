@@ -105,7 +105,7 @@ const getServiceStyle = (service: string) => {
 
 // HIGH-07 fix: removed Google favicon service (leaked full service list to Google).
 // Now renders a letter avatar using the service name - zero external requests.
-const FaviconImage = ({ service, className }: { url: string; service: string; className?: string }) => {
+const FaviconImage = ({ service, className }: { service: string; className?: string }) => {
   const style = getServiceStyle(service);
   const letter = (service || '?').trim().charAt(0).toUpperCase();
 
@@ -288,7 +288,10 @@ export default function Vault() {
     setItemToEdit(cred);
     setIsAdding(false);
     // Clear the state so refreshing the page doesn't re-open the form.
-    navigate(location.pathname, { replace: true, state: {} });
+    const safePath = (location.pathname.startsWith('/') && !location.pathname.startsWith('//')) 
+      ? location.pathname 
+      : '/vault';
+    navigate(safePath, { replace: true, state: {} });
   }, [location.state, credentials]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopyUsername = async (username: string, id: number | string) => {
@@ -656,7 +659,7 @@ export default function Vault() {
                               ? <div className="w-full h-full bg-purple-600 flex items-center justify-center"><FileText size={22} className="text-white" /></div>
                               : item.credentialType === 'payment_card'
                               ? <div className="w-full h-full bg-emerald-700 flex items-center justify-center"><CreditCard size={22} className="text-white" /></div>
-                              : <FaviconImage url={item.url} service={item.service} className="w-full h-full" />}
+                              : <FaviconImage service={item.service} className="w-full h-full" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-black text-base text-black dark:text-white leading-tight tracking-tight truncate">{item.service}</div>
@@ -965,7 +968,7 @@ export default function Vault() {
                 
                 <div className="bg-surface-container-low rounded-xl p-4 mb-8">
                   <div className="flex items-center gap-3 mb-3">
-                    <img src={itemToDelete.logo} alt="" className="w-5 h-5 object-contain" />
+                    <FaviconImage service={itemToDelete.service} className="w-6 h-6 rounded border-none shadow-none group-hover:scale-100" />
                     <span className="font-bold text-sm text-black dark:text-white">{itemToDelete.service}</span>
                   </div>
                   <ul className="space-y-2 text-sm text-on-surface-variant">

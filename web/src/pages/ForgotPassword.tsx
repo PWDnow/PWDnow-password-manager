@@ -134,7 +134,7 @@ export default function ForgotPassword() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#141414] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-base"
-                    placeholder="name@company.com"
+                    placeholder={t('login.emailPlaceholder', 'name@company.com')}
                     required
                     autoComplete="off"
                     aria-invalid={!!error}

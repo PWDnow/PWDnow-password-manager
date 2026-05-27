@@ -365,6 +365,24 @@ export default function Settings() {
         return;
       }
       await writeEncryptedLocal('email_server_config', JSON.stringify(emailServerForm));
+      // Also persist to server so login OTP emails use the configured SMTP
+      try {
+        await apiFetch('/api/vault/smtp-config', {
+          method: 'PUT',
+          body: JSON.stringify({
+            host: emailServerForm.host.trim(),
+            port: emailServerForm.port,
+            protocol: emailServerForm.protocol || (emailServerForm.secure ? 'ssl_tls' : 'starttls'),
+            username: emailServerForm.user.trim(),
+            password: emailServerForm.pass || '',
+            fromName: emailServerForm.fromName || 'PWDnow',
+            fromAddress: emailServerForm.user.trim(),
+            mxVerified: !!(check && check.mx.length > 0),
+          }),
+        });
+      } catch (e) {
+        console.warn('[smtp-config] Server persist failed:', e);
+      }
       setEmailServerConfig(emailServerForm);
       setIsEmailServerModalOpen(false);
       addNotification({ title: t('settings.emailServerSaved', 'SMTP Saved'), message: t('settings.emailServerSavedDesc', 'Email server configuration saved.'), type: 'success' });
@@ -817,7 +835,7 @@ export default function Settings() {
 
             {/* ── Authentication ───────────────────────────────────────────────── */}
             <section id="s-auth" className="scroll-mt-24">
-              <MfaSection profile={profile} />
+              <MfaSection profile={profile} emailServerConfig={emailServerConfig} />
             </section>
 
             <div className="h-px bg-neutral-200 dark:bg-white/8" />

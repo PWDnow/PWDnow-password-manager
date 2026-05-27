@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, useReducer } from 'react';
-import { ChevronRight, RefreshCw, Copy, Info, Lock, Briefcase, User, Wallet, MoreHorizontal, Check, X, Wand2, Hash, Type, Globe, Plus, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, CreditCard, Key, Clock, Eye, EyeOff, Smartphone, HelpCircle, Shield, Bold, Italic, Underline, List, Eraser, ToggleLeft, ToggleRight, FileText, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, useReducer, useMemo } from 'react';
+import { ChevronRight, ChevronLeft, Calendar, RefreshCw, Copy, Info, Lock, Briefcase, User, Wallet, MoreHorizontal, Check, X, Wand2, Hash, Type, Globe, Plus, Gamepad2, Bitcoin, Dices, Folder as FolderIcon, CreditCard, Key, Clock, Eye, EyeOff, Smartphone, HelpCircle, Shield, Bold, Italic, Underline, List, Eraser, ToggleLeft, ToggleRight, FileText, ShieldCheck, Atom, ShieldAlert, Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { TOTP } from 'totp-generator';
@@ -12,7 +12,23 @@ import { useNotification } from '../context/NotificationContext';
 import { daemon } from '../utils/daemonClient';
 import { secureClipboard } from '../utils/clipboardGuard';
 import { readDecryptedLocal } from '../utils/localCrypto';
+import { checkHibpPassword } from '../utils/hibp';
+import {
+  charsetSize,
+  randomPasswordBits,
+  passphraseBits,
+  classifyQuantum,
+  crackTime,
+  quantumCrackTime,
+  ATTACKER_PROFILES,
+  QUANTUM_PROOF_BITS,
+  type AttackerProfileId,
+  type CrackTime,
+} from '../utils/passwordEntropy';
 import PhoneCountrySelect from '../components/PhoneCountrySelect';
+
+/** Words in the EFF long wordlist — used to score passphrase entropy. */
+const EFF_WORDLIST_SIZE = 7776;
 
 type BreachStatus = 'idle' | 'checking' | 'pwned' | 'clean' | 'unavailable' | 'error';
 
@@ -46,6 +62,173 @@ const ICON_MAP: Record<string, React.FC<any>> = {
 };
 
 import COUNTRIES from '../data/countries.json';
+import {
+  detectCardNetwork, formatPan, maskPan, maxPanLength, luhnCheck, isPanComplete,
+  daysUntilExpiry, CARD_EXPIRY_MIN_DAYS, PAN_UNHIDE, BROWSER_AUTOFILL, type CardNetwork,
+} from '../utils/cardUtils';
+
+// ── Card Expiry Month/Year Picker ──────────────────────────────────────────
+interface CardExpiryPickerProps {
+  value: string;
+  onChange: (v: string) => void;
+  minDays: number;
+}
+
+function CardExpiryPicker({ value, onChange, minDays }: CardExpiryPickerProps) {
+  const { t, i18n } = useTranslation();
+
+  const monthLabels = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(i18n.language, { month: 'short' });
+    return Array.from({ length: 12 }, (_, idx) =>
+      fmt.format(new Date(2000, idx, 1)).replace(/\.$/, '').toUpperCase()
+    );
+  }, [i18n.language]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const today = new Date();
+  const todayYear  = today.getFullYear();
+  const todayMonth = today.getMonth() + 1; // 1-based
+
+  const parsed        = value.match(/^(\d{1,2})\/(\d{4})$/);
+  const selectedMonth = parsed ? parseInt(parsed[1], 10) : null;
+  const selectedYear  = parsed ? parseInt(parsed[2], 10) : null;
+
+  const [pickerYear, setPickerYear] = useState(selectedYear ?? todayYear);
+
+  // Sync picker year when value is cleared externally
+  useEffect(() => {
+    if (!value) setPickerYear(todayYear);
+  }, [value, todayYear]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const selectMonth = (month: number) => {
+    onChange(`${String(month).padStart(2, '0')}/${pickerYear}`);
+    setOpen(false);
+  };
+
+  const isDisabled = (month: number) => {
+    if (pickerYear < todayYear) return true;
+    if (pickerYear === todayYear && month <= todayMonth) return true;
+    return false;
+  };
+
+  const daysLeft   = daysUntilExpiry(value);
+  const isExpired  = daysLeft !== null && daysLeft < 0;
+  const isCurrent  = selectedYear === todayYear && selectedMonth === todayMonth;
+  const isSoon     = daysLeft !== null && daysLeft >= 0 && daysLeft <= minDays;
+
+  let borderCls = 'border-black/15 dark:border-white/15';
+  let statusEl: React.ReactNode = null;
+  if (value) {
+    if (isExpired || isCurrent) {
+      borderCls = 'border-red-500';
+      statusEl = (
+        <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1 mt-1.5">
+          <AlertTriangle size={10} />{t('addCredential.cardExpired', 'This card has already expired')}
+        </p>
+      );
+    } else if (isSoon) {
+      borderCls = 'border-amber-400';
+      statusEl = (
+        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1 mt-1.5">
+          <AlertTriangle size={10} />{t('addCredential.cardExpiringSoon', 'Expires in {{days}} days. Verify before saving.', { days: daysLeft })}
+        </p>
+      );
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={`w-full px-6 py-4 bg-surface-container-low rounded-xl border ${borderCls} text-black dark:text-white font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all text-left flex items-center justify-between`}
+      >
+        <span className={value ? 'font-mono' : 'text-outline-variant'}>
+          {value || t('addCredential.cardExpiryPick', 'MM / YYYY')}
+        </span>
+        <Calendar size={16} className="text-on-surface-variant shrink-0" />
+      </button>
+      {statusEl}
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.14 }}
+            className="absolute z-50 top-full mt-2 left-0 bg-white dark:bg-surface-container-low border border-outline-variant/20 rounded-2xl shadow-2xl p-4 w-64"
+          >
+            {/* Year navigation */}
+            <div className="flex items-center justify-between mb-3">
+              <button
+                type="button"
+                onClick={() => setPickerYear(y => Math.max(todayYear, y - 1))}
+                disabled={pickerYear <= todayYear}
+                className="p-1.5 rounded-lg hover:bg-surface-container-high disabled:opacity-25 disabled:cursor-not-allowed transition-colors text-black dark:text-white"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-black text-black dark:text-white">{pickerYear}</span>
+              <button
+                type="button"
+                onClick={() => setPickerYear(y => Math.min(todayYear + 20, y + 1))}
+                disabled={pickerYear >= todayYear + 20}
+                className="p-1.5 rounded-lg hover:bg-surface-container-high disabled:opacity-25 disabled:cursor-not-allowed transition-colors text-black dark:text-white"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Month grid — 4 columns × 3 rows */}
+            <div className="grid grid-cols-4 gap-1">
+              {monthLabels.map((name, idx) => {
+                const month    = idx + 1;
+                const disabled = isDisabled(month);
+                const active   = selectedMonth === month && selectedYear === pickerYear;
+                const dToEnd   = daysUntilExpiry(`${String(month).padStart(2, '0')}/${pickerYear}`);
+                const soonWarn = !disabled && dToEnd !== null && dToEnd >= 0 && dToEnd <= minDays;
+
+                return (
+                  <button
+                    key={month}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => selectMonth(month)}
+                    className={`relative py-2 rounded-xl text-[11px] font-bold transition-all text-center ${
+                      active
+                        ? 'bg-black dark:bg-white text-white dark:text-black'
+                        : disabled
+                        ? 'text-outline-variant/30 cursor-not-allowed'
+                        : soonWarn
+                        ? 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                        : 'text-black dark:text-white hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {name}
+                    {soonWarn && !active && (
+                      <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 // Renders **bold**, *italic*, __underline__, and - bullet lists as React elements.
 function parseMarkdown(text: string): React.ReactNode[] {
@@ -125,7 +308,7 @@ function formReducer(state: CredentialFormState, action: FormAction): Credential
 }
 
 export default function AddCredential({ folders, activeTab, initialData, onCreateFolder, onAddCredential, onUpdateCredential, onCancel }: AddCredentialProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { assetHolder } = useVault();
   const effWordListRef = useRef<string[]>(WORD_LIST_FALLBACK);
@@ -149,6 +332,8 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   }, []);
   const [showCardNumber, setShowCardNumber]     = useState(false);
   const [showCvv, setShowCvv]                   = useState(false);
+  // null = unchecked, false = Luhn ok, true = Luhn failed
+  const [cardLuhnError, setCardLuhnError]       = useState<boolean | null>(null);
 
   const [length, setLength] = useState(24);
   const [wordCount, setWordCount] = useState(6);
@@ -170,6 +355,11 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
   // block submit. Kept in state rather than derived so the UI can show
   // "checking…" feedback during the async daemon round-trip.
   const [breachStatus, setBreachStatus] = useState<BreachStatus>('idle');
+  // Number of times the current password appears in HIBP (0 when clean/unknown).
+  const [breachCount, setBreachCount] = useState(0);
+  // Which adversary the crack-time estimate is modelled against. Defaults to the
+  // worst realistic case ("high-value target") so the figures stay conservative.
+  const [attackerProfile, setAttackerProfile] = useState<AttackerProfileId>('nationState');
 
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
   const [showPhoneSuggestions, setShowPhoneSuggestions] = useState<string | null>(null);
@@ -520,26 +710,37 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     generatePassword();
   }, [generatePassword]);
 
-  // HIBP breach lookup, debounced. Only runs against the local daemon filter
-  // (architecture §4 - passwords never leave the machine). Debounced so
-  // typing doesn't hammer the socket; reset to idle for empty inputs.
+  // HIBP breach lookup, debounced. Primary: HIBP k-anonymity range API
+  // (only a 5-char SHA-1 prefix leaves the browser). Fallback: daemon's
+  // local cuckoo filter if the API is unreachable. Advisory only — does
+  // not block save.
   useEffect(() => {
-    if (!password) { setBreachStatus('idle'); return; }
-    if (!daemon.isConnected) { setBreachStatus('unavailable'); return; }
+    if (!password) { setBreachStatus('idle'); setBreachCount(0); return; }
     setBreachStatus('checking');
     const snapshot = password;
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      daemon.checkPasswordBreached(snapshot)
-        .then(({ pwned, filter_available }) => {
-          // Late responses for a stale password would flicker the banner;
-          // drop them if the user has typed since we issued the request.
-          if (snapshot !== password) return;
-          if (!filter_available) setBreachStatus('unavailable');
-          else setBreachStatus(pwned ? 'pwned' : 'clean');
+      checkHibpPassword(snapshot, controller.signal)
+        .then(({ pwned, count }) => {
+          if (snapshot !== password || controller.signal.aborted) return;
+          setBreachCount(pwned ? count : 0);
+          setBreachStatus(pwned ? 'pwned' : 'clean');
         })
-        .catch(() => { if (snapshot === password) setBreachStatus('error'); });
+        .catch(() => {
+          if (snapshot !== password || controller.signal.aborted) return;
+          // HIBP API failed — try daemon's local filter as fallback (no count).
+          if (!daemon.isConnected) { setBreachStatus('unavailable'); return; }
+          daemon.checkPasswordBreached(snapshot)
+            .then(({ pwned, filter_available }) => {
+              if (snapshot !== password) return;
+              setBreachCount(0);
+              if (!filter_available) setBreachStatus('unavailable');
+              else setBreachStatus(pwned ? 'pwned' : 'clean');
+            })
+            .catch(() => { if (snapshot === password) setBreachStatus('error'); });
+        });
     }, 400);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [password]);
 
   const getStrength = (pwd: string) => {
@@ -578,6 +779,40 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
   const strength = getStrength(password);
 
+  // ── Live entropy / quantum / crack-time analysis (drives the advisory) ──────
+  // Bits reflect the *current* generator configuration so the figures update as
+  // the user drags the length/word-count sliders or toggles character classes.
+  const entropyBits = isPassphrase
+    ? passphraseBits(wordCount, EFF_WORDLIST_SIZE)
+    : randomPasswordBits(
+        password.length,
+        charsetSize({ uppercase: includeUppercase, lowercase: includeLowercase, numbers: includeNumbers, symbols: includeSymbols }),
+      );
+  const bitsRounded = Math.round(entropyBits);
+  const quantum = classifyQuantum(entropyBits);
+  const bitsToQuantumProof = Math.max(0, Math.ceil(QUANTUM_PROOF_BITS - entropyBits));
+  const guessesPerSecond = ATTACKER_PROFILES[attackerProfile];
+  const classicalCrack = crackTime(entropyBits, guessesPerSecond);
+  const quantumCrack = quantumCrackTime(entropyBits, guessesPerSecond);
+
+  // Locale-aware compact formatter ("9.5K", "14B", "1.2T") for large year counts.
+  const numberFmt = useMemo(
+    () => new Intl.NumberFormat(i18n.language, { notation: 'compact', maximumFractionDigits: 1 }),
+    [i18n.language],
+  );
+  const formatCrack = (ct: CrackTime): string => {
+    switch (ct.unit) {
+      case 'instant': return t('addCredential.crack.instant', 'instantly');
+      case 'seconds': return t('addCredential.crack.seconds', '{{value}} seconds', { value: ct.value });
+      case 'minutes': return t('addCredential.crack.minutes', '{{value}} minutes', { value: ct.value });
+      case 'hours': return t('addCredential.crack.hours', '{{value}} hours', { value: ct.value });
+      case 'days': return t('addCredential.crack.days', '{{value}} days', { value: ct.value });
+      case 'years': return t('addCredential.crack.years', '{{value}} years', { value: numberFmt.format(ct.value) });
+      case 'powerYears': return t('addCredential.crack.powerYears', '10^{{exp}} years', { exp: ct.value });
+      default: return '';
+    }
+  };
+
   const handleCopy = () => {
     secureClipboard(password, () => {}, () => {}, 10);
     setCopied(true);
@@ -608,13 +843,6 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
             // Non-login types bypass the URL/password validation flow
             if (credentialType !== 'login') {
-              function detectCardType(num: string): string {
-                if (/^4/.test(num)) return 'visa';
-                if (/^(51|52|53|54|55|2[2-7])/.test(num)) return 'mastercard';
-                if (/^3[47]/.test(num)) return 'amex';
-                if (/^(6011|622|64[4-9]|65)/.test(num)) return 'discover';
-                return '';
-              }
               const nonLoginCred: Credential = {
                 id: initialData?.id || generateUUID(),
                 service: title.trim(),
@@ -629,7 +857,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 credentialType,
                 ...(credentialType === 'passkey' ? { rpId, rpName, credentialId, userHandle, authenticatorName, backedUp } : {}),
                 ...(credentialType === 'secure_note' ? { noteContent } : {}),
-                ...(credentialType === 'payment_card' ? { cardholderName, cardNumber, cardExpiry, cardCvv, cardBillingAddress, cardType: detectCardType(cardNumber) } : {}),
+                ...(credentialType === 'payment_card' ? { cardholderName, cardNumber, cardExpiry, cardCvv, cardBillingAddress, cardType: detectCardNetwork(cardNumber)?.id ?? '' } : {}),
                 description: description.trim() || undefined,
               };
               try {
@@ -835,56 +1063,181 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 )}
 
                 {/* Payment card fields */}
-                {credentialType === 'payment_card' && (
-                  <div className="space-y-6">
-                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-700 dark:text-yellow-400">
-                      {t('addCredential.cardDisclaimer', 'Personal reference storage only - not PCI-DSS certified.')}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardholderName', 'Cardholder Name')}</label>
-                        <input type="text" value={cardholderName} onChange={e => dispatch({ type: 'setField', field: 'cardholderName', value: e.target.value })} placeholder="John Doe"
-                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
+                {credentialType === 'payment_card' && (() => {
+                  const cardNetwork = detectCardNetwork(cardNumber);
+                  const cvvMax      = cardNetwork?.cvvLength ?? 4;
+                  return (
+                    <div className="space-y-6">
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-700 dark:text-yellow-400">
+                        {t('addCredential.cardDisclaimer', 'Personal reference storage only — not PCI-DSS certified.')}
                       </div>
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardNumber', 'Card Number')}</label>
-                        <div className="relative">
-                          <input type={showCardNumber ? 'text' : 'password'} value={cardNumber}
-                            onChange={e => dispatch({ type: 'setField', field: 'cardNumber', value: e.target.value.replace(/\D/g, '').slice(0, 19) })}
-                            placeholder="•••• •••• •••• ••••" inputMode="numeric"
-                            className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12" />
-                          <button type="button" onClick={() => setShowCardNumber(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                            {showCardNumber ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
+
+                      {/* Row 1: Cardholder + Card Number */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Cardholder name */}
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                            {t('addCredential.cardholderName', 'Cardholder Name')}
+                          </label>
+                          <input
+                            type="text"
+                            value={cardholderName}
+                            onChange={e => dispatch({ type: 'setField', field: 'cardholderName', value: e.target.value })}
+                            placeholder="John Doe"
+                            className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all"
+                          />
+                        </div>
+
+                        {/* Card Number with live BIN detection + Luhn */}
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                            {t('addCredential.cardNumber', 'Card Number')}
+                          </label>
+                          <div
+                            className="relative"
+                            onBlur={e => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                setShowCardNumber(false);
+                              }
+                            }}
+                          >
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={cardNumber === '' ? '' : showCardNumber ? formatPan(cardNumber, null) : maskPan(cardNumber, PAN_UNHIDE)}
+                              placeholder="XXXX XXXX XXXX XXXX"
+                              onFocus={() => { if (!showCardNumber) setShowCardNumber(true); }}
+                              onChange={e => {
+                                const raw = e.target.value.replace(/\D/g, '');
+                                const net = detectCardNetwork(raw);
+                                const trimmed = raw.slice(0, maxPanLength(net));
+                                dispatch({ type: 'setField', field: 'cardNumber', value: trimmed });
+                                if (isPanComplete(trimmed, net)) {
+                                  setCardLuhnError(!luhnCheck(trimmed));
+                                } else {
+                                  setCardLuhnError(null);
+                                }
+                              }}
+                              className={`w-full px-6 py-4 pr-28 bg-surface-container-low rounded-xl border font-mono outline-none focus:ring-2 transition-all ${
+                                cardLuhnError
+                                  ? 'border-red-500 focus:ring-red-500/20 text-red-600 dark:text-red-400'
+                                  : 'border-black/15 dark:border-white/15 text-black dark:text-white focus:ring-on-primary-container/20'
+                              }`}
+                            />
+                            {/* Network badge + eye toggle */}
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                              {cardNetwork && (
+                                <span
+                                  className="text-[9px] font-black px-2 py-0.5 rounded-md whitespace-nowrap leading-none"
+                                  style={{ backgroundColor: cardNetwork.bgColor, color: cardNetwork.textColor }}
+                                >
+                                  {cardNetwork.label}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowCardNumber(v => !v)}
+                                className="text-on-surface-variant hover:text-black dark:hover:text-white transition-colors"
+                              >
+                                {showCardNumber ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Luhn error */}
+                          <AnimatePresence>
+                            {cardLuhnError && (
+                              <motion.p
+                                initial={{ opacity: 0, y: -6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -6 }}
+                                className="text-[10px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1"
+                              >
+                                <AlertTriangle size={10} />
+                                {t('addCredential.cardLuhnError', 'Invalid card number. Check your digits.')}
+                              </motion.p>
+                            )}
+                          </AnimatePresence>
+
+                          {/* Luhn valid badge */}
+                          {cardLuhnError === false && cardNumber && (
+                            <p className="text-[10px] font-bold text-green-600 flex items-center gap-1">
+                              <Check size={10} strokeWidth={3} />
+                              {t('addCredential.cardLuhnValid', 'Valid card number')}
+                            </p>
+                          )}
+
+                          {/* Network hint while typing */}
+                          {cardLuhnError == null && cardNetwork && cardNumber && !isPanComplete(cardNumber, cardNetwork) && (
+                            <p className="text-[10px] text-on-surface-variant/60 font-medium">
+                              {t('addCredential.cardNetworkHint', '{{network}}, {{length}} digits expected', {
+                                network: cardNetwork.label,
+                                length: maxPanLength(cardNetwork),
+                              })}
+                            </p>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardExpiry', 'Expiry (MM/YYYY)')}</label>
-                        <input type="text" value={cardExpiry} onChange={e => dispatch({ type: 'setField', field: 'cardExpiry', value: e.target.value })} placeholder="12/2028" maxLength={7}
-                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
-                      </div>
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardCvv', 'CVV')}</label>
-                        <div className="relative">
-                          <input type={showCvv ? 'text' : 'password'} value={cardCvv}
-                            onChange={e => dispatch({ type: 'setField', field: 'cardCvv', value: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                            placeholder="•••" inputMode="numeric"
-                            className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12" />
-                          <button type="button" onClick={() => setShowCvv(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                            {showCvv ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
+
+                      {/* Row 2: Expiry picker + CVV */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                            {t('addCredential.cardExpiry', 'Expiry Date')}
+                          </label>
+                          <CardExpiryPicker
+                            value={cardExpiry}
+                            onChange={v => dispatch({ type: 'setField', field: 'cardExpiry', value: v })}
+                            minDays={CARD_EXPIRY_MIN_DAYS}
+                          />
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                            {t('addCredential.cardCvv', 'CVV')}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showCvv ? 'text' : 'password'}
+                              value={cardCvv}
+                              onChange={e => dispatch({ type: 'setField', field: 'cardCvv', value: e.target.value.replace(/\D/g, '').slice(0, cvvMax) })}
+                              placeholder={cvvMax === 4 ? '••••' : '•••'}
+                              inputMode="numeric"
+                              autoComplete={BROWSER_AUTOFILL ? 'cc-csc' : 'off'}
+                              className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowCvv(v => !v)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                            >
+                              {showCvv ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
+                          {cvvMax === 4 && (
+                            <p className="text-[10px] text-on-surface-variant/60">
+                              {t('addCredential.cardCvv4Hint', 'Amex uses a 4-digit security code')}
+                            </p>
+                          )}
                         </div>
                       </div>
+
+                      {/* Billing address */}
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                          {t('addCredential.cardBillingAddress', 'Billing Address (optional)')}
+                        </label>
+                        <input
+                          type="text"
+                          value={cardBillingAddress}
+                          onChange={e => dispatch({ type: 'setField', field: 'cardBillingAddress', value: e.target.value })}
+                          placeholder={t('addCredential.cardBillingPlaceholder', '123 Main St, City')}
+                          className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.cardBillingAddress', 'Billing Address (optional)')}</label>
-                      <input type="text" value={cardBillingAddress} onChange={e => dispatch({ type: 'setField', field: 'cardBillingAddress', value: e.target.value })} placeholder="123 Main St, City"
-                        className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
@@ -990,6 +1343,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   value={password}
                   onChange={(e) => dispatch({ type: 'setField', field: 'password', value: e.target.value })}
                   aria-label="Password"
+                  autoComplete={BROWSER_AUTOFILL ? 'new-password' : 'off'}
                   className="w-full px-6 py-4 pr-52 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white font-mono tracking-widest focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -1785,24 +2139,131 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   </div>
                 </div>
 
-                <div className="mt-3 p-3 bg-white/5 rounded-2xl border border-white/10">
-                  <div className="flex gap-4">
+                <div className="mt-3 p-4 bg-white/5 rounded-2xl border border-white/10 space-y-4">
+                  {/* Header — entropy headline */}
+                  <div className="flex gap-3 items-center">
                     <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
                       <ShieldCheck size={20} className="text-white" />
                     </div>
                     <div>
-                      <h4 className="text-white font-bold text-sm mb-1">{t('addCredential.securityAdvisory', 'Security Advisory')}</h4>
-                      <p className="text-xs text-white/40 leading-relaxed font-medium">
-                        {isPassphrase ? (
-                          <Trans i18nKey="addCredential.passphraseAdvisory" values={{ bits: wordCount * 12 }}>
-                            Passphrases provide high entropy with low cognitive load. This configuration yields approximately <span className="text-white font-bold">{wordCount * 12} bits</span> of security.
-                          </Trans>
-                        ) : (
-                          <Trans i18nKey="addCredential.passwordAdvisory" values={{ bits: Math.floor(password.length * Math.log2(charsetLength(includeUppercase, includeLowercase, includeNumbers, includeSymbols))) }}>
-                            This password uses <span className="text-white font-bold">{Math.floor(password.length * Math.log2(charsetLength(includeUppercase, includeLowercase, includeNumbers, includeSymbols)))} bit entropy</span>. Recommended for high-value targets.
-                          </Trans>
-                        )}
+                      <h4 className="text-white font-bold text-sm">{t('addCredential.securityAdvisory', 'Security Advisory')}</h4>
+                      <p className="text-[11px] text-white/40 font-medium">
+                        {t('addCredential.entropyHeadline', '{{bits}} bits of entropy · {{label}}', { bits: bitsRounded, label: strength.label })}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Quantum-resistance badge (reactive to entropy) */}
+                  <div
+                    className={`rounded-xl border p-3 ${
+                      quantum.level === 'proof' ? 'border-green-500/40 bg-green-500/10'
+                      : quantum.level === 'resistant' ? 'border-amber-500/40 bg-amber-500/10'
+                      : 'border-red-500/40 bg-red-500/10'
+                    }`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      {quantum.level === 'proof' ? <ShieldCheck size={15} className="text-green-300 shrink-0" aria-hidden="true" />
+                        : quantum.level === 'resistant' ? <Atom size={15} className="text-amber-300 shrink-0" aria-hidden="true" />
+                        : <ShieldAlert size={15} className="text-red-300 shrink-0" aria-hidden="true" />}
+                      <span className={`text-xs font-black uppercase tracking-widest ${
+                        quantum.level === 'proof' ? 'text-green-300'
+                        : quantum.level === 'resistant' ? 'text-amber-300'
+                        : 'text-red-300'
+                      }`}>
+                        {quantum.level === 'proof' ? t('addCredential.quantum.proof', 'Quantum-Proof')
+                          : quantum.level === 'resistant' ? t('addCredential.quantum.resistant', 'Quantum-Resistant')
+                          : t('addCredential.quantum.vulnerable', 'Quantum-Vulnerable')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/50 leading-relaxed">
+                      {quantum.level === 'proof'
+                        ? t('addCredential.quantum.proofDesc', "Retains 128-bit security even against Grover's algorithm — on par with the AES-256 backbone of this vault.")
+                        : quantum.level === 'resistant'
+                        ? t('addCredential.quantum.resistantDesc', "Grover's algorithm halves this to {{pq}} effective bits. Add ~{{add}} more bits of entropy to reach quantum-proof.", { pq: Math.round(quantum.postQuantumBits), add: bitsToQuantumProof })
+                        : t('addCredential.quantum.vulnerableDesc', "Grover's algorithm halves this to just {{pq}} effective bits against a quantum attacker.", { pq: Math.round(quantum.postQuantumBits) })}
+                    </p>
+                  </div>
+
+                  {/* Threat-model selector — recomputes crack time live */}
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">{t('addCredential.attacker.label', 'Threat Model')}</span>
+                    <div className="flex p-1 bg-white/5 rounded-xl gap-1 mt-2" role="tablist" aria-label={t('addCredential.attacker.label', 'Threat Model')}>
+                      {(['online', 'gpu', 'nationState'] as AttackerProfileId[]).map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          role="tab"
+                          aria-selected={attackerProfile === id}
+                          onClick={() => setAttackerProfile(id)}
+                          className={`flex-1 px-2 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all ${attackerProfile === id ? 'bg-white text-black shadow' : 'text-white/40 hover:text-white/70'}`}
+                        >
+                          {id === 'online' ? t('addCredential.attacker.online', 'Online')
+                            : id === 'gpu' ? t('addCredential.attacker.gpu', 'GPU Rig')
+                            : t('addCredential.attacker.nationState', 'Nation-State')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Crack-time estimate — classical vs quantum */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Clock size={12} className="text-white/40" aria-hidden="true" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{t('addCredential.crack.classical', 'Classical')}</span>
+                      </div>
+                      <p className="text-sm font-bold text-white break-words leading-tight">{formatCrack(classicalCrack)}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Atom size={12} className="text-white/40" aria-hidden="true" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{t('addCredential.crack.quantum', 'Quantum')}</span>
+                      </div>
+                      <p className="text-sm font-bold text-white break-words leading-tight">{formatCrack(quantumCrack)}</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-white/30 leading-snug -mt-1">
+                    {t('addCredential.crack.note', "Average time to exhaust the keyspace at {{rate}} guesses/sec. Quantum figures assume Grover's algorithm.", { rate: numberFmt.format(guessesPerSecond) })}
+                  </p>
+
+                  {/* Breach intelligence (Have I Been Pwned) */}
+                  <div
+                    className={`rounded-xl border p-3 flex items-start gap-2 ${
+                      breachStatus === 'pwned' ? 'border-red-500/40 bg-red-500/10'
+                      : breachStatus === 'clean' ? 'border-green-500/40 bg-green-500/10'
+                      : 'border-white/10 bg-white/5'
+                    }`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {breachStatus === 'checking' ? <Loader2 size={15} className="text-white/50 animate-spin mt-[1px] shrink-0" aria-hidden="true" />
+                      : breachStatus === 'pwned' ? <ShieldAlert size={15} className="text-red-300 mt-[1px] shrink-0" aria-hidden="true" />
+                      : breachStatus === 'clean' ? <ShieldCheck size={15} className="text-green-300 mt-[1px] shrink-0" aria-hidden="true" />
+                      : <Info size={15} className="text-white/40 mt-[1px] shrink-0" aria-hidden="true" />}
+                    <div>
+                      <p className={`text-xs font-bold ${
+                        breachStatus === 'pwned' ? 'text-red-300'
+                        : breachStatus === 'clean' ? 'text-green-300'
+                        : 'text-white/60'
+                      }`}>
+                        {breachStatus === 'checking' ? t('addCredential.breach.checking', 'Checking breach databases…')
+                          : breachStatus === 'pwned' ? t('addCredential.breach.pwned', 'Found in public breaches')
+                          : breachStatus === 'clean' ? t('addCredential.breach.clean', 'Not found in any known breach')
+                          : breachStatus === 'idle' ? t('addCredential.breach.idle', 'Enter a password to check')
+                          : t('addCredential.breach.unavailable', 'Breach check unavailable')}
+                      </p>
+                      {breachStatus === 'pwned' && (
+                        <p className="text-[11px] text-red-200/70 leading-snug">
+                          {breachCount > 0
+                            ? t('addCredential.breach.pwnedCount', 'Exposed {{count}} times in known breaches — never use this password.', { count: breachCount })
+                            : t('addCredential.breach.pwnedGeneric', 'This password has leaked publicly — choose another.')}
+                        </p>
+                      )}
+                      {breachStatus === 'clean' && (
+                        <p className="text-[11px] text-green-200/60 leading-snug">{t('addCredential.breach.cleanDesc', 'Checked against Have I Been Pwned via k-anonymity — your password never left the device.')}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1871,13 +2332,4 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       </div>
     </motion.div>
   );
-}
-
-function charsetLength(u: boolean, l: boolean, n: boolean, s: boolean) {
-  let count = 0;
-  if (u) count += 26;
-  if (l) count += 26;
-  if (n) count += 10;
-  if (s) count += 30;
-  return count || 1;
 }

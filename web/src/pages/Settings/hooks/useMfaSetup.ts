@@ -63,17 +63,17 @@ export function useMfaSetup(profile: UserProfile) {
   // WebAuthn
   const [webAuthnError, setWebAuthnError] = useState('');
   const [webAuthnBusy, setWebAuthnBusy] = useState(false);
-  const [webAuthnKeyName, setWebAuthnKeyName] = useState('My Security Key');
+  const [webAuthnKeyName, setWebAuthnKeyName] = useState(t('mfa.defaultKeyName', 'My Security Key'));
 
   // Passkey
   const [passkeyError, setPasskeyError] = useState('');
   const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const [passkeyName, setPasskeyName] = useState('My Device');
+  const [passkeyName, setPasskeyName] = useState(t('mfa.defaultDeviceName', 'My Device'));
 
   // Platform auth
   const [platformError, setPlatformError] = useState('');
   const [platformBusy, setPlatformBusy] = useState(false);
-  const [platformName, setPlatformName] = useState('This Device');
+  const [platformName, setPlatformName] = useState(t('mfa.defaultThisDevice', 'This Device'));
 
   // Email OTP
   const [emailInput, setEmailInput] = useState(profile.email || '');
@@ -126,7 +126,7 @@ export function useMfaSetup(profile: UserProfile) {
     setWebAuthnBusy(true);
     try {
       const userEmail = profile.email || 'user@pwdnow';
-      await registerWebAuthn(userEmail, userEmail, profile.firstName || 'User', webAuthnKeyName.trim() || 'Security Key');
+      await registerWebAuthn(userEmail, userEmail, profile.firstName || 'User', webAuthnKeyName.trim() || t('mfa.defaultKeyName', 'My Security Key'));
       refreshMfa();
       setMfaModal({ type: 'webauthn', step: 3 });
     } catch (err) {
@@ -149,7 +149,7 @@ export function useMfaSetup(profile: UserProfile) {
     setPasskeyBusy(true);
     try {
       const userEmail = profile.email || 'user@pwdnow';
-      await registerPasskey(userEmail, userEmail, profile.firstName || 'User', passkeyName.trim() || 'My Device');
+      await registerPasskey(userEmail, userEmail, profile.firstName || 'User', passkeyName.trim() || t('mfa.defaultDeviceName', 'My Device'));
       refreshMfa();
       setMfaModal({ type: 'passkey', step: 3 });
     } catch (err) {
@@ -173,7 +173,7 @@ export function useMfaSetup(profile: UserProfile) {
     setPlatformBusy(true);
     try {
       const userEmail = profile.email || 'user@pwdnow';
-      await registerPlatformAuth(userEmail, userEmail, profile.firstName || 'User', platformName.trim() || 'This Device');
+      await registerPlatformAuth(userEmail, userEmail, profile.firstName || 'User', platformName.trim() || t('mfa.defaultThisDevice', 'This Device'));
       refreshLoginHints();
       refreshMfa();
       setMfaModal({ type: 'platform', step: 3 });
@@ -256,26 +256,78 @@ export function useMfaSetup(profile: UserProfile) {
     refreshMfa();
   };
 
-  const handleEmailSend = () => {
+  const handleEmailSend = async () => {
     setEmailBusy(true);
-    const code = generateEmailCode(emailInput);
-    setEmailSimCode(code);
-    setTimeout(() => {
+    setEmailError('');
+    try {
+      // Detect browser for email context
+      const { isBraveBrowser } = await import('../../../utils/browser');
+      const browserName = (await isBraveBrowser()) ? 'Brave' : undefined;
+
+      const res = await fetch('/api/auth/send-setup-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          toEmail: emailInput,
+          browser: browserName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === 'smtp_not_configured') {
+          setEmailError('Email server not configured. Set up SMTP in Security settings first.');
+          setEmailBusy(false);
+          return;
+        }
+        if (data.error === 'resend_too_soon') {
+          setEmailError(`Please wait ${Math.ceil((data.waitMs || 30000) / 1000)}s before resending.`);
+          setEmailBusy(false);
+          return;
+        }
+        throw new Error(data.error || 'Failed to send code');
+      }
+      // Server sent a real email — no sim code needed
+      setEmailSimCode(null);
       setEmailBusy(false);
       setMfaModal({ type: 'email', step: 2 });
-    }, 800);
+    } catch (e: any) {
+      setEmailError(e.message || 'Failed to send verification code.');
+      setEmailBusy(false);
+    }
   };
 
-  const handleEmailVerify = () => {
+  const handleEmailVerify = async () => {
     const token = emailCode.join('');
-    const ok = verifyEmailCode(token);
-    if (!ok) { setEmailError('Incorrect code. Codes expire after 5 minutes.'); return; }
-    const cfg = getMfaConfig();
-    cfg.email = { enabled: true, address: emailInput, enabledAt: Date.now() };
-    saveMfaConfig(cfg);
-    refreshLoginHints();
-    refreshMfa();
-    setMfaModal({ type: 'email', step: 3 });
+    setEmailError('');
+    try {
+      const res = await fetch('/api/auth/verify-setup-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code: token }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        if (data.error === 'expired_or_invalid') {
+          setEmailError('Code expired. Please request a new one.');
+        } else if (data.error === 'too_many_attempts') {
+          setEmailError('Too many attempts. Please request a new code.');
+        } else {
+          setEmailError(`Incorrect code.${data.attemptsLeft != null ? ` ${data.attemptsLeft} attempt(s) left.` : ''}`);
+        }
+        return;
+      }
+      // Verified — enable email MFA
+      const cfg = getMfaConfig();
+      cfg.email = { enabled: true, address: data.email || emailInput, enabledAt: Date.now() };
+      saveMfaConfig(cfg);
+      refreshLoginHints();
+      refreshMfa();
+      setMfaModal({ type: 'email', step: 3 });
+    } catch (e: any) {
+      setEmailError(e.message || 'Verification failed.');
+    }
   };
 
   const handleEmailRemove = () => {

@@ -102,4 +102,5 @@ export interface EmailServerConfig {
   pass: string;
   secure?: boolean;
   protocol?: 'none' | 'ssl_tls' | 'starttls';
+  fromName?: string;
 }

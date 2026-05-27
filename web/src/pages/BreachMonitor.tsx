@@ -26,6 +26,7 @@ interface ScanResult {
 // ── Plan B: HIBP k-anonymity API ────────────────────────────────────────────
 async function checkViaHibpApi(password: string): Promise<boolean> {
   const msgBuffer = new TextEncoder().encode(password);
+  // deepcode ignore InsecureHash: HIBP API explicitly requires SHA-1 for k-anonymity
   const hashBuffer = await crypto.subtle.digest('SHA-1', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();

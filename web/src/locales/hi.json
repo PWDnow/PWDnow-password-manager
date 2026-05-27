@@ -164,9 +164,16 @@
     "cardDisclaimer": "केवल व्यक्तिगत संदर्भ भंडारण — PCI-DSS प्रमाणित नहीं।",
     "cardholderName": "कार्डधारक का नाम",
     "cardNumber": "कार्ड नंबर",
-    "cardExpiry": "समाप्ति तिथि (MM/YYYY)",
+    "cardExpiry": "समाप्ति तिथि",
     "cardCvv": "CVV",
     "cardBillingAddress": "बिलिंग पता (वैकल्पिक)",
+    "cardExpiryPick": "MM / YYYY",
+    "cardCvv4Hint": "Amex 4 अंकों का सुरक्षा कोड उपयोग करता है",
+    "cardLuhnError": "अमान्य कार्ड नंबर। अपने अंक जांचें।",
+    "cardLuhnValid": "वैध कार्ड नंबर",
+    "cardExpired": "यह कार्ड पहले ही समाप्त हो चुका है",
+    "cardExpiringSoon": "{{days}} दिनों में समाप्त। सहेजने से पहले सत्यापित करें।",
+    "cardNetworkHint": "{{network}}, {{length}} अंक अपेक्षित",
     "editTitle": "क्रेडेंशियल संपादित करें",
     "addTitle": "नया क्रेडेंशियल",
     "description": "एंटरप्राइज़-स्तरीय एन्क्रिप्शन और उन्नत सुरक्षा प्रोटोकॉल के साथ अपनी लॉगिन जानकारी सुरक्षित रूप से संग्रहीत करें।",
@@ -252,7 +259,8 @@
       "bulletList": "Bullet list",
       "clear": "Remove formatting from selection"
     },
-    "tagsLabel": "टैग"
+    "tagsLabel": "टैग",
+    "cardBillingPlaceholder": "123 मुख्य सड़क, शहर"
   },
   "manageFolders": {
     "title": "फ़ोल्डर प्रबंधित करें",
@@ -846,7 +854,8 @@
     "passkeyDesc": "अपनी उंगलियों की छाप, चेहरा या डिवाइस PIN उपयोग करें",
     "simEmailPreview": "सिमुलेटेड ईमेल पूर्वावलोकन",
     "simEmailCode": "आपका एक बार का कोड:",
-    "simEmailNote": "5 मिनट के लिए वैध। साझा न करें।"
+    "simEmailNote": "5 मिनट के लिए वैध। साझा न करें।",
+    "emailPlaceholder": "नाम@कंपनी.com"
   },
   "register": {
     "title": "खाता बनाएं",
@@ -1130,7 +1139,10 @@
     "operationTimedOut": "ऑपरेशन समय समाप्त। बटन क्लिक करने से पहले सुरक्षा कुंजी लगाएँ और तुरंत ब्राउज़र संकेत का जवाब दें।",
     "credentialAlreadyRegistered": "यह क्रेडेंशियल पहले से पंजीकृत है। मौजूदा प्रविष्टि हटाएँ और पुनः प्रयास करें।",
     "authenticatorTypeNotSupported": "यह प्रमाणक प्रकार वर्तमान ब्राउज़र या वातावरण में समर्थित नहीं है।",
-    "registrationFailed": "पंजीकरण विफल। अपने प्रमाणक की जाँच करें और पुनः प्रयास करें।"
+    "registrationFailed": "पंजीकरण विफल। अपने प्रमाणक की जाँच करें और पुनः प्रयास करें।",
+    "defaultKeyName": "मेरी सुरक्षा कुंजी",
+    "defaultDeviceName": "मेरा डिवाइस",
+    "defaultThisDevice": "यह डिवाइस"
   },
   "audit": {
     "activeSessions": "सक्रिय सत्र",

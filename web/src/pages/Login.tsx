@@ -735,6 +735,13 @@ export default function Login() {
         return;
       }
     } catch (err) {
+      if (err instanceof TypeError) {
+        // Network error — server unreachable. Don't count as a failed login attempt.
+        setError(t('login.serviceUnavailable', 'A service is currently unavailable. Please try again in a moment or contact your administrator.'));
+        setPassword('');
+        setLoading(false);
+        return;
+      }
       logger.error('[Login] offline auth error:', err);
     }
 
@@ -882,7 +889,7 @@ export default function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#141414] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all outline-none text-base"
-                    placeholder="name@company.com"
+                    placeholder={t('login.emailPlaceholder', 'name@company.com')}
                     required
                     autoFocus
                     autoComplete="email"
@@ -951,7 +958,7 @@ export default function Login() {
                         placeholder="••••••••"
                         required
                         autoFocus
-                        autoComplete="current-password"
+                        autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'current-password' : 'off'}
                         aria-invalid={!!error}
                       />
                     </div>
@@ -1069,7 +1076,7 @@ export default function Login() {
                                 placeholder="••••••••"
                                 required
                                 autoFocus
-                                autoComplete="current-password"
+                                autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'current-password' : 'off'}
                                 aria-invalid={!!error}
                               />
                             </div>

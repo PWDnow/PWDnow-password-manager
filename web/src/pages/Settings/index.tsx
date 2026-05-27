@@ -138,7 +138,7 @@ export default function Settings() {
 
         {activeTab === 'security' && (
           <>
-            <MfaSection profile={profile} />
+            <MfaSection profile={profile} emailServerConfig={null} />
             <RecoveryKeySection 
               profile={profile} 
               setIsRecoveryModalOpen={setIsRecoveryModalOpen} 

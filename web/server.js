@@ -542,7 +542,16 @@ app.get('/api/system/dns-check', async (req, res) => {
     return res.status(400).json({ error: 'Invalid domain' });
   }
   const cleanDomain = domain.toLowerCase().trim();
-  const dkimSelectors = ['mail', 'default', 'google', 'selector1', 'selector2'];
+  const dkimSelectors = [
+    'mail', 'default', 'google', 'selector1', 'selector2',
+    // Zoho
+    'zoho', 'zmail', 'zm1', 'zm2', '1024', '2048',
+    // Other providers
+    'k1', 'k2', 'k3', 'dkim', 'smtp', 'email', 's1', 's2',
+    'protonmail', 'protonmail2', 'protonmail3',
+    'amazonses', 'postmark', 'mandrill', 'cm', 'mimecast',
+    'dkim2', 'sig1', 'everlytickey1', 'everlytickey2',
+  ];
 
   const [mxR, txtR, dmarcR, dkimR, bimiR] = await Promise.allSettled([
     dnsPromises.resolveMx(cleanDomain),
@@ -567,7 +576,10 @@ app.get('/api/system/dns-check', async (req, res) => {
   let dkim = false;
   if (dkimR.status === 'fulfilled') {
     dkim = dkimR.value.some(
-      r => r.status === 'fulfilled' && r.value.some(txt => txt.join('').includes('v=DKIM1'))
+      r => r.status === 'fulfilled' && r.value.some(txt => {
+        const joined = txt.join('');
+        return joined.includes('v=DKIM1') || (joined.includes('p=') && joined.includes('k='));
+      })
     );
   }
 
@@ -588,7 +600,7 @@ mountAuthAndVault(app);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get('*', (req, res) => {
+app.get('*path', (req, res) => {
   const indexHtml = getSriHtml();
   if (!indexHtml) {
     return res.status(503).send('Application not built. Run: npm run build');
