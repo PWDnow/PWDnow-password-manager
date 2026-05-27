@@ -167,9 +167,16 @@
     "cardDisclaimer": "仅限个人参考存储 — 未经 PCI-DSS 认证。",
     "cardholderName": "持卡人姓名",
     "cardNumber": "卡号",
-    "cardExpiry": "有效期（MM/YYYY）",
+    "cardExpiry": "有效期",
     "cardCvv": "CVV",
     "cardBillingAddress": "账单地址（可选）",
+    "cardExpiryPick": "月 / 年",
+    "cardCvv4Hint": "Amex 使用4位安全码",
+    "cardLuhnError": "无效的卡号。请检查您的数字。",
+    "cardLuhnValid": "有效的卡号",
+    "cardExpired": "此卡已过期",
+    "cardExpiringSoon": "将在 {{days}} 天后过期。保存前请核实。",
+    "cardNetworkHint": "{{network}}，需要 {{length}} 位数字",
     "editTitle": "编辑凭据",
     "addTitle": "新建凭据",
     "description": "使用企业级加密和高级安全协议安全存储您的登录信息。",
@@ -255,7 +262,8 @@
       "bulletList": "Bullet list",
       "clear": "Remove formatting from selection"
     },
-    "tagsLabel": "标签"
+    "tagsLabel": "标签",
+    "cardBillingPlaceholder": "北京市朝阳区建国路123号"
   },
   "manageFolders": {
     "title": "管理文件夹",
@@ -849,7 +857,8 @@
     "passkeyDesc": "使用您的指纹、面部或设备 PIN",
     "simEmailPreview": "模拟电子邮件预览",
     "simEmailCode": "您的一次性验证码：",
-    "simEmailNote": "有效期 5 分钟。请勿分享。"
+    "simEmailNote": "有效期 5 分钟。请勿分享。",
+    "emailPlaceholder": "名字@公司.com"
   },
   "register": {
     "title": "创建账户",
@@ -1092,7 +1101,10 @@
     "operationTimedOut": "操作超时。请在点击按钮之前插入安全密钥，并及时响应浏览器提示。",
     "credentialAlreadyRegistered": "此凭据已注册。请删除现有条目后重试。",
     "authenticatorTypeNotSupported": "当前浏览器或环境不支持此认证器类型。",
-    "registrationFailed": "注册失败。请检查您的认证器后重试。"
+    "registrationFailed": "注册失败。请检查您的认证器后重试。",
+    "defaultKeyName": "我的安全密钥",
+    "defaultDeviceName": "我的设备",
+    "defaultThisDevice": "此设备"
   },
   "audit": {
     "activeSessions": "活跃会话",

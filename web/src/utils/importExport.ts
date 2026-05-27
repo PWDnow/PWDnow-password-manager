@@ -281,6 +281,7 @@ export function importBitwardenJSON(text: string): ImportResult {
 }
 
 export function importBitwardenCSV(text: string): ImportResult {
+  // deepcode ignore NoHardcodedPasswords: This is a CSV header mapping, not a hardcoded credential
   return csvImport(text, {
     title:'name', url:'login_uri', username:'login_username',
     password:'login_password', notes:'notes', otp:'login_totp', folder:'folder',

@@ -1213,12 +1213,21 @@ export function mountAuthRoutes(app) {
       }
     }
 
-    const DKIM_SELECTORS = ['google', 'default', 'selector1', 'selector2', 'k1', 'mail', 'dkim', 'smtp', 'email', 's1'];
+    const DKIM_SELECTORS = [
+      'google', 'default', 'selector1', 'selector2', 'k1', 'k2', 'k3',
+      'mail', 'dkim', 'smtp', 'email', 's1', 's2',
+      // Zoho
+      'zoho', 'zmail', 'zm1', 'zm2', '1024', '2048',
+      // Other providers
+      'protonmail', 'protonmail2', 'protonmail3',
+      'amazonses', 'postmark', 'mandrill', 'cm', 'mimecast',
+      'dkim2', 'sig1', 'everlytickey1', 'everlytickey2',
+    ];
     const dkimResults = await Promise.allSettled(
       DKIM_SELECTORS.map(async selector => {
         const txt = await dnsPromises.resolveTxt(`${selector}._domainkey.${domain}`);
         const record = txt.flat().join('');
-        if (record.includes('v=DKIM1') || record.includes('p=')) return { selector, record };
+        if (record.includes('v=DKIM1') || (record.includes('p=') && record.includes('k='))) return { selector, record };
         throw new Error('no_match');
       })
     );

@@ -167,9 +167,16 @@
     "cardDisclaimer": "Apenas armazenamento de referência pessoal — não certificado PCI-DSS.",
     "cardholderName": "Nome do titular",
     "cardNumber": "Número do cartão",
-    "cardExpiry": "Validade (MM/AAAA)",
+    "cardExpiry": "Data de validade",
     "cardCvv": "CVV",
     "cardBillingAddress": "Endereço de cobrança (opcional)",
+    "cardExpiryPick": "MM / AAAA",
+    "cardCvv4Hint": "Amex usa um código de segurança de 4 dígitos",
+    "cardLuhnError": "Número de cartão inválido. Verifique os dígitos.",
+    "cardLuhnValid": "Número de cartão válido",
+    "cardExpired": "Este cartão já expirou",
+    "cardExpiringSoon": "Expira em {{days}} dias. Verifique antes de guardar.",
+    "cardNetworkHint": "{{network}}, {{length}} dígitos esperados",
     "editTitle": "Editar credencial",
     "addTitle": "Nova credencial",
     "description": "Armazene suas informações de login com segurança usando criptografia de nível empresarial e protocolos de segurança avançados.",
@@ -255,7 +262,8 @@
       "bulletList": "Bullet list",
       "clear": "Remove formatting from selection"
     },
-    "tagsLabel": "Tags"
+    "tagsLabel": "Tags",
+    "cardBillingPlaceholder": "Rua Principal 123, Cidade"
   },
   "manageFolders": {
     "title": "Gerenciar pastas",
@@ -849,7 +857,8 @@
     "passkeyDesc": "Use sua impressão digital, rosto ou PIN do dispositivo",
     "simEmailPreview": "Pré-visualização de e-mail simulado",
     "simEmailCode": "Seu código de uso único:",
-    "simEmailNote": "Válido por 5 minutos. Não compartilhe."
+    "simEmailNote": "Válido por 5 minutos. Não compartilhe.",
+    "emailPlaceholder": "nome@empresa.com"
   },
   "register": {
     "title": "Criar uma conta",
@@ -1092,7 +1101,10 @@
     "operationTimedOut": "A operação expirou. Conecte a chave de segurança antes de clicar e responda prontamente.",
     "credentialAlreadyRegistered": "Esta credencial já está registrada. Remova a entrada existente e tente novamente.",
     "authenticatorTypeNotSupported": "Este tipo de autenticador não é suportado no navegador ou ambiente atual.",
-    "registrationFailed": "Falha no registro. Verifique seu autenticador e tente novamente."
+    "registrationFailed": "Falha no registro. Verifique seu autenticador e tente novamente.",
+    "defaultKeyName": "Minha chave de segurança",
+    "defaultDeviceName": "Meu dispositivo",
+    "defaultThisDevice": "Este dispositivo"
   },
   "audit": {
     "activeSessions": "Sessões ativas",

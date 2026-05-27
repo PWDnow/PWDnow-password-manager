@@ -164,9 +164,16 @@
     "cardDisclaimer": "個人用リファレンスストレージのみ — PCI-DSS認証なし。",
     "cardholderName": "カード名義人",
     "cardNumber": "カード番号",
-    "cardExpiry": "有効期限（MM/YYYY）",
+    "cardExpiry": "有効期限",
     "cardCvv": "CVV",
     "cardBillingAddress": "請求先住所（オプション）",
+    "cardExpiryPick": "MM / YYYY",
+    "cardCvv4Hint": "Amexは4桁のセキュリティコードを使用します",
+    "cardLuhnError": "カード番号が無効です。数字を確認してください。",
+    "cardLuhnValid": "有効なカード番号",
+    "cardExpired": "このカードはすでに有効期限切れです",
+    "cardExpiringSoon": "{{days}}日後に有効期限が切れます。保存前に確認してください。",
+    "cardNetworkHint": "{{network}}、{{length}}桁が必要です",
     "editTitle": "認証情報を編集",
     "addTitle": "新しい認証情報",
     "description": "エンタープライズレベルの暗号化と高度なセキュリティプロトコルでログイン情報を安全に保存します。",
@@ -252,7 +259,8 @@
       "bulletList": "箇条書きリスト",
       "clear": "選択範囲から書式を削除"
     },
-    "tagsLabel": "タグ"
+    "tagsLabel": "タグ",
+    "cardBillingPlaceholder": "東京都渋谷区1-2-3"
   },
   "manageFolders": {
     "title": "フォルダ管理",
@@ -846,7 +854,8 @@
     "passkeyDesc": "指紋、顔、またはデバイスPINを使用",
     "simEmailPreview": "シミュレートされたメールのプレビュー",
     "simEmailCode": "ワンタイムコード:",
-    "simEmailNote": "5分間有効。共有しないでください。"
+    "simEmailNote": "5分間有効。共有しないでください。",
+    "emailPlaceholder": "名前@会社.com"
   },
   "register": {
     "title": "アカウントを作成",
@@ -1130,7 +1139,10 @@
     "operationTimedOut": "操作がタイムアウトしました。ボタンをクリックする前にセキュリティキーを接続し、ブラウザのプロンプトにすぐに応答してください。",
     "credentialAlreadyRegistered": "この資格情報はすでに登録されています。既存のエントリを削除して再試行してください。",
     "authenticatorTypeNotSupported": "この認証器タイプは現在のブラウザまたは環境ではサポートされていません。",
-    "registrationFailed": "登録に失敗しました。認証器を確認して再試行してください。"
+    "registrationFailed": "登録に失敗しました。認証器を確認して再試行してください。",
+    "defaultKeyName": "マイセキュリティキー",
+    "defaultDeviceName": "マイデバイス",
+    "defaultThisDevice": "このデバイス"
   },
   "audit": {
     "activeSessions": "アクティブセッション",

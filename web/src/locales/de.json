@@ -167,9 +167,16 @@
     "cardDisclaimer": "Nur persönliche Referenzspeicherung – nicht PCI-DSS-zertifiziert.",
     "cardholderName": "Name des Karteninhabers",
     "cardNumber": "Kartennummer",
-    "cardExpiry": "Ablaufdatum (MM/JJJJ)",
+    "cardExpiry": "Ablaufdatum",
     "cardCvv": "CVV",
     "cardBillingAddress": "Rechnungsadresse (optional)",
+    "cardExpiryPick": "MM / JJJJ",
+    "cardCvv4Hint": "Amex verwendet einen 4-stelligen Sicherheitscode",
+    "cardLuhnError": "Ungültige Kartennummer. Überprüfen Sie Ihre Ziffern.",
+    "cardLuhnValid": "Gültige Kartennummer",
+    "cardExpired": "Diese Karte ist bereits abgelaufen",
+    "cardExpiringSoon": "Läuft in {{days}} Tagen ab. Vor dem Speichern prüfen.",
+    "cardNetworkHint": "{{network}}, {{length}} Stellen erwartet",
     "editTitle": "Zugangsdaten bearbeiten",
     "addTitle": "Neue Zugangsdaten",
     "description": "Speichern Sie Ihre Anmeldeinformationen sicher mit Verschlüsselung auf Unternehmensniveau und fortschrittlichen Sicherheitsprotokollen.",
@@ -255,7 +262,8 @@
       "bulletList": "Liste",
       "clear": "Formatierung löschen"
     },
-    "tagsLabel": "Tags"
+    "tagsLabel": "Tags",
+    "cardBillingPlaceholder": "Musterstraße 1, Stadt"
   },
   "manageFolders": {
     "title": "Ordner verwalten",
@@ -849,7 +857,8 @@
     "passkeyDesc": "Verwenden Sie Ihren Fingerabdruck, Ihr Gesicht oder Ihre Geräte-PIN",
     "simEmailPreview": "Simulierte E-Mail-Vorschau",
     "simEmailCode": "Ihr Einmalcode:",
-    "simEmailNote": "Gültig für 5 Minuten. Nicht weitergeben."
+    "simEmailNote": "Gültig für 5 Minuten. Nicht weitergeben.",
+    "emailPlaceholder": "name@unternehmen.com"
   },
   "register": {
     "title": "Konto erstellen",
@@ -1092,7 +1101,10 @@
     "operationTimedOut": "Zeitüberschreitung. Stecken Sie den Sicherheitsschlüssel ein, bevor Sie den Button klicken.",
     "credentialAlreadyRegistered": "Diese Anmeldeinformation ist bereits registriert. Entfernen Sie den vorhandenen Eintrag und versuchen Sie es erneut.",
     "authenticatorTypeNotSupported": "Dieser Authentifikatortyp wird im aktuellen Browser nicht unterstützt.",
-    "registrationFailed": "Registrierung fehlgeschlagen. Überprüfen Sie Ihren Authentifikator."
+    "registrationFailed": "Registrierung fehlgeschlagen. Überprüfen Sie Ihren Authentifikator.",
+    "defaultKeyName": "Mein Sicherheitsschlüssel",
+    "defaultDeviceName": "Mein Gerät",
+    "defaultThisDevice": "Dieses Gerät"
   },
   "audit": {
     "activeSessions": "Aktive Sitzungen",

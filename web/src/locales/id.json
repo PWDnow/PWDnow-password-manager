@@ -164,9 +164,16 @@
     "cardDisclaimer": "Hanya penyimpanan referensi pribadi — tidak bersertifikat PCI-DSS.",
     "cardholderName": "Nama pemegang kartu",
     "cardNumber": "Nomor kartu",
-    "cardExpiry": "Kedaluwarsa (BB/TTTT)",
+    "cardExpiry": "Tanggal Kedaluwarsa",
     "cardCvv": "CVV",
     "cardBillingAddress": "Alamat penagihan (opsional)",
+    "cardExpiryPick": "BB / TTTT",
+    "cardCvv4Hint": "Amex menggunakan kode keamanan 4 digit",
+    "cardLuhnError": "Nomor kartu tidak valid. Periksa digit Anda.",
+    "cardLuhnValid": "Nomor kartu valid",
+    "cardExpired": "Kartu ini sudah kedaluwarsa",
+    "cardExpiringSoon": "Kedaluwarsa dalam {{days}} hari. Verifikasi sebelum menyimpan.",
+    "cardNetworkHint": "{{network}}, {{length}} digit diharapkan",
     "editTitle": "Edit kredensial",
     "addTitle": "Kredensial baru",
     "description": "Simpan informasi login Anda dengan aman menggunakan enkripsi tingkat perusahaan dan protokol keamanan canggih.",
@@ -252,7 +259,8 @@
       "bulletList": "Bullet list",
       "clear": "Remove formatting from selection"
     },
-    "tagsLabel": "Tag"
+    "tagsLabel": "Tag",
+    "cardBillingPlaceholder": "Jl. Utama No. 123, Kota"
   },
   "manageFolders": {
     "title": "Kelola folder",
@@ -846,7 +854,8 @@
     "passkeyDesc": "Gunakan sidik jari, wajah, atau PIN perangkat Anda",
     "simEmailPreview": "Pratinjau Email Simulasi",
     "simEmailCode": "Kode sekali pakai Anda:",
-    "simEmailNote": "Berlaku selama 5 menit. Jangan dibagikan."
+    "simEmailNote": "Berlaku selama 5 menit. Jangan dibagikan.",
+    "emailPlaceholder": "nama@perusahaan.com"
   },
   "register": {
     "title": "Buat akun",
@@ -1130,7 +1139,10 @@
     "operationTimedOut": "Operasi habis waktu. Colokkan kunci keamanan sebelum mengklik tombol dan segera respons permintaan browser.",
     "credentialAlreadyRegistered": "Kredensial ini sudah terdaftar. Hapus entri yang ada dan coba lagi.",
     "authenticatorTypeNotSupported": "Jenis autentikator ini tidak didukung di browser atau lingkungan saat ini.",
-    "registrationFailed": "Pendaftaran gagal. Periksa autentikator Anda dan coba lagi."
+    "registrationFailed": "Pendaftaran gagal. Periksa autentikator Anda dan coba lagi.",
+    "defaultKeyName": "Kunci Keamanan Saya",
+    "defaultDeviceName": "Perangkat Saya",
+    "defaultThisDevice": "Perangkat Ini"
   },
   "audit": {
     "activeSessions": "Sesi Aktif",

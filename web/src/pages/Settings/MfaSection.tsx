@@ -20,9 +20,10 @@ import type { UserProfile } from '../../context/UserContext';
 
 interface Props {
   profile: UserProfile;
+  emailServerConfig: import('../../types').EmailServerConfig | null;
 }
 
-export default function MfaSection({ profile }: Props) {
+export default function MfaSection({ profile, emailServerConfig }: Props) {
   const { t } = useTranslation();
   const {
     mfaConfig,
@@ -452,6 +453,7 @@ export default function MfaSection({ profile }: Props) {
                 setMfaModal={setMfaModal}
                 setEmailCode={setEmailCode}
                 setEmailError={setEmailError}
+                emailServerConfig={emailServerConfig}
                 handlePasskeyRemove={handlePasskeyRemove}
                 passkeyName={passkeyName}
                 setPasskeyName={setPasskeyName}

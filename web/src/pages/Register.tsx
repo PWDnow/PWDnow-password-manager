@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Shield, ArrowRight, Building2, Users, Loader2, Check, X, Minus } from 'lucide-react';
@@ -9,6 +9,7 @@ import { daemon } from '../utils/daemonClient';
 import { generateUUID } from '../utils/crypto';
 import { apiFetch, ApiError, hasServerSession as _hasServerSession } from '../utils/api';
 import { logger } from '../utils/logger';
+import { checkHibpPassword } from '../utils/hibp';
 
 export default function Register() {
   const { t } = useTranslation();
@@ -34,6 +35,49 @@ export default function Register() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
 
+  // HIBP live check state: null = not checked, true = clean, false = pwned
+  const [hibpStatus, setHibpStatus] = useState<boolean | null>(null);
+  const [hibpChecking, setHibpChecking] = useState(false);
+  const hibpAbortRef = useRef<AbortController | null>(null);
+
+  // Debounced HIBP k-anonymity check on password change
+  useEffect(() => {
+    // Reset when password is empty or too short to be meaningful
+    if (!formData.password || formData.password.length < 8) {
+      setHibpStatus(null);
+      setHibpChecking(false);
+      return;
+    }
+
+    setHibpChecking(true);
+    const timer = setTimeout(() => {
+      // Cancel any in-flight request
+      hibpAbortRef.current?.abort();
+      const controller = new AbortController();
+      hibpAbortRef.current = controller;
+
+      checkHibpPassword(formData.password, controller.signal)
+        .then(({ pwned }) => {
+          if (!controller.signal.aborted) {
+            setHibpStatus(!pwned); // true = clean, false = pwned
+            setHibpChecking(false);
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            // Network error / API down — don't block, show neutral
+            setHibpStatus(null);
+            setHibpChecking(false);
+          }
+        });
+    }, 600); // 600ms debounce to avoid hammering API while typing
+
+    return () => {
+      clearTimeout(timer);
+      hibpAbortRef.current?.abort();
+    };
+  }, [formData.password]);
+
   const WEAK_PATTERNS_RULE = [/^(.)\1+$/, /^(0123456789|12345678901|abcdefghij)/i, /^(password|letmein|welcome|qwerty)/i];
 
   const passwordRules = [
@@ -55,7 +99,7 @@ export default function Register() {
     {
       key: 'rule4',
       label: t('register.passwordRule4', 'Not found in known data breaches'),
-      met: null,
+      met: hibpChecking ? null : hibpStatus,
     },
   ];
 
@@ -95,18 +139,34 @@ export default function Register() {
       setError(t('register.errorPasswordWeak', 'This password is too common or predictable. Please choose a stronger one.'));
       return;
     }
-    if (formData.password !== confirmPassword) {
+    let mismatch = formData.password.length === confirmPassword.length ? 0 : 1;
+    for (let i = 0; i < Math.max(formData.password.length, confirmPassword.length); i++) {
+      mismatch |= (formData.password.charCodeAt(i) || 0) ^ (confirmPassword.charCodeAt(i) || 0);
+    }
+    if (mismatch !== 0) {
       setError(t('register.errorPasswordMatch', 'Passwords do not match.'));
       return;
     }
 
+    // Block registration if the password has been found in known breaches.
+    // Primary: HIBP k-anonymity range API (only 5-char SHA-1 prefix leaves the browser).
+    // Fallback: daemon's local cuckoo filter (fully offline).
     try {
-      const { pwned } = await daemon.checkPasswordBreached(formData.password);
+      const { pwned } = await checkHibpPassword(formData.password);
       if (pwned) {
         setError(t('register.errorPasswordPwned', 'This password was found in a known data breach. Please choose a different one.'));
         return;
       }
-    } catch { /* daemon unavailable - skip HIBP check */ }
+    } catch {
+      // HIBP API unreachable — try daemon's local filter as fallback
+      try {
+        const { pwned } = await daemon.checkPasswordBreached(formData.password);
+        if (pwned) {
+          setError(t('register.errorPasswordPwned', 'This password was found in a known data breach. Please choose a different one.'));
+          return;
+        }
+      } catch { /* both unavailable — allow registration to proceed */ }
+    }
 
     setLoading(true);
 

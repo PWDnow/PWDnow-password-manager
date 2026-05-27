@@ -18,6 +18,7 @@ import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { isWebAuthnSupported, isSecureContext, type MfaConfig } from '../../utils/mfa';
 import type { MfaModalState } from './hooks/useMfaSetup';
+import type { EmailServerConfig } from '../../types';
 
 interface DigitInputHandlers {
   onChange(index: number, value: string): void;
@@ -76,6 +77,7 @@ interface Props {
   platformBusy: boolean;
   platformError: string;
   platformAuthAvail: boolean | null;
+  emailServerConfig: EmailServerConfig | null;
 }
 
 export default function MfaModalContent(props: Props) {
@@ -130,7 +132,8 @@ export default function MfaModalContent(props: Props) {
     handlePlatformRegister,
     platformBusy,
     platformError,
-    platformAuthAvail
+    platformAuthAvail,
+    emailServerConfig,
   } = props;
 
   return (

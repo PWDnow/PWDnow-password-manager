@@ -173,9 +173,16 @@
     "cardDisclaimer": "Stockage de référence personnel uniquement — pas certifié PCI-DSS.",
     "cardholderName": "Nom du titulaire",
     "cardNumber": "Numéro de carte",
-    "cardExpiry": "Expiration (MM/AAAA)",
+    "cardExpiry": "Date d'expiration",
     "cardCvv": "CVV",
     "cardBillingAddress": "Adresse de facturation (optionnel)",
+    "cardExpiryPick": "MM / AAAA",
+    "cardCvv4Hint": "Amex utilise un code de sécurité à 4 chiffres",
+    "cardLuhnError": "Numéro de carte invalide. Vérifiez vos chiffres.",
+    "cardLuhnValid": "Numéro de carte valide",
+    "cardExpired": "Cette carte a déjà expiré",
+    "cardExpiringSoon": "Expire dans {{days}} jours. Vérifiez avant d'enregistrer.",
+    "cardNetworkHint": "{{network}}, {{length}} chiffres attendus",
     "editTitle": "Modifier l'identifiant",
     "addTitle": "Nouvel identifiant",
     "description": "Stockez vos informations de connexion en toute sécurité grâce à un chiffrement de niveau entreprise et des protocoles de sécurité avancés.",
@@ -206,6 +213,43 @@
     "securityAdvisory": "Avis de sécurité",
     "passphraseAdvisory": "Les phrases secrètes offrent une entropie élevée avec une faible charge cognitive. Cette configuration donne environ <1>{{bits}} bits</1> de sécurité.",
     "passwordAdvisory": "Ce mot de passe utilise une entropie de <1>{{bits}} bits</1>. Recommandé pour les cibles de haute valeur.",
+    "entropyHeadline": "{{bits}} bits d'entropie · {{label}}",
+    "quantum": {
+      "proof": "Inviolable au quantique",
+      "resistant": "Résistant au quantique",
+      "vulnerable": "Vulnérable au quantique",
+      "proofDesc": "Conserve une sécurité de 128 bits même face à l'algorithme de Grover — au niveau du socle AES-256 de ce coffre.",
+      "resistantDesc": "L'algorithme de Grover réduit cela à {{pq}} bits effectifs. Ajoutez ~{{add}} bits d'entropie de plus pour devenir inviolable au quantique.",
+      "vulnerableDesc": "L'algorithme de Grover réduit cela à seulement {{pq}} bits effectifs face à un attaquant quantique."
+    },
+    "attacker": {
+      "label": "Modèle de menace",
+      "online": "En ligne",
+      "gpu": "Ferme GPU",
+      "nationState": "État-nation"
+    },
+    "crack": {
+      "classical": "Classique",
+      "quantum": "Quantique",
+      "instant": "instantanément",
+      "seconds": "{{value}} secondes",
+      "minutes": "{{value}} minutes",
+      "hours": "{{value}} heures",
+      "days": "{{value}} jours",
+      "years": "{{value}} ans",
+      "powerYears": "10^{{exp}} ans",
+      "note": "Temps moyen pour épuiser l'espace de clés à {{rate}} essais/s. Les estimations quantiques supposent l'algorithme de Grover."
+    },
+    "breach": {
+      "checking": "Vérification des bases de fuites…",
+      "pwned": "Trouvé dans des fuites publiques",
+      "clean": "Introuvable dans les fuites connues",
+      "idle": "Saisissez un mot de passe pour vérifier",
+      "unavailable": "Vérification des fuites indisponible",
+      "pwnedCount": "Exposé {{count}} fois dans des fuites connues — n'utilisez jamais ce mot de passe.",
+      "pwnedGeneric": "Ce mot de passe a fuité publiquement — choisissez-en un autre.",
+      "cleanDesc": "Vérifié via Have I Been Pwned en k-anonymat — votre mot de passe n'a jamais quitté l'appareil."
+    },
     "generator": "Générateur",
     "aesEncryption": "Chiffrement AES-256 bits",
     "zeroKnowledge": "Architecture Zero-Knowledge",
@@ -261,7 +305,8 @@
       "bulletList": "Liste à puces",
       "clear": "Supprimer la mise en forme de la sélection"
     },
-    "tagsLabel": "Tags"
+    "tagsLabel": "Tags",
+    "cardBillingPlaceholder": "123 rue Principale, Ville"
   },
   "manageFolders": {
     "title": "Gérer les dossiers",
@@ -858,7 +903,8 @@
     "passkeyDesc": "Utilisez votre empreinte digitale, votre visage ou le PIN de l'appareil",
     "simEmailPreview": "Aperçu de l'e-mail simulé",
     "simEmailCode": "Votre code à usage unique :",
-    "simEmailNote": "Valide 5 minutes. Ne pas partager."
+    "simEmailNote": "Valide 5 minutes. Ne pas partager.",
+    "emailPlaceholder": "nom@entreprise.com"
   },
   "register": {
     "title": "Créer un compte",
@@ -1108,7 +1154,10 @@
     "operationTimedOut": "L'opération a expiré. Branchez votre clé avant de cliquer et répondez rapidement.",
     "credentialAlreadyRegistered": "Cette accréditation est déjà enregistrée. Supprimez l'entrée existante et réessayez.",
     "authenticatorTypeNotSupported": "Ce type d'authentificateur n'est pas pris en charge dans le navigateur ou l'environnement actuel.",
-    "registrationFailed": "Échec de l'enregistrement. Vérifiez votre authentificateur et réessayez."
+    "registrationFailed": "Échec de l'enregistrement. Vérifiez votre authentificateur et réessayez.",
+    "defaultKeyName": "Ma clé de sécurité",
+    "defaultDeviceName": "Mon appareil",
+    "defaultThisDevice": "Cet appareil"
   },
   "audit": {
     "activeSessions": "Sessions actives",

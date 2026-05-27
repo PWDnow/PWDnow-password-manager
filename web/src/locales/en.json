@@ -171,9 +171,16 @@
     "cardDisclaimer": "Personal reference storage only — not PCI-DSS certified.",
     "cardholderName": "Cardholder Name",
     "cardNumber": "Card Number",
-    "cardExpiry": "Expiry (MM/YYYY)",
+    "cardExpiry": "Expiry Date",
+    "cardExpiryPick": "MM / YYYY",
     "cardCvv": "CVV",
+    "cardCvv4Hint": "Amex uses a 4-digit security code",
     "cardBillingAddress": "Billing Address (optional)",
+    "cardLuhnError": "Invalid card number. Check your digits.",
+    "cardLuhnValid": "Valid card number",
+    "cardExpired": "This card has already expired",
+    "cardExpiringSoon": "Expires in {{days}} days. Verify before saving.",
+    "cardNetworkHint": "{{network}}, {{length}} digits expected",
     "editTitle": "Edit Credential",
     "addTitle": "New Credential",
     "description": "Securely store your login information with enterprise-grade encryption and advanced security protocols.",
@@ -204,6 +211,43 @@
     "securityAdvisory": "Security Advisory",
     "passphraseAdvisory": "Passphrases provide high entropy with low cognitive load. This configuration yields approximately <1>{{bits}} bits</1> of security.",
     "passwordAdvisory": "This password uses <1>{{bits}} bit entropy</1>. Recommended for high-value targets.",
+    "entropyHeadline": "{{bits}} bits of entropy · {{label}}",
+    "quantum": {
+      "proof": "Quantum-Proof",
+      "resistant": "Quantum-Resistant",
+      "vulnerable": "Quantum-Vulnerable",
+      "proofDesc": "Retains 128-bit security even against Grover's algorithm — on par with the AES-256 backbone of this vault.",
+      "resistantDesc": "Grover's algorithm halves this to {{pq}} effective bits. Add ~{{add}} more bits of entropy to reach quantum-proof.",
+      "vulnerableDesc": "Grover's algorithm halves this to just {{pq}} effective bits against a quantum attacker."
+    },
+    "attacker": {
+      "label": "Threat Model",
+      "online": "Online",
+      "gpu": "GPU Rig",
+      "nationState": "Nation-State"
+    },
+    "crack": {
+      "classical": "Classical",
+      "quantum": "Quantum",
+      "instant": "instantly",
+      "seconds": "{{value}} seconds",
+      "minutes": "{{value}} minutes",
+      "hours": "{{value}} hours",
+      "days": "{{value}} days",
+      "years": "{{value}} years",
+      "powerYears": "10^{{exp}} years",
+      "note": "Average time to exhaust the keyspace at {{rate}} guesses/sec. Quantum figures assume Grover's algorithm."
+    },
+    "breach": {
+      "checking": "Checking breach databases…",
+      "pwned": "Found in public breaches",
+      "clean": "Not found in any known breach",
+      "idle": "Enter a password to check",
+      "unavailable": "Breach check unavailable",
+      "pwnedCount": "Exposed {{count}} times in known breaches — never use this password.",
+      "pwnedGeneric": "This password has leaked publicly — choose another.",
+      "cleanDesc": "Checked against Have I Been Pwned via k-anonymity — your password never left the device."
+    },
     "generator": "Generator",
     "aesEncryption": "AES-256 Bit Encryption",
     "zeroKnowledge": "Zero-Knowledge Architecture",
@@ -259,7 +303,8 @@
       "bulletList": "Bullet list",
       "clear": "Remove formatting from selection"
     },
-    "tagsLabel": "Tags"
+    "tagsLabel": "Tags",
+    "cardBillingPlaceholder": "123 Main St, City"
   },
   "manageFolders": {
     "title": "Manage Folders",
@@ -856,7 +901,8 @@
     "passkeyDesc": "Use your fingerprint, face, or device PIN",
     "simEmailPreview": "Simulated Email Preview",
     "simEmailCode": "Your one-time code:",
-    "simEmailNote": "Valid for 5 minutes. Do not share."
+    "simEmailNote": "Valid for 5 minutes. Do not share.",
+    "emailPlaceholder": "name@company.com"
   },
   "register": {
     "title": "Create Account",
@@ -1106,7 +1152,10 @@
     "operationTimedOut": "The operation timed out. Plug in your security key before clicking the button, then respond promptly to the browser prompt.",
     "credentialAlreadyRegistered": "This credential is already registered. Remove the existing entry and try again.",
     "authenticatorTypeNotSupported": "This authenticator type is not supported in the current browser or environment.",
-    "registrationFailed": "Registration failed. Check your authenticator and try again."
+    "registrationFailed": "Registration failed. Check your authenticator and try again.",
+    "defaultKeyName": "My Security Key",
+    "defaultDeviceName": "My Device",
+    "defaultThisDevice": "This Device"
   },
   "audit": {
     "activeSessions": "Active Sessions",
