@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { useVault } from '../../context/VaultContext';
 import { daemon } from '../../utils/daemonClient';
+import { BROWSER_AUTOFILL } from '../../utils/cardUtils';
 import {
   getDuressModeConfig, getDuressModeConfigFull,
   getTravelModeConfig, getTravelModeConfigAsync,
@@ -469,6 +470,7 @@ export default function SecurityModesSection({
                       <input type="password" value={confirmTravelPassword}
                         onChange={e => { setConfirmTravelPassword(e.target.value); setTravelError(''); }}
                         placeholder={t('settings.travelRepeatPassword', 'Repeat password')}
+                        autoComplete={BROWSER_AUTOFILL ? 'new-password' : 'off'}
                         className="w-full px-5 py-4 bg-surface-container-low rounded-xl border border-zinc-300 dark:border-zinc-600 text-black dark:text-white font-bold focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition-all"
                       />
                     </div>
@@ -569,6 +571,7 @@ export default function SecurityModesSection({
                 <input type="password" value={disableTravelPw}
                   onChange={e => { setDisableTravelPw(e.target.value); setDisableTravelError(''); }}
                   placeholder={t('settings.travelPasswordPlaceholder', 'Enter your travel password')}
+                  autoComplete={BROWSER_AUTOFILL ? 'current-password' : 'off'}
                   className="w-full px-5 py-4 bg-surface-container-low rounded-xl border border-zinc-300 dark:border-zinc-600 text-black dark:text-white font-bold focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all"
                   onKeyDown={e => e.key === 'Enter' && handleDisableTravel()}
                   autoFocus
@@ -654,6 +657,7 @@ export default function SecurityModesSection({
                           <input type="password" value={confirmDuressPassword}
                             onChange={e => { setConfirmDuressPassword(e.target.value); setDuressError(''); }}
                             placeholder={t('settings.duressRepeat', 'Repeat duress password')}
+                            autoComplete={BROWSER_AUTOFILL ? 'new-password' : 'off'}
                             autoFocus
                             className="w-full px-5 py-4 bg-surface-container-low rounded-xl border border-outline-variant/20 text-black dark:text-white font-bold focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none transition-all"
                           />
