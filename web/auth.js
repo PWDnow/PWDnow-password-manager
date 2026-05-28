@@ -8,6 +8,7 @@ import { loadIpPolicy, ipBlockingMiddleware, getServerPublicIp as _getServerPubl
 import { IpIntelligenceService } from './ipIntelligence.js';
 import { mountAuthRoutes } from './routes/authRoutes.js';
 import { mountVaultRoutes } from './routes/vaultRoutes.js';
+import { validateEnvSmtp } from './lib/smtpConfig.js';
 
 // ── Module initialisation ─────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export function initAuth({ dataDir }) {
   // Pre-populate the derived-key cache for the two hottest paths.
   derivedKey('jwe/session', 32);
   derivedKey('users/enc', 32);
+  validateEnvSmtp().catch(e => console.error('[smtp] Startup validation error:', e.message));
 }
 
 // ── Re-export getServerPublicIp so server.js import is unchanged ──────────────

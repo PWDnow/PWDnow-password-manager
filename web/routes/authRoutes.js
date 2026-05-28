@@ -74,6 +74,8 @@ import {
   PBKDF2_HASH_PREFIX,
 } from '../lib/rateLimiter.js';
 
+import { getEnvSmtpConfig, parseSmtpTestFilter } from '../lib/smtpConfig.js';
+
 // Async PBKDF2 — runs in the libuv thread pool so 1M iterations don't block the event loop.
 const pbkdf2Async = promisify(pbkdf2);
 
@@ -901,7 +903,7 @@ export function mountAuthRoutes(app) {
       if (mfaMethods.includes('email')) {
         const otp = await storeEmailOtp(partialToken);
         const profile  = readUserBlob(u.id, 'profile', { email: '' });
-        const smtpCfg  = readUserBlob(u.id, 'smtp_config', null);
+        const smtpCfg  = readUserBlob(u.id, 'smtp_config', null) ?? getEnvSmtpConfig();
         const toEmail  = typeof profile.email === 'string' ? profile.email.trim() : '';
         if (toEmail && smtpCfg) {
           const emailCtx = {
@@ -1178,6 +1180,10 @@ export function mountAuthRoutes(app) {
       smtp:  { ok: false, error: null },
     };
 
+    // Honour SMTP_TEST env var — can be overridden per-request via body.tests.
+    const rawTests = typeof req.body?.tests === 'string' ? req.body.tests : null;
+    const testFilter = parseSmtpTestFilter(rawTests ?? process.env.SMTP_TEST ?? 'full');
+
     const [mxR, txtR, dmarcR, bimiR] = await Promise.allSettled([
       dnsPromises.resolveMx(domain),
       dnsPromises.resolveTxt(domain),
@@ -1189,11 +1195,11 @@ export function mountAuthRoutes(app) {
       result.mx.found = true;
       result.mx.records = mxR.value.sort((a, b) => a.priority - b.priority).slice(0, 5);
     }
-    if (txtR.status === 'fulfilled') {
+    if (testFilter.has('spf') && txtR.status === 'fulfilled') {
       const spf = txtR.value.flat().find(r => r.startsWith('v=spf1'));
       if (spf) { result.spf.found = true; result.spf.record = spf; }
     }
-    if (dmarcR.status === 'fulfilled') {
+    if (testFilter.has('dmarc') && dmarcR.status === 'fulfilled') {
       const dmarc = dmarcR.value.flat().find(r => r.startsWith('v=DMARC1'));
       if (dmarc) {
         result.dmarc.found = true; result.dmarc.record = dmarc;
@@ -1202,7 +1208,7 @@ export function mountAuthRoutes(app) {
         result.dmarc.pct = pct ? parseInt(pct[1], 10) : null;
       }
     }
-    if (bimiR.status === 'fulfilled') {
+    if (testFilter.has('bimi') && bimiR.status === 'fulfilled') {
       const bimi = bimiR.value.flat().find(r => r.startsWith('v=BIMI1'));
       if (bimi) {
         result.bimi.found = true; result.bimi.record = bimi;
@@ -1232,7 +1238,7 @@ export function mountAuthRoutes(app) {
       })
     );
     const firstDkim = dkimResults.find(r => r.status === 'fulfilled');
-    if (firstDkim?.status === 'fulfilled') {
+    if (testFilter.has('dkim') && firstDkim?.status === 'fulfilled') {
       const { selector, record } = firstDkim.value;
       result.dkim.found = true; result.dkim.selector = selector;
       result.dkim.record = record.length > 120 ? record.slice(0, 120) + '…' : record;
@@ -1286,7 +1292,7 @@ export function mountAuthRoutes(app) {
       sendCount: sendCount + 1, windowStart, lastSentAt: now,
     });
 
-    const smtpCfg = readUserBlob(req.user.id, 'smtp_config', null);
+    const smtpCfg = readUserBlob(req.user.id, 'smtp_config', null) ?? getEnvSmtpConfig();
     try {
       const setupCtx = {
         ip: getClientIp(req),
