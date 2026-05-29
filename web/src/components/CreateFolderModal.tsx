@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useNotification } from '../context/NotificationContext';
 import { Folder } from '../types';
 import { sanitizeSvg } from '../utils/sanitize';
+import { BROWSER_AUTOFILL } from '../utils/cardUtils';
+import { useAutofillGuard } from '../utils/autofill';
 import { generateUUID } from '../utils/crypto';
 import { ICON_MAP } from '../utils/folderIcons';
 
@@ -47,6 +49,11 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
   const [selectedIconName, setSelectedIconName] = useState<string>('Folder');
   const [customSvg, setCustomSvg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Browser-autofill suppression (see useAutofillGuard). Gated by the
+  // VITE_BROWSER_AUTOFILL flag.
+  const guardTitle = useAutofillGuard();
+  const guardDesc = useAutofillGuard();
 
   const { addNotification } = useNotification();
   const { t } = useTranslation();
@@ -128,7 +135,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
           </div>
 
           <div className="p-6 overflow-y-auto no-scrollbar">
-            <form id="create-folder-form" onSubmit={handleSubmit} className="space-y-8">
+            <form id="create-folder-form" onSubmit={handleSubmit} className="space-y-8" autoComplete={BROWSER_AUTOFILL ? 'on' : 'off'}>
               {/* Folder Name */}
               <div>
                 <label htmlFor="folder-title" className="block text-xs font-black uppercase tracking-widest text-on-surface-variant mb-2">
@@ -139,6 +146,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  {...guardTitle}
                   placeholder={t('manageFolders.folderNamePlaceholder', 'e.g. Personal, Gaming, Crypto')}
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
                   required
@@ -171,6 +179,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   id="folder-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  {...guardDesc}
                   placeholder={t('manageFolders.descriptionPlaceholder', "What's inside this folder?")}
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all resize-none h-24"
                 />
