@@ -1203,7 +1203,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                               onChange={e => dispatch({ type: 'setField', field: 'cardCvv', value: e.target.value.replace(/\D/g, '').slice(0, cvvMax) })}
                               placeholder={cvvMax === 4 ? '••••' : '•••'}
                               inputMode="numeric"
-                              autoComplete={BROWSER_AUTOFILL ? 'cc-csc' : 'off'}
+                              autoComplete={BROWSER_AUTOFILL ? 'cc-csc' : 'new-password'}
                               className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all pr-12"
                             />
                             <button
@@ -1269,8 +1269,9 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                       if (cleaned !== username) dispatch({ type: 'setField', field: 'username', value: cleaned });
                     }
                   }}
-                  placeholder={t('assetHolder.emailPlaceholder', 'name@example.com')} 
+                  placeholder={t('assetHolder.emailPlaceholder', 'name@example.com')}
                   aria-label="Username or Email"
+                  autoComplete={BROWSER_AUTOFILL ? 'username' : 'off'}
                   className={`w-full px-6 py-4 bg-surface-container-low rounded-xl text-black dark:text-white placeholder:text-outline-variant focus:ring-2 transition-all outline-none ${usernameError ? 'border border-red-500 focus:ring-red-500/20' : 'border border-black/15 dark:border-white/15 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30'}`}
                 />
                 {usernameError && (
@@ -1343,7 +1344,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   value={password}
                   onChange={(e) => dispatch({ type: 'setField', field: 'password', value: e.target.value })}
                   aria-label="Password"
-                  autoComplete={BROWSER_AUTOFILL ? 'new-password' : 'off'}
+                  autoComplete="new-password"
                   className="w-full px-6 py-4 pr-52 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white font-mono tracking-widest focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
