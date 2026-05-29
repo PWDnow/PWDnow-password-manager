@@ -705,6 +705,7 @@ export default function Settings() {
                           onKeyDown={e => e.key === 'Enter' && handleEncryptedImport()}
                           placeholder={t('settings.importPassphrasePlaceholder', 'Export passphrase…')}
                           className={inputCls}
+                          autoComplete="new-password"
                           autoFocus
                         />
                         {importPassphraseError && <p className="text-[11px] text-red-500">{importPassphraseError}</p>}
@@ -801,11 +802,13 @@ export default function Settings() {
                           onChange={e => { setExportPassphrase(e.target.value); setExportPassphraseError(''); }}
                           placeholder={t('settings.exportPassphrasePlaceholder', 'Enter a strong passphrase…')}
                           className={inputCls}
+                          autoComplete="new-password"
                         />
                         <input type="password" value={exportPassphraseConfirm}
                           onChange={e => { setExportPassphraseConfirm(e.target.value); setExportPassphraseError(''); }}
                           placeholder={t('settings.exportPassphraseConfirmPlaceholder', 'Confirm passphrase…')}
                           className={inputCls}
+                          autoComplete="new-password"
                         />
                         {exportPassphraseError && <p className="text-[11px] text-red-500">{exportPassphraseError}</p>}
                       </div>
