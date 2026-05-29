@@ -892,7 +892,7 @@ export default function Login() {
                     placeholder={t('login.emailPlaceholder', 'name@company.com')}
                     required
                     autoFocus
-                    autoComplete="email"
+                    autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'email' : 'off'}
                   />
                 </div>
 
@@ -958,7 +958,7 @@ export default function Login() {
                         placeholder="••••••••"
                         required
                         autoFocus
-                        autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'current-password' : 'off'}
+                        autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'current-password' : 'new-password'}
                         aria-invalid={!!error}
                       />
                     </div>
@@ -1076,7 +1076,7 @@ export default function Login() {
                                 placeholder="••••••••"
                                 required
                                 autoFocus
-                                autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'current-password' : 'off'}
+                                autoComplete={import.meta.env.VITE_BROWSER_AUTOFILL === 'true' ? 'current-password' : 'new-password'}
                                 aria-invalid={!!error}
                               />
                             </div>
