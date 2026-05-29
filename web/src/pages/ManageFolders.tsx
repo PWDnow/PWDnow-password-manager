@@ -25,6 +25,8 @@ import { Folder, Credential } from '../types';
 import { useVault } from '../context/VaultContext';
 import { generateUUID } from '../utils/crypto';
 import { sanitizeSvg } from '../utils/sanitize';
+import { useAutofillGuard } from '../utils/autofill';
+import { BROWSER_AUTOFILL } from '../utils/cardUtils';
 import SEO from '../components/SEO';
 
 const ICON_OPTIONS = [
@@ -70,6 +72,11 @@ export default function ManageFolders() {
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const [localFolderCredentials, setLocalFolderCredentials] = useState<Credential[]>([]);
   const modalRef = React.useRef<HTMLDivElement>(null);
+
+  // Browser-autofill suppression for the "create folder" form (see
+  // useAutofillGuard). Gated by the VITE_BROWSER_AUTOFILL flag.
+  const guardNewLabel = useAutofillGuard();
+  const guardNewDesc = useAutofillGuard();
 
   const folderCredentials = folderToDelete 
     ? credentials.filter(c => c.folderId === folderToDelete.id)
@@ -325,9 +332,10 @@ export default function ManageFolders() {
                         type="text" 
                         value={newLabel}
                         onChange={(e) => setNewLabel(e.target.value)}
+                        {...guardNewLabel}
                         placeholder={t('manageFolders.folderNamePlaceholder', 'e.g. Personal, Gaming, Crypto')}
                         className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-4 text-sm font-bold text-black dark:text-white outline-none focus:border-black dark:focus:border-white transition-all"
-                        autoFocus
+                        autoFocus={BROWSER_AUTOFILL}
                       />
                     </div>
  
@@ -336,6 +344,7 @@ export default function ManageFolders() {
                       <textarea 
                         value={newDescription}
                         onChange={(e) => setNewDescription(e.target.value)}
+                        {...guardNewDesc}
                         placeholder={t('manageFolders.descriptionPlaceholder', "What's inside this folder?")}
                         className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-4 text-sm font-bold text-black dark:text-white outline-none focus:border-black dark:focus:border-white transition-all h-32 resize-none"
                       />
