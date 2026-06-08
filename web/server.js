@@ -11,8 +11,8 @@ import dotenv from 'dotenv';
 import { register as promRegister, collectDefaultMetrics, Counter, Gauge, Histogram } from 'prom-client';
 import { createServer as createHttpServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
-import { WebSocketServer } from 'ws';
-import net from 'net';
+import grpc from '@grpc/grpc-js';
+import protoLoader from '@grpc/proto-loader';
 import { initAuth, mountAuthAndVault, getServerPublicIp } from './auth.js';
 import { promises as dnsPromises } from 'dns';
 
@@ -30,11 +30,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = parseInt(process.env.PORT || '1234', 10);
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
-const DAEMON_SOCKET = process.env.VAULT_SOCKET || '/run/vault-daemon/vault.sock';
-// #24-FIX: reject /tmp-based socket paths unless explicitly overridden for testing.
-if (DAEMON_SOCKET.startsWith('/tmp/') && process.env.VAULT_ALLOW_INSECURE_SOCKET !== '1') {
-  throw new Error(`VAULT_SOCKET "${DAEMON_SOCKET}" uses /tmp — set VAULT_ALLOW_INSECURE_SOCKET=1 to override (not for production use)`);
-}
+// The daemon now exposes gRPC (Phase 1 of the horizontal-scalability migration)
+// instead of a Unix domain socket. Default to loopback; override for a remote
+// daemon pod in distributed deployments.
+const DAEMON_GRPC_ADDR = process.env.DAEMON_GRPC_ADDR || '127.0.0.1:50051';
 
 // Guard: in production, nginx proxies to port 1234 — a mismatch causes 502.
 if (process.env.NODE_ENV === 'production' && PORT !== 1234) {
@@ -101,11 +100,6 @@ export const httpRequestDuration = new Histogram({
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5],
 });
 
-export const wsConnections = new Gauge({
-  name: 'pwdnow_ws_connections_active',
-  help: 'Number of active WebSocket connections',
-});
-
 export const authAttempts = new Counter({
   name: 'pwdnow_auth_attempts_total',
   help: 'Total authentication attempts',
@@ -136,7 +130,7 @@ if (SSL_MODE === 'force' && tlsOptions) {
   });
 }
 
-initAuth({ dataDir: DATA_DIR });
+await initAuth({ dataDir: DATA_DIR });
 
 // Skip compression on /api/ routes to prevent BREACH/HEIST side-channel attacks
 // on authenticated JSON responses. Static assets and SPA HTML are safe to compress.
@@ -385,15 +379,31 @@ app.get('/api/setup-token', refuseIfSetupDone, (req, res) => {
   if (!isLocalhost(req)) {
     return res.status(403).json({ error: 'forbidden' });
   }
+
+  // #10-FIX: Strict Host header validation to block DNS-rebinding.
+  // Trusting only 'localhost' and '127.0.0.1' ensures the browser's 
+  // same-origin policy treats this as a distinct local origin.
+  const host = req.headers['host'];
+  const localHostRe = /^(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
+  if (!host || !localHostRe.test(host)) {
+    return res.status(403).json({ error: 'forbidden: invalid host' });
+  }
+
   // DNS-rebinding guard: if Origin or Referer is present, it must be a localhost origin.
   const origin = req.headers['origin'];
   const referer = req.headers['referer'];
-  const localOriginRe = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+  const localOriginRe = /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
   if (origin && !localOriginRe.test(origin)) {
-    return res.status(403).json({ error: 'forbidden' });
+    return res.status(403).json({ error: 'forbidden: invalid origin' });
   }
-  if (referer && !localOriginRe.test(new URL(referer).origin)) {
-    return res.status(403).json({ error: 'forbidden' });
+  if (referer) {
+    try {
+      if (!localOriginRe.test(new URL(referer).origin)) {
+        return res.status(403).json({ error: 'forbidden: invalid referer' });
+      }
+    } catch {
+      return res.status(403).json({ error: 'forbidden: malformed referer' });
+    }
   }
   res.json({ token: SETUP_TOKEN });
 });
@@ -490,49 +500,39 @@ app.get('/health', (req, res) => {
   if (!isLocalhost(req)) {
     return res.status(200).json({ status: 'ok' });
   }
-  const socket = net.createConnection(DAEMON_SOCKET);
+  // Probe the daemon over gRPC (Ping). The daemon no longer binds a Unix
+  // socket — it speaks gRPC on 127.0.0.1:50051 (see grpcClient below).
   let responded = false;
   const probeStart = Date.now();
+  const deadline = new Date(Date.now() + 3000);
 
-  const fail = (reason) => {
-    if (!responded) {
-      responded = true;
-      socket.destroy();
-      const mem = process.memoryUsage();
-      res.status(503).json({
-        status:      'unhealthy',
-        reason,
-        pid:         process.pid,
-        uptime_secs: Math.floor(process.uptime()),
+  grpcClient.Ping({}, daemonMetadata(), { deadline }, (err) => {
+    if (responded) return;
+    responded = true;
+    const mem = process.memoryUsage();
+    if (err) {
+      return res.status(503).json({
+        status:       'unhealthy',
+        reason:       err.details || err.message || 'daemon_unreachable',
+        pid:          process.pid,
+        uptime_secs:  Math.floor(process.uptime()),
         node_version: process.version,
         mem_rss_mib:  +(mem.rss / 1048576).toFixed(1),
-        daemon_ok:   false,
+        daemon_ok:    false,
       });
     }
-  };
-
-  socket.setTimeout(3000);
-  socket.on('connect', () => {
-    if (!responded) {
-      responded = true;
-      const latency_ms = Date.now() - probeStart;
-      socket.destroy();
-      const mem = process.memoryUsage();
-      res.status(200).json({
-        status:         'ok',
-        pid:            process.pid,
-        uptime_secs:    Math.floor(process.uptime()),
-        node_version:   process.version,
-        mem_rss_mib:    +(mem.rss / 1048576).toFixed(1),
-        mem_heap_mib:   +(mem.heapUsed / 1048576).toFixed(1),
-        daemon_ok:      true,
-        daemon_latency_ms: latency_ms,
-        server_start_iso: new Date(SERVER_START_TIME).toISOString(),
-      });
-    }
+    res.status(200).json({
+      status:            'ok',
+      pid:               process.pid,
+      uptime_secs:       Math.floor(process.uptime()),
+      node_version:      process.version,
+      mem_rss_mib:       +(mem.rss / 1048576).toFixed(1),
+      mem_heap_mib:      +(mem.heapUsed / 1048576).toFixed(1),
+      daemon_ok:         true,
+      daemon_latency_ms: Date.now() - probeStart,
+      server_start_iso:  new Date(SERVER_START_TIME).toISOString(),
+    });
   });
-  socket.on('timeout', () => fail('daemon_timeout'));
-  socket.on('error',   (err) => fail(err.message));
 });
 
 // ── DNS record check — public utility (DNS is public info, no auth needed) ────
@@ -615,171 +615,102 @@ app.get('*path', (req, res) => {
   res.send(html);
 });
 
-// ── Vault Daemon WebSocket Proxy ──────────────────────────────────────────────
-// Each browser WS connection gets its own Unix socket connection to the daemon.
-// Browser binary messages (raw msgpack) are prefixed with a 4-byte big-endian
-// length and forwarded; daemon length-prefixed frames are stripped and forwarded back.
+// ── Vault Daemon gRPC Proxy ───────────────────────────────────────────────────
+
+const PROTO_PATH = path.join(__dirname, '../proto/vault.proto');
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
+const vaultProto = protoDescriptor.vault;
+
+const grpcClient = new vaultProto.VaultService(
+  DAEMON_GRPC_ADDR,
+  grpc.credentials.createInsecure()
+);
+
+// Peer-auth token shared with the daemon (replaces SO_PEERCRED). Resolved from
+// DAEMON_GRPC_TOKEN, else the 0600 token file the daemon writes on first boot.
+const DAEMON_GRPC_TOKEN_FILE = process.env.DAEMON_GRPC_TOKEN_FILE
+  || path.join(__dirname, '../daemon_data/grpc.token');
+let _cachedDaemonToken = null;
+function daemonToken() {
+  if (_cachedDaemonToken) return _cachedDaemonToken;
+  const fromEnv = (process.env.DAEMON_GRPC_TOKEN || '').trim();
+  if (fromEnv) { _cachedDaemonToken = fromEnv; return fromEnv; }
+  try {
+    const t = readFileSync(DAEMON_GRPC_TOKEN_FILE, 'utf8').trim();
+    if (t) { _cachedDaemonToken = t; return t; }
+  } catch { /* token file not present yet */ }
+  return '';
+}
+function daemonMetadata() {
+  const md = new grpc.Metadata();
+  const t = daemonToken();
+  if (t) md.set('x-daemon-token', t);
+  return md;
+}
+
+app.post('/api/rpc', (req, res) => {
+  const { method, payload } = req.body;
+  if (!method) return res.status(400).json({ error: 'Method required' });
+
+  if (typeof grpcClient[method] !== 'function') {
+    return res.status(404).json({ error: `Method ${method} not found` });
+  }
+
+  const callPayload = payload || {};
+
+  const convertArraysToBuffers = (obj) => {
+    if (Array.isArray(obj)) {
+      if (obj.length > 0 && typeof obj[0] === 'number') {
+        return Buffer.from(obj);
+      }
+      return obj.map(convertArraysToBuffers);
+    } else if (obj !== null && typeof obj === 'object') {
+      const newObj = {};
+      for (const key in obj) {
+        newObj[key] = convertArraysToBuffers(obj[key]);
+      }
+      return newObj;
+    }
+    return obj;
+  };
+
+  const grpcPayload = convertArraysToBuffers(callPayload);
+
+  grpcClient[method](grpcPayload, daemonMetadata(), (error, response) => {
+    if (error) {
+      return res.json({ status: 'Error', data: { code: error.code || error.message, message: error.details || error.message } });
+    }
+    const convertBuffersToArrays = (obj) => {
+      if (Buffer.isBuffer(obj)) {
+        return Array.from(obj);
+      } else if (Array.isArray(obj)) {
+        return obj.map(convertBuffersToArrays);
+      } else if (obj !== null && typeof obj === 'object') {
+        const newObj = {};
+        for (const key in obj) {
+          newObj[key] = convertBuffersToArrays(obj[key]);
+        }
+        return newObj;
+      }
+      return obj;
+    };
+
+    res.json({ status: 'Ok', data: convertBuffersToArrays(response) });
+  });
+});
 
 const mainServer = tlsOptions
   ? createHttpsServer(tlsOptions, app)
   : createHttpServer(app);
 
-// Cap WebSocket frame size at 4 MiB — matches daemon's MAX_FRAME_SIZE.
-const wss = new WebSocketServer({ server: mainServer, path: '/ws', maxPayload: 4 * 1024 * 1024 });
-
-// Allowed WebSocket origins — populated once at startup, checked on each connection.
 const listenPort = tlsOptions ? SSL_PORT : PORT;
-const ALLOWED_WS_ORIGINS = new Set([
-  `http://localhost:${PORT}`,
-  `https://localhost:${PORT}`,
-  `http://127.0.0.1:${PORT}`,
-  `https://127.0.0.1:${PORT}`,
-  ...(tlsOptions ? [
-    `https://localhost:${SSL_PORT}`,
-    `https://127.0.0.1:${SSL_PORT}`,
-  ] : []),
-  // Operator-configured production domain
-  ...(process.env.VAULT_ORIGIN ? [process.env.VAULT_ORIGIN] : []),
-]);
-
-// Per-IP reconnect throttle — max 30 connections per minute per IP.
-const wsConnectCounts = new Map(); // ip -> { count, resetAt }
-const WS_CONNECT_WINDOW_MS = 60_000;
-const WS_CONNECT_LIMIT = 30;
-
-function isWsRateLimited(ip) {
-  // M-9 fix: port the immutable-update pattern from auth.js:106-118.
-  // The previous code did `entry.count += 1` AFTER the get/set, which under
-  // burst load could spike the counter above the cap briefly because a
-  // concurrent message handler reading the entry would see the old count
-  // while we are about to increment it. Constructing a fresh entry object
-  // and overwriting via .set is a single atomic step (Map.set is sync).
-  const now = Date.now();
-  const e = wsConnectCounts.get(ip) ?? { count: 0, resetAt: now + WS_CONNECT_WINDOW_MS };
-  const reset = now > e.resetAt;
-  const next = {
-    count: reset ? 1 : e.count + 1,
-    resetAt: reset ? now + WS_CONNECT_WINDOW_MS : e.resetAt,
-  };
-  wsConnectCounts.set(ip, next);
-  return next.count > WS_CONNECT_LIMIT;
-}
-
-// Per-tab nonce rate limiter — max 200 IPC commands per minute per tab.
-const wsNonceCounts = new Map(); // nonce -> { count, resetAt }
-const WS_NONCE_WINDOW_MS = 60_000;
-const WS_NONCE_LIMIT = 200;
-
-let activeWsCount = 0;
-const MAX_GLOBAL_WS_CONNECTIONS = 200;
-
-wss.on('connection', (ws, req) => {
-  const clientIp = req.headers['x-real-ip'] || req.socket.remoteAddress || '';
-  if (isWsRateLimited(clientIp)) {
-    ws.close(1013, 'too many connections from this IP');
-    return;
-  }
-
-  if (activeWsCount >= MAX_GLOBAL_WS_CONNECTIONS) {
-    ws.close(1013, 'server busy (max connections reached)');
-    return;
-  }
-  activeWsCount++;
-
-  // Drop stalling connections within 10s to prevent Slowloris-style exhaustion.
-  let hasReceivedData = false;
-  const handshakeTimeout = setTimeout(() => {
-    if (!hasReceivedData) {
-      ws.close(1008, 'handshake timeout');
-    }
-  }, 10_000);
-
-  ws.on('close', () => {
-    activeWsCount--;
-    clearTimeout(handshakeTimeout);
-  });
-
-  // #2-FIX: Validate Origin against the strict allow-list only — drop isSameHost
-  // fallback that DNS-rebinding can satisfy with attacker-controlled Host header.
-  const origin = req.headers['origin'];
-  if (!origin || !ALLOWED_WS_ORIGINS.has(origin)) {
-    ws.close(1008, 'origin not allowed');
-    return;
-  }
-
-  // #2-FIX: Sec-Tab-Nonce is mandatory; both the cookie and query param must be
-  // present and equal. Accepting a query-only nonce when the cookie is absent
-  // allows cross-site WS from pages that never set the cookie.
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const queryNonce = url.searchParams.get('nonce');
-  let cookieNonce = null;
-  const cookies = (req.headers.cookie || '').split(';');
-  for (const c of cookies) {
-    if (c.trim().startsWith('Sec-Tab-Nonce=')) {
-      cookieNonce = c.split('=')[1].trim();
-    }
-  }
-
-  if (!cookieNonce || cookieNonce !== queryNonce) {
-    ws.close(1008, 'tab nonce mismatch');
-    return;
-  }
-
-  const daemon = net.createConnection(DAEMON_SOCKET);
-  let readBuf = Buffer.alloc(0);
-
-  daemon.on('connect', () => {});
-
-  // Browser → Daemon
-  ws.on('message', (data) => {
-    hasReceivedData = true;
-    // M-9 fix: immutable update (matches auth.js:106-118 / isWsRateLimited).
-    // Drive-by fix: the previous code referenced an undefined `nonce` symbol
-    // (typo for `cookieNonce`) so the rate-limiter was a no-op. Fixed here.
-    const now = Date.now();
-    const prior = wsNonceCounts.get(cookieNonce) ?? { count: 0, resetAt: now + WS_NONCE_WINDOW_MS };
-    const reset = now > prior.resetAt;
-    const updated = {
-      count: reset ? 1 : prior.count + 1,
-      resetAt: reset ? now + WS_NONCE_WINDOW_MS : prior.resetAt,
-    };
-    wsNonceCounts.set(cookieNonce, updated);
-    if (updated.count > WS_NONCE_LIMIT) {
-      ws.close(1008, 'rate limit exceeded for this tab');
-      return;
-    }
-
-    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-    const lenBuf = Buffer.alloc(4);
-    lenBuf.writeUInt32BE(buf.length, 0);
-    daemon.write(Buffer.concat([lenBuf, buf]));
-  });
-
-  // Daemon → Browser
-  daemon.on('data', (chunk) => {
-    readBuf = Buffer.concat([readBuf, chunk]);
-    while (readBuf.length >= 4) {
-      const frameLen = readBuf.readUInt32BE(0);
-      if (readBuf.length < 4 + frameLen) break; // incomplete frame — wait for more data
-      const frame = readBuf.slice(4, 4 + frameLen);
-      if (ws.readyState === ws.OPEN) ws.send(frame);
-      readBuf = readBuf.slice(4 + frameLen);
-    }
-  });
-
-  daemon.on('error', (err) => {
-    if (ws.readyState === ws.OPEN) {
-      ws.close(1011, `daemon unavailable: ${err.message}`);
-    }
-  });
-
-  daemon.on('close', () => {
-    if (ws.readyState === ws.OPEN) ws.close(1001, 'daemon disconnected');
-  });
-
-  ws.on('close', () => { daemon.destroy(); });
-  ws.on('error', (e) => { daemon.destroy(); });
-});
 
 
 // ── Start ─────────────────────────────────────────────────────────────────────
@@ -813,6 +744,17 @@ mainServer.listen(listenPort, BIND_HOST, () => {
   if (process.send) process.send('ready');
 });
 
+// ── Defunct WebSocket Handler ────────────────────────────────────────────────
+// The project has migrated from WebSocket/msgpack to a gRPC-over-HTTP bridge
+// at /api/rpc. We catch any stale /ws upgrade requests here and return 410 Gone.
+mainServer.on('upgrade', (req, socket) => {
+  if (req.url === '/ws') {
+    console.log(`[server] Defunct /ws upgrade requested from ${req.socket.remoteAddress} — returning 410 Gone`);
+    socket.write('HTTP/1.1 410 Gone\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+  }
+});
+
 mainServer.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
     console.error(`\n CRITICAL ERROR: Port ${listenPort} is already in use!`);
@@ -831,9 +773,6 @@ const DRAIN_TIMEOUT_MS = 25_000;
 
 function gracefulShutdown(signal) {
   console.log(`[server] ${signal} received — stopping listener, draining (max ${DRAIN_TIMEOUT_MS / 1000}s)...`);
-
-  // Stop the WebSocket server from accepting new upgrades.
-  wss.close(() => { console.log('[server] WebSocket server closed'); });
 
   // Stop accepting new HTTP(S) connections; drain existing keep-alive connections.
   mainServer.close((err) => {

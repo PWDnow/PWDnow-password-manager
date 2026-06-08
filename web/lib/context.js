@@ -6,4 +6,8 @@ export const ctx = {
   ipIntel: null,
   ipPolicy: { blockTor: true, blockProxy: true, blockVpn: false, blockAbuser: true },
   derivedKeyCache: new Map(),
+  /** @type {import('./stateStore.js').InMemoryStateStore | import('./redisStateStore.js').RedisStateStore} */
+  stateStore: null,
+  /** @type {import('./vaultRepository.js').FileVaultRepository} */
+  vaultRepository: null,
 };

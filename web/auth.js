@@ -9,10 +9,12 @@ import { IpIntelligenceService } from './ipIntelligence.js';
 import { mountAuthRoutes } from './routes/authRoutes.js';
 import { mountVaultRoutes } from './routes/vaultRoutes.js';
 import { validateEnvSmtp } from './lib/smtpConfig.js';
+import { InMemoryStateStore } from './lib/stateStore.js';
+import { FileVaultRepository } from './lib/vaultRepository.js';
 
 // ── Module initialisation ─────────────────────────────────────────────────────
 
-export function initAuth({ dataDir }) {
+export async function initAuth({ dataDir }) {
   ctx.DATA_DIR = dataDir;
   ctx.derivedKeyCache.clear(); // clear on re-init in case MASTER_KEY changes
   if (!existsSync(ctx.DATA_DIR)) mkdirSync(ctx.DATA_DIR, { recursive: true, mode: 0o700 });
@@ -33,6 +35,24 @@ export function initAuth({ dataDir }) {
 
   ctx.ipIntel = new IpIntelligenceService(process.env.IPREGISTRY_API_KEY ?? '', ctx.DATA_DIR);
   ctx.ipPolicy = loadIpPolicy();
+
+  // ── StateStore ─────────────────────────────────────────────────────────────
+  // Default: in-memory (self-host / single-node, zero config).
+  // Upgrade to Redis when REDIS_URL is set — makes rate limits cluster-aware.
+  ctx.stateStore = new InMemoryStateStore();
+  if (process.env.REDIS_URL) {
+    try {
+      const { RedisStateStore } = await import('./lib/redisStateStore.js');
+      ctx.stateStore = new RedisStateStore(process.env.REDIS_URL);
+      const redisDisplay = process.env.REDIS_URL.replace(/:\/\/[^@]*@/, '://*@');
+      console.log(`[StateStore] Redis: ${redisDisplay}`);
+    } catch (e) {
+      console.warn('[StateStore] Redis init failed, using in-memory:', e.message);
+    }
+  }
+
+  // ── VaultRepository ────────────────────────────────────────────────────────
+  ctx.vaultRepository = new FileVaultRepository(ctx.DATA_DIR);
 
   // Pre-warm to avoid mid-request outbound network calls on the first login.
   _getServerPublicIp().catch(() => {});
