@@ -176,7 +176,7 @@ export function mountVaultRoutes(app) {
     // Clear the in-memory account-lockout counter for this account so any
     // failures accumulated before arming don't strand the wipe path behind an
     // 'account_locked' response.
-    if (emailHash) resetAccountFailures(emailHash);
+    if (emailHash) await resetAccountFailures(emailHash);
     res.json({ ok: true });
   });
   app.delete('/api/vault/duress-enforce', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
@@ -331,7 +331,7 @@ export function mountVaultRoutes(app) {
 
   // Public endpoint — no auth. Rate limited to prevent filesystem enumeration.
   app.get('/api/share/:shareId', async (req, res) => {
-    if (!checkEmergencyRate(getClientIp(req))) {
+    if (!await checkEmergencyRate(getClientIp(req))) {
       return res.status(429).json({ error: 'too_many_requests' });
     }
     const { shareId } = req.params;
@@ -443,7 +443,7 @@ export function mountVaultRoutes(app) {
   // Public endpoint — no auth. Rate limited: each call iterates all users + decrypts
   // emergency files, so without limiting this enables cross-tenant DoS.
   app.post('/api/emergency/request/:token', async (req, res) => {
-    if (!checkEmergencyRate(getClientIp(req))) {
+    if (!await checkEmergencyRate(getClientIp(req))) {
       return res.status(429).json({ error: 'too_many_requests' });
     }
     const { token } = req.params;

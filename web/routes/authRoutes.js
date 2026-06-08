@@ -79,9 +79,7 @@ import { getEnvSmtpConfig, parseSmtpTestFilter } from '../lib/smtpConfig.js';
 // Async PBKDF2 — runs in the libuv thread pool so 1M iterations don't block the event loop.
 const pbkdf2Async = promisify(pbkdf2);
 
-// ── Concurrency counter ────────────────────────────────────────────────────────
-// Local to this module so hashPassword / verifyPassword can mutate it.
-let _argon2ActiveCount = 0;
+// Argon2 concurrency is tracked in ctx.stateStore (cluster-aware in Redis mode).
 
 // ── Password hashing helpers ───────────────────────────────────────────────────
 
@@ -127,12 +125,13 @@ function constEq(a, b) {
 }
 
 export async function hashPassword(password) {
-  if (_argon2ActiveCount >= ARGON2_MAX_CONCURRENT) {
+  const count = await ctx.stateStore.incrExpire('argon2:active', 120_000);
+  if (count > ARGON2_MAX_CONCURRENT) {
+    await ctx.stateStore.decr('argon2:active');
     const err = new Error('too_many_requests');
     err.status = 429;
     throw err;
   }
-  _argon2ActiveCount++;
   try {
     return await argon2.hash(password, {
       type: argon2.argon2id,
@@ -141,17 +140,18 @@ export async function hashPassword(password) {
       parallelism: ARGON2_PARALLELISM,
     });
   } finally {
-    _argon2ActiveCount--;
+    await ctx.stateStore.decr('argon2:active');
   }
 }
 
 export async function verifyPassword(hashOrLegacy, password, legacySaltHex) {
-  if (_argon2ActiveCount >= ARGON2_MAX_CONCURRENT) {
+  const count = await ctx.stateStore.incrExpire('argon2:active', 120_000);
+  if (count > ARGON2_MAX_CONCURRENT) {
+    await ctx.stateStore.decr('argon2:active');
     const err = new Error('too_many_requests');
     err.status = 429;
     throw err;
   }
-  _argon2ActiveCount++;
   try {
     if (hashOrLegacy && hashOrLegacy.startsWith('$argon2id$')) {
       return await argon2.verify(hashOrLegacy, password);
@@ -170,7 +170,7 @@ export async function verifyPassword(hashOrLegacy, password, legacySaltHex) {
     const hash = scryptHash(password, legacySaltHex);
     return constEq(hash, hashOrLegacy);
   } finally {
-    _argon2ActiveCount--;
+    await ctx.stateStore.decr('argon2:active');
   }
 }
 
@@ -652,7 +652,7 @@ export function mountAuthRoutes(app) {
   });
 
   app.post('/api/auth/register', authMiddleware, async (req, res) => {
-    if (!checkRegisterRate(getClientIp(req))) {
+    if (!await checkRegisterRate(getClientIp(req))) {
       return res.status(429).json({ error: 'too_many_requests' });
     }
     const { email, password, firstName, lastName, cryptoSalt } = req.body || {};
@@ -695,6 +695,7 @@ export function mountAuthRoutes(app) {
   app.post('/api/auth/login-hints', async (req, res) => {
     const { email, hints } = req.body || {};
 
+    // ── Update hints (Authenticated path) ────────────────────────────────────
     if (hints) {
       return authMiddleware(req, res, () => {
         return requireAuth(req, res, () => {
@@ -721,7 +722,8 @@ export function mountAuthRoutes(app) {
       });
     }
 
-    if (!checkHintsRate(getClientIp(req))) {
+    // ── Read hints (Unauthenticated path) ───────────────────────────────────
+    if (!await checkHintsRate(getClientIp(req))) {
       return res.status(429).json({ error: 'too_many_requests' });
     }
 
@@ -729,16 +731,35 @@ export function mountAuthRoutes(app) {
     const emailHash = hashEmail(email);
     const users = loadUsers();
     const u = users.find(x => x.emailHash === emailHash);
-    const defaults = { totp: false, emailOtp: false, passwordEnabled: true, webauthn: false, passwordlessEnabled: false };
+    
+    // V-26-04 Fix: Always return a uniform structure to prevent user enumeration.
+    // Registered and unregistered users must be indistinguishable here.
+    const defaults = { 
+      totp: false, 
+      emailOtp: false, 
+      passwordEnabled: true, 
+      webauthn: false, 
+      passwordlessEnabled: false 
+    };
+
     if (!u || !u.loginHints) {
+      // For non-existent users, we return the same defaults.
+      // To prevent timing oracles, we could add a tiny random jitter, 
+      // but a uniform response is the primary defense.
       return res.json({ hints: defaults });
     }
-    const { cryptoSalt: _removed, ...rawHints } = u.loginHints;
+
+    // For existent users, we filter their hints through the same safe default schema.
+    const rawHints = u.loginHints || {};
     const safeHints = {};
     for (const k of Object.keys(defaults)) {
-      if (typeof rawHints[k] === 'boolean') safeHints[k] = rawHints[k];
+      if (typeof rawHints[k] === 'boolean') {
+        safeHints[k] = rawHints[k];
+      } else {
+        safeHints[k] = defaults[k];
+      }
     }
-    return res.json({ hints: { ...defaults, ...safeHints } });
+    return res.json({ hints: safeHints });
   });
 
   app.post('/api/auth/crypto-salt', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
@@ -778,9 +799,11 @@ export function mountAuthRoutes(app) {
 
     const clientIdentity = deriveClientIdentity(req, fingerprint);
 
-    const ipBlocked      = !checkLoginRate(getClientIp(req));
-    const fpBlocked      = !checkFingerprintRate(clientIdentity);
-    const accountBlocked = !duressArmed && !checkAccountRate(emailHash);
+    const [ipBlocked, fpBlocked, accountBlocked] = await Promise.all([
+      checkLoginRate(getClientIp(req)).then(ok => !ok),
+      checkFingerprintRate(clientIdentity).then(ok => !ok),
+      duressArmed ? Promise.resolve(false) : checkAccountRate(emailHash).then(ok => !ok),
+    ]);
     if (ipBlocked || fpBlocked || accountBlocked) {
       try {
         const dummy = await getDummyArgon2Hash();
@@ -811,8 +834,9 @@ export function mountAuthRoutes(app) {
     }
 
     if (!authenticated) {
-      if (!duressArmed) recordAccountFailure(emailHash);
-      recordFingerprintFailure(clientIdentity);
+      const failOps = [recordFingerprintFailure(clientIdentity)];
+      if (!duressArmed) failOps.push(recordAccountFailure(emailHash));
+      await Promise.all(failOps);
 
       if (uSnapshot) {
         await withUsersLock(async (freshUsers) => {
@@ -851,8 +875,7 @@ export function mountAuthRoutes(app) {
       else if (duressRemaining !== null) body.duressRemaining = duressRemaining;
       return res.status(200).json(body);
     }
-    resetAccountFailures(emailHash);
-    resetFingerprintFailures(clientIdentity);
+    await Promise.all([resetAccountFailures(emailHash), resetFingerprintFailures(clientIdentity)]);
 
     let finalU = null;
     await withUsersLock(async (freshUsers) => {
@@ -1043,12 +1066,12 @@ export function mountAuthRoutes(app) {
       if (users[idx].fingerprintLog.length === before) return false;
     });
     if (found === false) return res.status(404).json({ error: 'not_found' });
-    resetFingerprintFailures(targetId);
+    await resetFingerprintFailures(targetId);
     res.json({ ok: true });
   });
 
   app.post('/api/auth/verify-password', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!checkLoginRate(getClientIp(req))) {
+    if (!await checkLoginRate(getClientIp(req))) {
       return res.status(429).json({ error: 'too_many_requests' });
     }
     try {
