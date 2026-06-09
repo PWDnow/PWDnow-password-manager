@@ -50,20 +50,21 @@ import {
 // Same pattern as withUsersLock / withMfaPendingLock.
 // H-10 fix: serialise the read-push-write on the per-user emergency_requests file.
 async function withEmergencyRequestsLock(uid, fn) {
+  const dir = userVaultDir(uid);
   const filePath = userVaultFile(uid, 'emergency_requests');
   const info = userInfo(uid, 'emergency_requests');
-  // Ensure parent directory exists before proper-lockfile tries to lock the file.
-  try { mkdirSync(userVaultDir(uid), { recursive: true, mode: 0o700 }); } catch (_) {}
-  if (!existsSync(filePath)) {
-    writeEncryptedFile(filePath, info, []);
-  }
+  // File backend: serialize read-push-write with proper-lockfile when the user dir
+  // exists. Postgres backend: no local dir — the repo UPSERT is the unit of work.
   let release = null;
   try {
-    release = await lock(filePath, { retries: { retries: 20, minTimeout: 50, maxTimeout: 500 } });
-    const requests = readEncryptedFile(filePath, info, []);
+    if (existsSync(dir)) {
+      if (!existsSync(filePath)) writeEncryptedFile(filePath, info, []);
+      release = await lock(filePath, { retries: { retries: 20, minTimeout: 50, maxTimeout: 500 } });
+    }
+    const requests = (await ctx.vaultRepository.getResource(uid, 'emergency_requests')) ?? [];
     const result = await fn(requests);
     if (result !== false) {
-      writeEncryptedFile(filePath, info, requests);
+      await ctx.vaultRepository.setResource(uid, 'emergency_requests', requests);
     }
     return result;
   } finally {
@@ -165,14 +166,12 @@ export function mountVaultRoutes(app) {
     if (typeof armed !== 'boolean') return res.status(400).json({ error: 'invalid_input' });
     const max = Math.max(1, Math.min(20, Number(maxAttempts) || 3));
     let emailHash = null;
-    const found = await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
-      users[idx].duressEnforce = armed ? { armed: true, maxAttempts: max } : null;
-      users[idx].duressFailureCount = 0;
-      emailHash = users[idx].emailHash;
+    const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      u.duressEnforce = armed ? { armed: true, maxAttempts: max } : null;
+      u.duressFailureCount = 0;
+      emailHash = u.emailHash;
     });
-    if (found === false) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ error: 'user_not_found' });
     // Clear the in-memory account-lockout counter for this account so any
     // failures accumulated before arming don't strand the wipe path behind an
     // 'account_locked' response.
@@ -180,13 +179,11 @@ export function mountVaultRoutes(app) {
     res.json({ ok: true });
   });
   app.delete('/api/vault/duress-enforce', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    const found = await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
-      users[idx].duressEnforce = null;
-      users[idx].duressFailureCount = 0;
+    const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      u.duressEnforce = null;
+      u.duressFailureCount = 0;
     });
-    if (found === false) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ error: 'user_not_found' });
     res.json({ ok: true });
   });
 
@@ -213,16 +210,14 @@ export function mountVaultRoutes(app) {
     if (!req.body || typeof req.body.data !== 'string') {
       return res.status(400).json({ error: 'invalid_input' });
     }
-    writeUserBlob(req.user.id, 'mfa_config', req.body);
+    await writeUserBlob(req.user.id, 'mfa_config', req.body);
 
-    // H-3 fix: lock users.enc — concurrent PUT /api/vault/mfa calls would
-    // otherwise clobber the TOTP secret or enforce flags.
+    // H-3 fix: serialize concurrent PUT /api/vault/mfa — would otherwise clobber
+    // the TOTP secret or enforce flags.
     const { enforce, serverSecret } = req.body;
-    await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
+    await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
       if (enforce && typeof enforce === 'object') {
-        users[idx].mfaEnforce = {
+        u.mfaEnforce = {
           totp:  enforce.totp  === true,
           email: enforce.email === true,
         };
@@ -230,9 +225,9 @@ export function mountVaultRoutes(app) {
       // TOTP secret stored server-encrypted so /login/finish can verify codes
       // without the client session key (which doesn't exist at login time).
       if (typeof serverSecret === 'string' && serverSecret.length > 0) {
-        users[idx].mfaTotpSecret = serverSecret;
+        u.mfaTotpSecret = serverSecret;
       } else if (enforce && enforce.totp === false) {
-        users[idx].mfaTotpSecret = null; // TOTP disabled — purge the server-held secret
+        u.mfaTotpSecret = null; // TOTP disabled — purge the server-held secret
       }
     });
 
@@ -242,14 +237,14 @@ export function mountVaultRoutes(app) {
 
   // ── SMTP config persistence (server-side, needed for login OTP sending) ──────
   app.get('/api/vault/smtp-config', authMiddleware, requireAuth, async (req, res) => {
-    const cfg = readUserBlob(req.user.id, 'smtp_config', null);
+    const cfg = await readUserBlob(req.user.id, 'smtp_config', null);
     if (!cfg) return res.json(null);
     // Never return the password to the browser — it was stored here for server use only.
     const { password: _pw, ...safe } = cfg;
     res.json({ ...safe, passwordSet: !!_pw });
   });
 
-  app.put('/api/vault/smtp-config', authMiddleware, requireAuth, requireCsrf, (req, res) => {
+  app.put('/api/vault/smtp-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const { host, port, protocol, username, password, fromName, fromAddress, mxVerified } = req.body ?? {};
     if (!host || typeof host !== 'string' || !port || !username || typeof username !== 'string') {
       return res.status(400).json({ error: 'invalid_input' });
@@ -258,12 +253,12 @@ export function mountVaultRoutes(app) {
     if (BLOCKED_HOST_RE.test(String(host).trim())) {
       return res.status(400).json({ error: 'invalid_smtp_host' });
     }
-    writeUserBlob(req.user.id, 'smtp_config', { host, port, protocol, username, password: password || '', fromName, fromAddress, mxVerified });
+    await writeUserBlob(req.user.id, 'smtp_config', { host, port, protocol, username, password: password || '', fromName, fromAddress, mxVerified });
     res.json({ ok: true });
   });
 
-  app.delete('/api/vault/smtp-config', authMiddleware, requireAuth, requireCsrf, (req, res) => {
-    writeUserBlob(req.user.id, 'smtp_config', null);
+  app.delete('/api/vault/smtp-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    await writeUserBlob(req.user.id, 'smtp_config', null);
     res.json({ ok: true });
   });
 
@@ -394,8 +389,8 @@ export function mountVaultRoutes(app) {
   function emergencyRequestsPath(uid) { return userVaultFile(uid, 'emergency_requests'); }
   function emergencyRequestsInfo(uid) { return userInfo(uid, 'emergency_requests'); }
 
-  app.get('/api/vault/emergency', authMiddleware, requireAuth, (req, res) => {
-    const cfg = readEncryptedFile(emergencyPath(req.user.id), emergencyInfo(req.user.id), null);
+  app.get('/api/vault/emergency', authMiddleware, requireAuth, async (req, res) => {
+    const cfg = await ctx.vaultRepository.getResource(req.user.id, 'emergency');
     res.json({ ok: true, config: cfg });
   });
 
@@ -407,8 +402,7 @@ export function mountVaultRoutes(app) {
     const hours = Number(waitPeriodHours);
     if (![24, 48, 72, 168].includes(hours)) return res.status(400).json({ error: 'invalid_wait_period' });
 
-    const users = loadUsers();
-    const u = users.find(x => x.id === req.user.id);
+    const u = await ctx.vaultRepository.findUserById(req.user.id);
     if (!u) return res.status(401).json({ error: 'user_not_found' });
     if (isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
     const verified = await verifyPassword(u.passwordHash, password, u.salt);
@@ -419,7 +413,6 @@ export function mountVaultRoutes(app) {
     clearMfaFailure(u.id);
 
     const uid = req.user.id;
-    if (!existsSync(userVaultDir(uid))) mkdirSync(userVaultDir(uid), { recursive: true, mode: 0o700 });
     const cfg = {
       enabled: true,
       contactEmail: contactEmail.trim().toLowerCase(),
@@ -427,16 +420,15 @@ export function mountVaultRoutes(app) {
       token: randomBytes(32).toString('hex'),
       createdAt: Date.now(),
     };
-    writeEncryptedFile(emergencyPath(uid), emergencyInfo(uid), cfg);
+    await ctx.vaultRepository.setResource(uid, 'emergency', cfg);
     // Never return the token in the creation response — prevents log exposure.
     // The authenticated owner can retrieve it via GET /api/vault/emergency.
     const { token: _stripped, ...safeConfig } = cfg;
     res.json({ ok: true, config: safeConfig });
   });
 
-  app.delete('/api/vault/emergency', authMiddleware, requireAuth, requireCsrf, (req, res) => {
-    const p = emergencyPath(req.user.id);
-    if (existsSync(p)) rmSync(p);
+  app.delete('/api/vault/emergency', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    await ctx.vaultRepository.deleteResource(req.user.id, 'emergency');
     res.json({ ok: true });
   });
 
@@ -487,8 +479,8 @@ export function mountVaultRoutes(app) {
     res.json({ ok: true, waitPeriodHours: ownerCfg.waitPeriodHours });
   });
 
-  app.get('/api/vault/emergency/requests', authMiddleware, requireAuth, (req, res) => {
-    const requests = readEncryptedFile(emergencyRequestsPath(req.user.id), emergencyRequestsInfo(req.user.id), []);
+  app.get('/api/vault/emergency/requests', authMiddleware, requireAuth, async (req, res) => {
+    const requests = (await ctx.vaultRepository.getResource(req.user.id, 'emergency_requests')) ?? [];
     res.json({ ok: true, requests });
   });
 
@@ -515,8 +507,7 @@ export function mountVaultRoutes(app) {
     // #1-FIX: require password re-verification before destructive wipe (CWE-306).
     const { password } = req.body ?? {};
     if (typeof password !== 'string') return res.status(400).json({ error: 'password_required' });
-    const users = loadUsers();
-    const u = users.find(x => x.id === req.user.id);
+    const u = await ctx.vaultRepository.findUserById(req.user.id);
     if (!u) return res.status(401).json({ error: 'user_not_found' });
     if (isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
     const verified = await verifyPassword(u.passwordHash, password, u.salt);
@@ -532,12 +523,12 @@ export function mountVaultRoutes(app) {
   });
 
   // ── Audit Log ─────────────────────────────────────────────────────────────────
-  app.get('/api/audit/events', authMiddleware, requireAuth, (req, res) => {
+  app.get('/api/audit/events', authMiddleware, requireAuth, async (req, res) => {
     const limit  = Math.min(Number(req.query.limit)  || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0,  0);
     const action = req.query.action || null;
     const since  = Number(req.query.since) || 0;
-    let events = loadAuditLog(req.user.id);
+    let events = await loadAuditLog(req.user.id);
     if (action) events = events.filter(e => e.action === action);
     if (since)  events = events.filter(e => e.ts >= since);
     events = events.slice().reverse(); // newest first
@@ -550,8 +541,7 @@ export function mountVaultRoutes(app) {
     if (typeof password !== 'string') {
       return res.status(400).json({ error: 'password_required' });
     }
-    const users = loadUsers();
-    const u = users.find(x => x.id === req.user.id);
+    const u = await ctx.vaultRepository.findUserById(req.user.id);
     if (!u) return res.status(401).json({ error: 'user_not_found' });
 
     if (isMfaLocked(u.id)) {
@@ -574,7 +564,7 @@ export function mountVaultRoutes(app) {
       }
       // Write a permanent marker before clearing so the next session can detect the gap.
       const marker = { id: generateUUID(), ts: Date.now(), action: 'audit_cleared', ip: getClientIp(req), success: true };
-      saveAuditLog(req.user.id, [marker]);
+      await saveAuditLog(req.user.id, [marker]);
     } finally {
       if (release) await release().catch(() => {});
     }

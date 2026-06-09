@@ -1,16 +1,16 @@
-# Graph Report - web  (2026-05-26)
+# Graph Report - web  (2026-05-29)
 
 ## Corpus Check
-- 192 files · ~279,423 words
+- 155 files · ~268,558 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 8446 nodes · 9904 edges · 302 communities (270 shown, 32 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 52 edges (avg confidence: 0.8)
+- 8624 nodes · 10121 edges · 312 communities (280 shown, 32 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 53 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `155a5891`
+- Built from commit: `a9fee971`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -296,6 +296,16 @@
 - [[_COMMUNITY_Community 299|Community 299]]
 - [[_COMMUNITY_Community 300|Community 300]]
 - [[_COMMUNITY_Community 301|Community 301]]
+- [[_COMMUNITY_Community 302|Community 302]]
+- [[_COMMUNITY_Community 303|Community 303]]
+- [[_COMMUNITY_Community 304|Community 304]]
+- [[_COMMUNITY_Community 305|Community 305]]
+- [[_COMMUNITY_Community 306|Community 306]]
+- [[_COMMUNITY_Community 307|Community 307]]
+- [[_COMMUNITY_Community 308|Community 308]]
+- [[_COMMUNITY_Community 309|Community 309]]
+- [[_COMMUNITY_Community 310|Community 310]]
+- [[_COMMUNITY_Community 311|Community 311]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `settings` - 120 edges
@@ -318,10 +328,10 @@
   routes/authRoutes.js → src/utils/crypto.ts
 - `initAuth()` --calls--> `writeEncryptedFile()`  [EXTRACTED]
   auth.js → lib/fileCrypto.js
-- `withEmergencyRequestsLock()` --calls--> `writeEncryptedFile()`  [EXTRACTED]
-  routes/vaultRoutes.js → lib/fileCrypto.js
+- `initAuth()` --calls--> `derivedKey()`  [EXTRACTED]
+  auth.js → lib/fileCrypto.js
 
-## Communities (302 total, 32 thin omitted)
+## Communities (312 total, 32 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.02
@@ -377,55 +387,55 @@ Nodes (112): settings, accept, accountPassword, accountPasswordDesc, accountSecu
 
 ### Community 13 - "Community 13"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.02
-Nodes (93): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+85 more)
+Nodes (101): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+93 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.02
-Nodes (93): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+85 more)
+Nodes (101): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+93 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 23 - "Community 23"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 25 - "Community 25"
 Cohesion: 0.02
-Nodes (92): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+84 more)
+Nodes (100): addCredential, accountTypeLabel, accountTypePlaceholder, addPhoneNumber, addQuestion, addTitle, addU2fKey, aesEncryption (+92 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.03
@@ -480,12 +490,12 @@ Cohesion: 0.03
 Nodes (77): breachMonitor, actionRequired, allClear, cancel, checked, clean, cleanLabel, clearWordlist (+69 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.04
-Nodes (102): DnsRow(), NAV_STRUCTURE, NavGroup, NavItem, NavStructureGroup, NavStructureItem, SvgP, buildKeePassXML() (+94 more)
+Cohesion: 0.05
+Nodes (25): NAV_STRUCTURE, NavGroup, NavItem, NavStructureGroup, NavStructureItem, SvgP, Props, RecoveryKeyModal() (+17 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.04
-Nodes (51): CreateFolderModal(), CreateFolderModalProps, PREDEFINED_ICONS, TEMPLATES, Header(), NetworkStatus(), NotificationDropdown(), NotificationDropdownProps (+43 more)
+Cohesion: 0.09
+Nodes (21): CreateFolderModal(), CreateFolderModalProps, PREDEFINED_ICONS, TEMPLATES, Sidebar(), SidebarProps, ICON_OPTIONS, ManageFolders() (+13 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.03
@@ -537,19 +547,19 @@ Nodes (65): vault, actions, addCredential, addNew, aesActive, allClear, assets, 
 
 ### Community 53 - "Community 53"
 Cohesion: 0.07
-Nodes (56): useSecurityModes(), Props, SvgP, EmailServerConfig, apiFetch(), hasServerSession(), readDecryptedLocal(), armDuressMode() (+48 more)
+Nodes (56): useSecurityModes(), SecurityModesSection(), SvgP, apiFetch(), getCsrfToken(), hasServerSession(), saveMfaConfigToServer(), armDuressMode() (+48 more)
 
 ### Community 54 - "Community 54"
 Cohesion: 0.03
 Nodes (63): vault, actions, addCredential, addNew, aesActive, allClear, assets, backTo (+55 more)
 
 ### Community 55 - "Community 55"
-Cohesion: 0.09
-Nodes (52): MfaModalState, MfaType, useMfaSetup(), DigitInputHandlers, MfaModalContent(), Props, MfaSection(), authenticateWebAuthn() (+44 more)
+Cohesion: 0.10
+Nodes (46): MfaModalState, MfaType, DigitInputHandlers, MfaModalContent(), Props, Props, EmailServerConfig, authenticateWebAuthn() (+38 more)
 
 ### Community 56 - "Community 56"
 Cohesion: 0.03
-Nodes (55): getServerPublicIp(), ALLOWED_WS_ORIGINS, app, authAttempts, cleanDomain, computeSriForAssets(), cookies, daemon (+47 more)
+Nodes (56): getServerPublicIp(), ALLOWED_WS_ORIGINS, app, authAttempts, cleanDomain, computeSriForAssets(), cookies, daemon (+48 more)
 
 ### Community 57 - "Community 57"
 Cohesion: 0.19
@@ -557,7 +567,7 @@ Nodes (11): CrackResult, DICT, ENC, tampered, timingSafeEq(), v1AttackOnV2File()
 
 ### Community 58 - "Community 58"
 Cohesion: 0.07
-Nodes (5): VaultContextType, AssetHolder, DaemonClient, uuidBytesToString(), uuidOut()
+Nodes (5): DaemonClient, uuidBytesToString(), uuidOut(), uuidOutOptional(), uuidStringToBytes()
 
 ### Community 59 - "Community 59"
 Cohesion: 0.04
@@ -568,8 +578,8 @@ Cohesion: 0.04
 Nodes (46): common, add, back, cancel, close, confirm, continue, copy (+38 more)
 
 ### Community 61 - "Community 61"
-Cohesion: 0.06
-Nodes (29): EmergencyAccessModal(), EmergencyConfig, EmergencyRequest, Props, WAIT_OPTIONS, HeaderProps, InstallPrompt(), Sidebar() (+21 more)
+Cohesion: 0.07
+Nodes (33): Header(), HeaderProps, InstallPrompt(), NetworkStatus(), NotificationDropdown(), NotificationDropdownProps, PasswordPromptModal(), Props (+25 more)
 
 ### Community 62 - "Community 62"
 Cohesion: 0.04
@@ -628,8 +638,8 @@ Cohesion: 0.05
 Nodes (38): dependencies, argon2, compression, cookie-parser, dompurify, dotenv, express, @fingerprintjs/fingerprintjs (+30 more)
 
 ### Community 76 - "Community 76"
-Cohesion: 0.09
-Nodes (23): Argon2idParams, argon2idWasm(), KdfRequest, deriveArgon2idMaster(), deriveLocalKey(), deriveLocalKeys(), deriveV1Only(), getKdfWorker() (+15 more)
+Cohesion: 0.08
+Nodes (29): defaultProfile, UserContext, UserContextType, UserProvider(), Argon2idParams, argon2idWasm(), KdfRequest, deriveArgon2idMaster() (+21 more)
 
 ### Community 77 - "Community 77"
 Cohesion: 0.10
@@ -696,8 +706,8 @@ Cohesion: 0.38
 Nodes (5): BufReader, parsePayload(), readFields(), writeRecord(), writeU32Field()
 
 ### Community 93 - "Community 93"
-Cohesion: 0.09
-Nodes (30): requireCsrf(), hashEmail(), constEq(), clearMfaFailure(), constEq(), consumeEmailOtp(), consumeMfaToken(), _escHtml() (+22 more)
+Cohesion: 0.13
+Nodes (24): constEq(), constEq(), consumeEmailOtp(), consumeMfaToken(), _escHtml(), issueMfaToken(), _mfaFailedAttempts, mfaPendingPath() (+16 more)
 
 ### Community 94 - "Community 94"
 Cohesion: 0.13
@@ -705,7 +715,7 @@ Nodes (17): importFromP2W(), isP2WFile(), readP2WCipherSuite(), readP2WTimestamp
 
 ### Community 95 - "Community 95"
 Cohesion: 0.05
-Nodes (35): ErrorBoundary, Props, RouteErrorBoundary(), State, LanguageModal(), LanguageModalProps, PublicHeader(), NotificationProvider() (+27 more)
+Nodes (33): ErrorBoundary, Props, RouteErrorBoundary(), State, LanguageModal(), LanguageModalProps, NotificationProvider(), Theme (+25 more)
 
 ### Community 96 - "Community 96"
 Cohesion: 0.07
@@ -713,11 +723,11 @@ Nodes (29): code:js ({), Completion Checklist (Final Verification Before Done), 
 
 ### Community 97 - "Community 97"
 Cohesion: 0.05
-Nodes (54): ConfirmModal(), Props, PasswordPromptModal(), Props, NotificationContext, NotificationContextType, DecryptionPendingError, DEFAULT_FOLDERS (+46 more)
+Nodes (59): ConfirmModal(), Props, NotificationContext, NotificationContextType, DecryptionPendingError, DEFAULT_FOLDERS, hasServerSession(), loadLocalAssetHolder() (+51 more)
 
 ### Community 98 - "Community 98"
-Cohesion: 0.09
-Nodes (17): Props, ShareModal(), TTL, SidebarProps, AddCredentialProps, CheckMethod, ScanResult, ScanState (+9 more)
+Cohesion: 0.06
+Nodes (26): Country, isoToFlag(), PhoneCountrySelect(), PhoneCountrySelectProps, SEOProps, Props, ShareModal(), TTL (+18 more)
 
 ### Community 99 - "Community 99"
 Cohesion: 0.20
@@ -796,8 +806,8 @@ Cohesion: 0.09
 Nodes (23): dashboard, activeSessions, activityAccessed, activityAudit, activityGenerated, activityLinked, compromised, criticalRecommendations (+15 more)
 
 ### Community 118 - "Community 118"
-Cohesion: 0.23
-Nodes (20): appendAuditEvent(), auditLogPath(), _auditQueue, compactIpInfo(), flushAuditQueue(), getServerPublicIp(), loadAuditLog(), processAuditEvent() (+12 more)
+Cohesion: 0.17
+Nodes (27): appendAuditEvent(), auditLogPath(), _auditQueue, compactIpInfo(), flushAuditQueue(), getServerPublicIp(), loadAuditLog(), processAuditEvent() (+19 more)
 
 ### Community 119 - "Community 119"
 Cohesion: 0.12
@@ -816,20 +826,20 @@ Cohesion: 0.11
 Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
 
 ### Community 123 - "Community 123"
-Cohesion: 0.18
-Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
+Cohesion: 0.11
+Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
 
 ### Community 124 - "Community 124"
+Cohesion: 0.11
+Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
+
+### Community 125 - "Community 125"
 Cohesion: 0.18
 Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
 
-### Community 125 - "Community 125"
-Cohesion: 0.11
-Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
-
 ### Community 126 - "Community 126"
-Cohesion: 0.11
-Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
+Cohesion: 0.18
+Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
 
 ### Community 127 - "Community 127"
 Cohesion: 0.11
@@ -860,8 +870,8 @@ Cohesion: 0.12
 Nodes (16): devDependencies, autoprefixer, jsdom, @playwright/test, tailwindcss, tsx, @types/dompurify, @types/express (+8 more)
 
 ### Community 135 - "Community 135"
-Cohesion: 0.28
-Nodes (15): decryptBlob(), derivedKey(), encryptBlob(), loadUsers(), loadUsersAsync(), readEncryptedFile(), readEncryptedFileAsync(), readEncryptedFileStrict() (+7 more)
+Cohesion: 0.24
+Nodes (16): decryptBlob(), encryptBlob(), hashEmail(), loadUsersAsync(), readEncryptedFileAsync(), readEncryptedFileStrict(), saveUsers(), saveUsersAsync() (+8 more)
 
 ### Community 136 - "Community 136"
 Cohesion: 0.13
@@ -876,8 +886,8 @@ Cohesion: 0.18
 Nodes (11): crack, classical, days, hours, instant, minutes, note, powerYears (+3 more)
 
 ### Community 139 - "Community 139"
-Cohesion: 0.14
-Nodes (12): b64payload, ct, headerB64, headerJSON, iv, payload, saltBytes, sig (+4 more)
+Cohesion: 0.05
+Nodes (40): code:block1 (# ── Browser Autofill ──────────────────────────────────────), code:js (// In auth.js, add at top of file (with other imports):), code:js (// Validate env-based SMTP config asynchronously — never blo), code:js (import { getEnvSmtpConfig } from '../lib/smtpConfig.js';), code:js (const smtpCfg  = readUserBlob(u.id, 'smtp_config', null);), code:js (const smtpCfg  = readUserBlob(u.id, 'smtp_config', null) ?? ), code:js (const smtpCfg = readUserBlob(req.user.id, 'smtp_config', nul), code:js (const smtpCfg = readUserBlob(req.user.id, 'smtp_config', nul) (+32 more)
 
 ### Community 140 - "Community 140"
 Cohesion: 0.14
@@ -896,28 +906,28 @@ Cohesion: 0.31
 Nodes (11): generate-ssl.sh script, die(), have_sudo(), hdr(), install_nss(), log(), ok(), warn() (+3 more)
 
 ### Community 145 - "Community 145"
-Cohesion: 0.15
-Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
+Cohesion: 0.33
+Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
 
 ### Community 146 - "Community 146"
 Cohesion: 0.33
 Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
 
 ### Community 147 - "Community 147"
+Cohesion: 0.15
+Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
+
+### Community 148 - "Community 148"
 Cohesion: 0.33
 Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
 
-### Community 148 - "Community 148"
-Cohesion: 0.15
-Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
-
 ### Community 149 - "Community 149"
-Cohesion: 0.15
-Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
+Cohesion: 0.33
+Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
 
 ### Community 150 - "Community 150"
-Cohesion: 0.24
-Nodes (12): authMiddleware(), clearSessionCookies(), issueJwt(), loadSessions(), parseUA(), recordSession(), requireAuth(), saveSessions() (+4 more)
+Cohesion: 0.20
+Nodes (10): requireCsrf(), userSharesDir(), clearSessionCookies(), requireAuth(), clearMfaFailure(), isMfaLocked(), performServerWipe(), readUserBlobAsync() (+2 more)
 
 ### Community 151 - "Community 151"
 Cohesion: 0.15
@@ -960,24 +970,24 @@ Cohesion: 0.29
 Nodes (6): dispatch(), err(), handle_connection(), PreAuthGuard, send(), SocketListener
 
 ### Community 161 - "Community 161"
-Cohesion: 0.18
-Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
+Cohesion: 0.11
+Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
 
 ### Community 162 - "Community 162"
 Cohesion: 0.11
 Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
 
 ### Community 163 - "Community 163"
+Cohesion: 0.18
+Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
+
+### Community 164 - "Community 164"
 Cohesion: 0.11
 Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
 
-### Community 164 - "Community 164"
-Cohesion: 0.18
-Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
-
 ### Community 165 - "Community 165"
-Cohesion: 0.18
-Nodes (11): sidebar, assetHolder, brand, createFolder, folders, health, manageFolders, security (+3 more)
+Cohesion: 0.11
+Nodes (17): language, title, pwa, install, installDesc, installTitle, sidebar, assetHolder (+9 more)
 
 ### Community 166 - "Community 166"
 Cohesion: 0.29
@@ -1184,8 +1194,8 @@ Cohesion: 0.33
 Nodes (6): toolbar, bold, bulletList, clear, italic, underline
 
 ### Community 219 - "Community 219"
-Cohesion: 0.15
-Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
+Cohesion: 0.33
+Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
 
 ### Community 220 - "Community 220"
 Cohesion: 0.33
@@ -1196,16 +1206,16 @@ Cohesion: 0.33
 Nodes (6): toolbar, bold, bulletList, clear, italic, underline
 
 ### Community 222 - "Community 222"
-Cohesion: 0.15
-Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
+Cohesion: 0.33
+Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
 
 ### Community 223 - "Community 223"
 Cohesion: 0.33
 Nodes (6): toolbar, bold, bulletList, clear, italic, underline
 
 ### Community 224 - "Community 224"
-Cohesion: 0.33
-Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
+Cohesion: 0.15
+Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
 
 ### Community 225 - "Community 225"
 Cohesion: 0.33
@@ -1216,8 +1226,8 @@ Cohesion: 0.33
 Nodes (6): toolbar, bold, bulletList, clear, italic, underline
 
 ### Community 227 - "Community 227"
-Cohesion: 0.33
-Nodes (6): header, menu, notifications, openSource, searchPlaceholder, suggestFeature
+Cohesion: 0.15
+Nodes (12): header, menu, notifications, openSource, searchPlaceholder, suggestFeature, language, title (+4 more)
 
 ### Community 228 - "Community 228"
 Cohesion: 0.33
@@ -1256,8 +1266,8 @@ Cohesion: 0.50
 Nodes (5): action.rs, config.rs, leak.rs, monitor/main.rs, risk.rs
 
 ### Community 238 - "Community 238"
-Cohesion: 0.09
-Nodes (33): Country, isoToFlag(), PhoneCountrySelect(), PhoneCountrySelectProps, AddCredential(), BreachStatus, charsetLength(), CredentialFormState (+25 more)
+Cohesion: 0.07
+Nodes (44): AddCredential(), BreachStatus, CardExpiryPicker(), CardExpiryPickerProps, charsetLength(), CredentialFormState, FormAction, ICON_MAP (+36 more)
 
 ### Community 239 - "Community 239"
 Cohesion: 0.40
@@ -1319,22 +1329,62 @@ Nodes (5): attacker, gpu, label, nationState, online
 Cohesion: 0.40
 Nodes (5): attacker, gpu, label, nationState, online
 
+### Community 302 - "Community 302"
+Cohesion: 0.13
+Nodes (28): ColMap, csvImport(), decryptPWDnowExport(), extractFromZip(), findCol(), import1PasswordCSV(), importBitwardenCSV(), importButtercup() (+20 more)
+
+### Community 303 - "Community 303"
+Cohesion: 0.07
+Nodes (17): EmergencyAccessModal(), EmergencyConfig, EmergencyRequest, Props, WAIT_OPTIONS, PageState, DriveEncryptionInfo, FipsEnableModal() (+9 more)
+
+### Community 304 - "Community 304"
+Cohesion: 0.07
+Nodes (28): exportToBitwardenJSON(), exportToButtercupJSON(), exportToEnpassCSV(), exportToKeePassCSV(), exportToKeeperCSV(), exportToLastPass(), exportToPasskyJSON(), exportToProtonPass() (+20 more)
+
+### Community 305 - "Community 305"
+Cohesion: 0.22
+Nodes (11): ALL_TESTS, DEFAULT_PORT, getEnvSmtpConfig(), parseSmtpTestFilter(), PROTOCOL_MAP, smtpTransportOpts(), validateEnvSmtp(), cfg (+3 more)
+
+### Community 306 - "Community 306"
+Cohesion: 0.23
+Nodes (11): computeExpiryDate(), FaviconImage(), getServiceStyle(), isExpired(), SecurityBadge(), SERVICE_COLORS, ShareModal, clearWithExec() (+3 more)
+
+### Community 307 - "Community 307"
+Cohesion: 0.29
+Nodes (10): defaults(), extractOtpSecret(), import1PUX(), importBitwardenJSON(), importEnpassJSON(), importKeePassXML(), importPadloc(), importProtonPass() (+2 more)
+
+### Community 308 - "Community 308"
+Cohesion: 0.29
+Nodes (4): ImportResult, importKdbx(), KdbxImportResult, _workerPending
+
+### Community 309 - "Community 309"
+Cohesion: 0.40
+Nodes (5): crc32(), createSingleFileZip(), exportToPWDnow1PUX(), writeU16LE(), writeU32LE()
+
+### Community 310 - "Community 310"
+Cohesion: 0.67
+Nodes (3): buildKeePassXML(), exportToKeePassXML(), exportToPWDnowXML()
+
+### Community 311 - "Community 311"
+Cohesion: 0.67
+Nodes (3): buildPWDnowPayload(), exportToPWDnow(), exportToPWDnowEncrypted()
+
 ## Knowledge Gaps
-- **7049 isolated node(s):** `target`, `experimentalDecorators`, `useDefineForClassFields`, `module`, `lib` (+7044 more)
+- **7201 isolated node(s):** `target`, `experimentalDecorators`, `useDefineForClassFields`, `module`, `lib` (+7196 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `addCredential` connect `Community 15` to `Community 132`, `Community 261`, `Community 104`, `Community 300`, `Community 174`, `Community 215`, `Community 154`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
-- **Why does `settings` connect `Community 4` to `Community 222`?**
+- **Why does `addCredential` connect `Community 21` to `Community 224`, `Community 180`, `Community 223`?**
   _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Why does `breachMonitor` connect `Community 35` to `Community 148`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `vault` connect `Community 52` to `Community 204`, `Community 165`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+- **Why does `DaemonClient` connect `Community 58` to `Community 97`, `Community 76`, `Community 118`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **What connects `target`, `experimentalDecorators`, `useDefineForClassFields` to the rest of the system?**
-  _7049 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _7201 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.016666666666666666 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**

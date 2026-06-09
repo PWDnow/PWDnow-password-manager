@@ -2,8 +2,8 @@
 
 ## Project Overview
 PWDnow is a highly secure, two-layer password manager.
-1. **Layer 1 (Daemon):** A Rust-based daemon (`daemon/`) that handles all cryptographic operations, SQLite + SQLCipher storage, and IPC. It runs completely offline and uses a Unix domain socket (`/run/vault-daemon/vault.sock`) with `SO_PEERCRED` for authentication.
-2. **Layer 2 (Web):** A React 19 SPA frontend (`web/`) with TypeScript, Vite, Tailwind CSS v4, and React Router v7. It is served by a minimal Express server (`web/server.js`) that also acts as a WebSocket proxy to the daemon.
+1. **Layer 1 (Daemon):** A Rust-based daemon (`daemon/`) that handles all cryptographic operations, SQLite + SQLCipher storage, and IPC. It runs completely offline and exposes a gRPC interface on `127.0.0.1:50051`.
+2. **Layer 2 (Web):** A React 19 SPA frontend (`web/`) with TypeScript, Vite, Tailwind CSS v4, and React Router v7. It is served by a minimal Express server (`web/server.js`) that also acts as a gRPC-over-HTTP proxy to the daemon at `/api/rpc`.
 
 ## Critical Security Guidelines
 - **Zero-Knowledge Architecture:** The web frontend must **NEVER** see or handle plaintext master keys, KEKs, VMKs, or DEKs.

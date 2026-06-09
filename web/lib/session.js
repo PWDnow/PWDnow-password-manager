@@ -67,12 +67,11 @@ export async function authMiddleware(req, _res, next) {
   if (!token) { req.user = null; return next(); }
   const payload = await verifyJwt(token);
   if (!payload) { req.user = null; return next(); }
-  const users = loadUsers();
-  const u = users.find(x => x.id === payload.sub);
+  const u = await ctx.vaultRepository.findUserById(payload.sub);
   if (!u) { req.user = null; return next(); }
 
   // Ensure jti is still active (not revoked by logout or password change).
-  const activeSessions = loadSessions(u.id);
+  const activeSessions = await ctx.vaultRepository.loadSessions(u.id);
   const isActive = activeSessions.some(s => s.jti === payload.jti);
   if (!isActive) {
     req.user = null;
@@ -156,7 +155,7 @@ export async function recordSession(uid, jti, req) {
     const { browser: browserHint } = req.body || {};
     const ua = req.headers['user-agent'] || '';
     const ip = getClientIp(req);
-    const all = loadSessions(uid).filter(s => s.jti !== jti);
+    const all = (await ctx.vaultRepository.loadSessions(uid)).filter(s => s.jti !== jti);
     const updated = all.map(s => ({ ...s, isCurrent: false }));
 
     let deviceName = parseUA(ua);
@@ -187,7 +186,7 @@ export async function recordSession(uid, jti, req) {
       isCurrent: true,
     });
     const trimmed = updated.length > 20 ? updated.slice(updated.length - 20) : updated;
-    saveSessions(uid, trimmed);
+    await ctx.vaultRepository.saveSessions(uid, trimmed);
   } finally {
     if (release) await release().catch(() => {});
   }

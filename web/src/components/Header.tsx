@@ -71,13 +71,21 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
     navigate('/login');
   };
 
-  const getPlaceholder = () => t('header.searchPlaceholder', 'Search your sanctuary...');
+  const [globalSearch, setGlobalSearch] = useState('');
+
+  const handleGlobalSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const q = globalSearch.trim();
+    if (!q) return;
+    navigate(`/vault?q=${encodeURIComponent(q)}`);
+    setGlobalSearch('');
+  };
 
   return (
     <>
       <header className="fixed top-0 right-0 left-16 md:left-64 h-16 glass-nav border-b border-outline-variant/10 z-40 flex items-center justify-between px-2 sm:px-4 md:px-12 transition-all duration-300 gap-2">
         <div className="flex items-center gap-1 sm:gap-4 flex-1">
-          <button 
+          <button
             onClick={onMenuClick}
             className="md:hidden p-1 sm:p-2 hover:bg-surface-container-high rounded-lg transition-colors shrink-0 text-black dark:text-white"
           >
@@ -85,9 +93,13 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
           </button>
           <div className="relative group flex-1">
             <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
-            <input 
-              type="text" 
-              placeholder={getPlaceholder()}
+            <input
+              type="text"
+              value={globalSearch}
+              onChange={e => setGlobalSearch(e.target.value)}
+              onKeyDown={handleGlobalSearch}
+              placeholder={t('header.searchPlaceholder', 'Search your sanctuary...')}
+              aria-label="Global search — press Enter to search"
               className="w-full bg-surface-container-highest border-none rounded-lg py-1.5 sm:py-2 pl-8 sm:pl-10 pr-2 sm:pr-4 text-xs sm:text-sm text-black dark:text-white focus:ring-2 focus:ring-on-primary-container/20 transition-all outline-none"
             />
           </div>

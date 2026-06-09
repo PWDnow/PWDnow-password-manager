@@ -8,7 +8,12 @@ Requires=local-fs.target
 Type=notify
 User=vault
 Group=vault
-ExecStart=/usr/local/bin/vault-daemon --socket /run/vault-daemon/vault.sock
+# Phase 1 (horizontal-scalability migration): the daemon speaks gRPC, not a Unix
+# socket. The peer-auth token is shared with the web proxy via this env file
+# (create /etc/vault-daemon/grpc.env containing: DAEMON_GRPC_TOKEN=<32+ random hex>).
+# The leading '-' makes the file optional (daemon self-generates a token otherwise).
+EnvironmentFile=-/etc/vault-daemon/grpc.env
+ExecStart=/usr/local/bin/vault-daemon --grpc-addr 127.0.0.1:50051 --vault /var/lib/vault-daemon/vault.db
 
 ProtectSystem=strict
 ProtectHome=true
@@ -28,7 +33,8 @@ ProtectClock=true
 ProtectHostname=true
 LockPersonality=true
 RestrictNamespaces=true
-RestrictAddressFamilies=AF_UNIX
+# AF_INET/AF_INET6 required for the loopback gRPC listener (was AF_UNIX-only).
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictRealtime=true
 RestrictSUIDSGID=true
 RemoveIPC=true
@@ -47,6 +53,8 @@ SystemCallFilter=~@privileged @resources @reboot @swap @raw-io @cpu-emulation @k
 
 RuntimeDirectory=vault-daemon
 RuntimeDirectoryMode=0700
+StateDirectory=vault-daemon
+StateDirectoryMode=0700
 WatchdogSec=30s
 Restart=on-failure
 RestartSec=5s

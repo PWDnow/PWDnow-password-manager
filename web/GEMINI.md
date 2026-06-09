@@ -14,7 +14,7 @@ PWDnow Web is a high-security React 19 SPA. It serves as Layer 2 to the Rust vau
 
 ## Architecture
 The application runs in three modes based on authentication state, managed in `VaultContext.tsx`:
-1. **Daemon Mode**: Guarded by `keyStore.hasToken`. Stores securely inside the Rust daemon.
+1. **Daemon Mode**: Guarded by `keyStore.hasToken`. Communicates with the Rust daemon via the Express gRPC bridge at `POST /api/rpc`.
 2. **Server Mode**: Guarded by `_pwd_csrf` cookie. Routes API calls through REST in `auth.js`.
 3. **Unauthenticated**: Redirects to `/login`.
 

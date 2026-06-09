@@ -11,6 +11,7 @@ import {
   isPlatformAuthAvailable, describeWebAuthnError,
   type MfaConfig, type WebAuthnCredentialMeta
 } from '../../../utils/mfa';
+import { apiFetch } from '../../../utils/api';
 import { logger } from '../../../utils/logger';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../../../context/NotificationContext';
@@ -260,39 +261,24 @@ export function useMfaSetup(profile: UserProfile) {
     setEmailBusy(true);
     setEmailError('');
     try {
-      // Detect browser for email context
       const { isBraveBrowser } = await import('../../../utils/browser');
       const browserName = (await isBraveBrowser()) ? 'Brave' : undefined;
-
-      const res = await fetch('/api/auth/send-setup-otp', {
+      await apiFetch('/api/auth/send-setup-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          toEmail: emailInput,
-          browser: browserName,
-        }),
+        body: JSON.stringify({ toEmail: emailInput, browser: browserName }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.error === 'smtp_not_configured') {
-          setEmailError('Email server not configured. Set up SMTP in Security settings first.');
-          setEmailBusy(false);
-          return;
-        }
-        if (data.error === 'resend_too_soon') {
-          setEmailError(`Please wait ${Math.ceil((data.waitMs || 30000) / 1000)}s before resending.`);
-          setEmailBusy(false);
-          return;
-        }
-        throw new Error(data.error || 'Failed to send code');
-      }
-      // Server sent a real email — no sim code needed
       setEmailSimCode(null);
       setEmailBusy(false);
       setMfaModal({ type: 'email', step: 2 });
     } catch (e: any) {
-      setEmailError(e.message || 'Failed to send verification code.');
+      const errCode: string = e?.data?.error ?? '';
+      if (errCode === 'smtp_not_configured') {
+        setEmailError('Email server not configured. Set up SMTP in Security settings first.');
+      } else if (errCode === 'resend_too_soon') {
+        setEmailError(`Please wait ${Math.ceil((e?.data?.waitMs || 30000) / 1000)}s before resending.`);
+      } else {
+        setEmailError(errCode || e?.message || 'Failed to send verification code.');
+      }
       setEmailBusy(false);
     }
   };
@@ -301,24 +287,10 @@ export function useMfaSetup(profile: UserProfile) {
     const token = emailCode.join('');
     setEmailError('');
     try {
-      const res = await fetch('/api/auth/verify-setup-otp', {
+      const data = await apiFetch<{ ok: boolean; email?: string }>('/api/auth/verify-setup-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ code: token }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        if (data.error === 'expired_or_invalid') {
-          setEmailError('Code expired. Please request a new one.');
-        } else if (data.error === 'too_many_attempts') {
-          setEmailError('Too many attempts. Please request a new code.');
-        } else {
-          setEmailError(`Incorrect code.${data.attemptsLeft != null ? ` ${data.attemptsLeft} attempt(s) left.` : ''}`);
-        }
-        return;
-      }
-      // Verified — enable email MFA
       const cfg = getMfaConfig();
       cfg.email = { enabled: true, address: data.email || emailInput, enabledAt: Date.now() };
       saveMfaConfig(cfg);
@@ -326,7 +298,15 @@ export function useMfaSetup(profile: UserProfile) {
       refreshMfa();
       setMfaModal({ type: 'email', step: 3 });
     } catch (e: any) {
-      setEmailError(e.message || 'Verification failed.');
+      const errCode: string = e?.data?.error ?? '';
+      if (errCode === 'expired_or_invalid') {
+        setEmailError('Code expired. Please request a new one.');
+      } else if (errCode === 'too_many_attempts') {
+        setEmailError('Too many attempts. Please request a new code.');
+      } else {
+        const attemptsLeft = e?.data?.attemptsLeft;
+        setEmailError(`Incorrect code.${attemptsLeft != null ? ` ${attemptsLeft} attempt(s) left.` : ''}`);
+      }
     }
   };
 

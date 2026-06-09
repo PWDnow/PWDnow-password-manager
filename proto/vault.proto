@@ -1,0 +1,412 @@
+syntax = "proto3";
+
+package vault;
+
+// ── The Main Vault Service ───────────────────────────────────────────────────
+
+service VaultService {
+    // Unauthenticated
+    rpc Ping (PingRequest) returns (PingResponse);
+    rpc GetStatus (GetStatusRequest) returns (StatusResponse);
+    rpc GetLoginHints (GetLoginHintsRequest) returns (LoginHintsResponse);
+    rpc Unlock (UnlockRequest) returns (UnlockedResponse);
+    rpc ForensicWipe (ForensicWipeRequest) returns (WipeCompleteResponse);
+    rpc GetPasskeyChallenge (GetPasskeyChallengeRequest) returns (PasskeyChallengeResponse);
+    rpc GetPqcChallenge (GetPqcChallengeRequest) returns (PqcChallengeResponse);
+    rpc UnlockWithPasskey (UnlockWithPasskeyRequest) returns (UnlockedResponse);
+    rpc UnlockWithPqc (UnlockWithPqcRequest) returns (UnlockedResponse);
+
+    // Authenticated
+    rpc ListFido2Devices (ListFido2DevicesRequest) returns (Fido2DevicesResponse);
+    rpc VerifyFido2Assertion (VerifyFido2AssertionRequest) returns (OkResponse);
+
+    rpc GetQuickUnlockChallenge (GetQuickUnlockChallengeRequest) returns (QuickUnlockChallengeResponse);
+    rpc QuickUnlock (QuickUnlockRequest) returns (UnlockedResponse);
+    rpc QuickUnlockEnroll (QuickUnlockEnrollRequest) returns (OkResponse);
+    rpc QuickUnlockRevoke (QuickUnlockRevokeRequest) returns (OkResponse);
+
+    rpc EnrollRecoveryKey (EnrollRecoveryKeyRequest) returns (OkResponse);
+    rpc UnlockWithRecoveryKey (UnlockWithRecoveryKeyRequest) returns (UnlockedResponse);
+
+    rpc Lock (LockRequest) returns (OkResponse);
+
+    rpc ListFolders (ListFoldersRequest) returns (FoldersResponse);
+    rpc AddFolder (AddFolderRequest) returns (CreatedResponse);
+    rpc UpdateFolder (UpdateFolderRequest) returns (OkResponse);
+    rpc DeleteFolder (DeleteFolderRequest) returns (OkResponse);
+    rpc ReorderFolders (ReorderFoldersRequest) returns (OkResponse);
+
+    rpc ListCredentials (ListCredentialsRequest) returns (CredentialsResponse);
+    rpc GetCredential (GetCredentialRequest) returns (CredentialResponse);
+    rpc AddCredential (AddCredentialRequest) returns (CreatedResponse);
+    rpc UpdateCredential (UpdateCredentialRequest) returns (OkResponse);
+    rpc DeleteCredential (DeleteCredentialRequest) returns (OkResponse);
+
+    rpc GetAssetHolder (GetAssetHolderRequest) returns (AssetHolderResponse);
+    rpc UpdateAssetHolder (UpdateAssetHolderRequest) returns (OkResponse);
+
+    rpc GetOtpCode (GetOtpCodeRequest) returns (OtpCodeResponse);
+
+    rpc ListFido2Keys (ListFido2KeysRequest) returns (Fido2KeysResponse);
+    rpc RegisterFido2 (RegisterFido2Request) returns (CreatedResponse);
+    rpc RemoveFido2 (RemoveFido2Request) returns (OkResponse);
+    rpc RegisterPqc (RegisterPqcRequest) returns (CreatedResponse);
+
+    rpc SetupVaultTotp (SetupVaultTotpRequest) returns (TotpSetupResponse);
+    rpc ConfirmVaultTotp (ConfirmVaultTotpRequest) returns (OkResponse);
+    rpc RemoveVaultTotp (RemoveVaultTotpRequest) returns (OkResponse);
+    rpc GetVaultTotpStatus (GetVaultTotpStatusRequest) returns (VaultTotpStatusResponse);
+
+    rpc CheckPasswordBreached (CheckPasswordBreachedRequest) returns (PwnedStatusResponse);
+
+    rpc GetAuditLog (GetAuditLogRequest) returns (AuditLogResponse);
+    rpc VerifyAuditChain (VerifyAuditChainRequest) returns (OkResponse);
+
+    rpc UnlockWithBackupCode (UnlockWithBackupCodeRequest) returns (UnlockedResponse);
+
+    rpc GetProfile (GetProfileRequest) returns (ProfileResponse);
+    rpc UpdateProfile (UpdateProfileRequest) returns (OkResponse);
+    rpc ChangePassword (ChangePasswordRequest) returns (OkResponse);
+    rpc VerifyMasterPassword (VerifyMasterPasswordRequest) returns (OkResponse);
+    rpc UpdateLoginPolicy (UpdateLoginPolicyRequest) returns (OkResponse);
+    rpc UploadProfilePicture (UploadProfilePictureRequest) returns (OkResponse);
+    rpc RemoveProfilePicture (RemoveProfilePictureRequest) returns (OkResponse);
+}
+
+// ── Messages ─────────────────────────────────────────────────────────────────
+
+message PingRequest {}
+message PingResponse {}
+
+message GetStatusRequest {}
+message StatusResponse {
+    bool locked = 1;
+}
+
+message GetLoginHintsRequest {}
+message QuickUnlockCred {
+    string credential_id_hex = 1;
+    string enc_kek = 2;
+    string nonce = 3;
+    string pub_key_cbor_hex = 4;
+    uint64 created_at = 5;
+}
+message LoginHintsResponse {
+    bool password_login_enabled = 1;
+    bool totp_enabled = 2;
+    bool email_otp_enabled = 3;
+    bool recovery_key_active = 4;
+    repeated bytes fido2_ids = 5;
+    repeated QuickUnlockCred quick_unlock_credentials = 6;
+}
+
+message UnlockRequest {
+    bytes password = 1;
+    optional bytes yubikey_response = 2;
+    optional string totp_code = 3;
+}
+message UnlockedResponse {
+    string session_token = 1;
+    bytes wipe_ticket_ciphertext = 2;
+    bytes wipe_ticket_nonce = 3;
+}
+
+message ForensicWipeRequest {
+    bytes wipe_ticket_ciphertext = 1;
+    bytes wipe_ticket_nonce = 2;
+}
+message WipeCompleteResponse {}
+
+message GetPasskeyChallengeRequest {}
+message PasskeyChallengeResponse {
+    bytes challenge = 1;
+}
+
+message GetPqcChallengeRequest {}
+message PqcChallengeResponse {
+    bytes challenge = 1;
+}
+
+message UnlockWithPasskeyRequest {
+    bytes credential_id = 1;
+    bytes auth_data = 2;
+    bytes signature = 3;
+    bytes client_data_json = 4;
+}
+
+message UnlockWithPqcRequest {
+    bytes credential_id = 1;
+    bytes signature = 2;
+    bytes kem_ciphertext = 3;
+    bytes client_data_json = 4;
+}
+
+message ListFido2DevicesRequest {
+    string session_token = 1;
+}
+message Fido2DevicesResponse {
+    repeated string paths = 1;
+}
+
+message VerifyFido2AssertionRequest {
+    string session_token = 1;
+    bytes credential_id = 2;
+    bytes auth_data = 3;
+    bytes signature = 4;
+    bytes client_data_json = 5;
+}
+
+message GetQuickUnlockChallengeRequest {}
+message QuickUnlockChallengeResponse {
+    bytes challenge = 1;
+}
+
+message QuickUnlockRequest {
+    bytes credential_id = 1;
+    bytes auth_data = 2;
+    bytes signature = 3;
+    bytes client_data_json = 4;
+    bytes dbk = 5;
+}
+
+message QuickUnlockEnrollRequest {
+    string session_token = 1;
+    bytes password = 2;
+    bytes credential_id = 3;
+    bytes pub_key_cbor = 4;
+    bytes dbk = 5;
+}
+
+message QuickUnlockRevokeRequest {
+    string session_token = 1;
+}
+
+message EnrollRecoveryKeyRequest {
+    string session_token = 1;
+    bytes recovery_key = 2;
+}
+
+message UnlockWithRecoveryKeyRequest {
+    bytes recovery_key = 1;
+}
+
+message LockRequest {
+    string session_token = 1;
+}
+
+message OkResponse {}
+
+message ListFoldersRequest {
+    string session_token = 1;
+}
+message FoldersResponse {
+    bytes data = 1; // msgpack or json payload of FolderRow
+}
+
+message AddFolderRequest {
+    string session_token = 1;
+    string name = 2;
+    optional string description = 3;
+    optional string icon_svg = 4;
+}
+message CreatedResponse {
+    string id = 1; // UUID as string
+}
+
+message UpdateFolderRequest {
+    string session_token = 1;
+    string id = 2; // UUID
+    string name = 3;
+    optional string description = 4;
+    optional string icon_svg = 5;
+}
+
+message DeleteFolderRequest {
+    string session_token = 1;
+    string id = 2; // UUID
+    optional string move_credentials_to = 3; // UUID
+}
+
+message ReorderFoldersRequest {
+    string session_token = 1;
+    repeated string ordered_ids = 2; // UUIDs
+}
+
+message ListCredentialsRequest {
+    string session_token = 1;
+    optional string folder_id = 2; // UUID
+}
+message CredentialsResponse {
+    bytes data = 1;
+}
+
+message GetCredentialRequest {
+    string session_token = 1;
+    string id = 2; // UUID
+}
+message CredentialResponse {
+    bytes data = 1;
+}
+
+message AddCredentialRequest {
+    string session_token = 1;
+    optional string folder_id = 2; // UUID
+    bytes blob = 3;
+}
+
+message UpdateCredentialRequest {
+    string session_token = 1;
+    string id = 2; // UUID
+    optional string folder_id = 3; // UUID
+    bytes blob = 4;
+}
+
+message DeleteCredentialRequest {
+    string session_token = 1;
+    string id = 2; // UUID
+}
+
+message GetAssetHolderRequest {
+    string session_token = 1;
+}
+message AssetHolderResponse {
+    bytes data = 1;
+}
+
+message UpdateAssetHolderRequest {
+    string session_token = 1;
+    bytes blob = 2;
+}
+
+message GetOtpCodeRequest {
+    string session_token = 1;
+    string credential_id = 2; // UUID
+}
+message OtpCodeResponse {
+    string code = 1;
+}
+
+message ListFido2KeysRequest {
+    string session_token = 1;
+}
+message Fido2KeysResponse {
+    bytes data = 1;
+}
+
+message RegisterFido2Request {
+    string session_token = 1;
+    string device_path = 2;
+    optional string name = 3;
+    bool resident_key = 4;
+}
+
+message RemoveFido2Request {
+    string session_token = 1;
+    string id = 2;
+}
+
+message RegisterPqcRequest {
+    string session_token = 1;
+    optional string name = 2;
+    bytes verifying_key = 3;
+    bytes encapsulation_key = 4;
+}
+
+message SetupVaultTotpRequest {
+    string session_token = 1;
+}
+message TotpSetupResponse {
+    string secret_b32 = 1;
+    string otp_uri = 2;
+    repeated string backup_codes = 3;
+}
+
+message ConfirmVaultTotpRequest {
+    string session_token = 1;
+    string code = 2;
+}
+
+message RemoveVaultTotpRequest {
+    string session_token = 1;
+    string code = 2;
+}
+
+message GetVaultTotpStatusRequest {
+    string session_token = 1;
+}
+message VaultTotpStatusResponse {
+    bool active = 1;
+}
+
+message CheckPasswordBreachedRequest {
+    string session_token = 1;
+    bytes password_bytes = 2;
+}
+message PwnedStatusResponse {
+    bool pwned = 1;
+    bool filter_available = 2;
+}
+
+message GetAuditLogRequest {
+    string session_token = 1;
+    uint32 limit = 2;
+}
+message AuditLogResponse {
+    bytes data = 1;
+}
+
+message VerifyAuditChainRequest {
+    string session_token = 1;
+}
+
+message UnlockWithBackupCodeRequest {
+    bytes password = 1;
+    optional bytes yubikey_response = 2;
+    string backup_code = 3;
+}
+
+message GetProfileRequest {
+    string session_token = 1;
+}
+message ProfileResponse {
+    string first_name = 1;
+    string last_name = 2;
+    string email = 3;
+    optional bytes profile_pic = 4;
+    optional uint64 password_changed_at = 5;
+}
+
+message UpdateProfileRequest {
+    string session_token = 1;
+    string first_name = 2;
+    string last_name = 3;
+    string email = 4;
+}
+
+message ChangePasswordRequest {
+    string session_token = 1;
+    bytes old_password = 2;
+    bytes new_password = 3;
+}
+
+message VerifyMasterPasswordRequest {
+    string session_token = 1;
+    bytes password = 2;
+}
+
+message UpdateLoginPolicyRequest {
+    string session_token = 1;
+    bool password_login_enabled = 2;
+    bool totp_enabled = 3;
+    bool email_otp_enabled = 4;
+    uint32 duress_max_attempts = 5;
+}
+
+message UploadProfilePictureRequest {
+    string session_token = 1;
+    bytes image_bytes = 2;
+}
+
+message RemoveProfilePictureRequest {
+    string session_token = 1;
+}

@@ -14,10 +14,10 @@ use tracing::{error, info};
 use tracing_subscriber::{fmt, EnvFilter};
 
 use error::VaultError;
-use ipc::socket::SocketListener;
+use ipc::grpc_server;
 use vault::state::DaemonState;
 
-const DEFAULT_SOCKET_PATH: &str = "/run/vault-daemon/vault.sock";
+const DEFAULT_GRPC_ADDR:   &str = "127.0.0.1:50051";
 const DEFAULT_VAULT_PATH:  &str = "vault.db";
 
 /// Parse a `--flag value` pair from `argv`.
@@ -26,6 +26,14 @@ fn arg_value(flag: &str) -> Option<PathBuf> {
     args.windows(2)
         .find(|w| w[0] == flag)
         .map(|w| PathBuf::from(&w[1]))
+}
+
+/// Parse a `--flag value` pair from `argv` as a String.
+fn arg_value_str(flag: &str) -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    args.windows(2)
+        .find(|w| w[0] == flag)
+        .map(|w| w[1].clone())
 }
 
 #[tokio::main]
@@ -46,12 +54,13 @@ async fn main() -> Result<(), VaultError> {
         .compact()
         .init();
 
-    let socket_path = arg_value("--socket")
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_SOCKET_PATH));
+    let grpc_addr = arg_value_str("--grpc-addr")
+        .or_else(|| std::env::var("DAEMON_GRPC_ADDR").ok())
+        .unwrap_or_else(|| DEFAULT_GRPC_ADDR.to_string());
     let vault_path = arg_value("--vault")
         .unwrap_or_else(|| PathBuf::from(DEFAULT_VAULT_PATH));
 
-    info!(socket = %socket_path.display(), vault = %vault_path.display(), "vault-daemon starting");
+    info!(grpc_addr = %grpc_addr, vault = %vault_path.display(), "vault-daemon starting");
 
     // FIPS 140-3 §AS09 power-on self-tests — must pass before advertising readiness.
     if let Err(e) = crypto::self_test::run_post() {
@@ -135,12 +144,9 @@ async fn main() -> Result<(), VaultError> {
         }
     });
 
-    let listener = SocketListener::bind(&socket_path, Arc::clone(&state)).await
-        .map_err(|e| VaultError::Ipc(format!("SocketListener::bind failed: {}", e)))?;
-
     tokio::select! {
-        result = listener.run() => {
-            if let Err(e) = result { error!(err = %e, "socket listener error"); }
+        result = grpc_server::start_server(Arc::clone(&state), grpc_addr.clone()) => {
+            if let Err(e) = result { error!(err = %e, "gRPC server error"); }
         }
         _ = signal::ctrl_c() => {
             info!("SIGINT received — locking vault, draining (10 s)");

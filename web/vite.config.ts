@@ -18,8 +18,8 @@ export default defineConfig(({mode}) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           navigateFallback: '/index.html',
-          // Never serve stale SPA shell for API calls, WS, or public share links
-          navigateFallbackDenylist: [/^\/api\//, /^\/ws/, /^\/share\//],
+          // Never serve stale SPA shell for API calls or public share links
+          navigateFallbackDenylist: [/^\/api\//, /^\/share\//],
           runtimeCaching: [
             {
               urlPattern: /^\/locales\//,
@@ -104,11 +104,7 @@ export default defineConfig(({mode}) => {
       // Do not modify — file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
-        '/api': 'http://127.0.0.1:1234',
-        '/ws': {
-          target: 'ws://127.0.0.1:1234',
-          ws: true
-        }
+        '/api': 'http://127.0.0.1:1234'
       }
     },
     test: {

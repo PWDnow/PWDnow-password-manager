@@ -124,7 +124,12 @@ fn main() {
         .write_to_file(out.join("fido2_bindings.rs"))
         .expect("failed to write fido2_bindings.rs");
 
+    // ── gRPC Protobuf ────────────────────────────────────────────────────────
+    tonic_prost_build::compile_protos("../proto/vault.proto")
+        .expect("Failed to compile gRPC protobufs");
+
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=../proto/vault.proto");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_PQ");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_MOCK_FIDO2");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");

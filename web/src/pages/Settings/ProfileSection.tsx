@@ -193,37 +193,29 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
           </div>
         </div>
 
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="mt-10 pt-10 border-t border-outline-variant/10 flex items-center justify-end gap-4"
-            >
-              <button 
-                type="button"
-                onClick={() => updateProfile(profile)} // Reset by using original profile
-                className="px-6 py-3 text-sm font-bold text-on-surface-variant hover:text-black transition-colors"
-              >
-                {t('common.cancel', 'Cancel')}
-              </button>
-              <button 
-                type="button"
-                onClick={handleSaveProfile}
-                disabled={isSaving}
-                className="px-10 py-3 bg-black text-white rounded-xl text-sm font-black uppercase tracking-widest hover:bg-black/90 transition-all flex items-center gap-2 shadow-lg shadow-black/10 disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <RefreshCw size={16} className="animate-spin" />
-                ) : (
-                  <Check size={16} />
-                )}
-                {t('common.save', 'Save Changes')}
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="mt-10 pt-10 border-t border-outline-variant/10 flex items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => updateProfile(profile)}
+            disabled={!hasChanges || isSaving}
+            className="px-6 py-3 text-sm font-bold text-on-surface-variant hover:text-black transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t('common.cancel', 'Cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveProfile}
+            disabled={!hasChanges || isSaving}
+            className="px-10 py-3 bg-black text-white rounded-xl text-sm font-black uppercase tracking-widest hover:bg-black/90 transition-all flex items-center gap-2 shadow-lg shadow-black/10 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <RefreshCw size={16} className="animate-spin" />
+            ) : (
+              <Check size={16} />
+            )}
+            {t('common.save', 'Save Changes')}
+          </button>
+        </div>
 
         <AnimatePresence>
           {showSaveSuccess && (

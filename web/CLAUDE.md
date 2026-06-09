@@ -17,8 +17,8 @@ Never speculate about code you have not opened. If the user references a file, y
 
 PWDnow is a zero-knowledge, local-first password manager with two cooperating layers:
 
-- **Layer 1 (Daemon)**: Rust binary (`daemon/`) — all cryptography, SQLCipher storage, Unix socket IPC. Runs fully offline.
-- **Layer 2 (Web)**: This directory (`web/`). React 19 SPA + Express server, acting as a GUI and WebSocket proxy to the daemon.
+- **Layer 1 (Daemon)**: Rust binary (`daemon/`) — all cryptography, SQLCipher storage. Runs fully offline and exposes gRPC on `127.0.0.1:50051`.
+- **Layer 2 (Web)**: This directory (`web/`). React 19 SPA + Express server, acting as a GUI and gRPC-over-HTTP proxy to the daemon at `/api/rpc`.
 
 **Architecture document**: `web/architecture.md` — full threat model, key hierarchy diagrams, crypto choices.  
 **Knowledge graph**: `web/graphify-out/GRAPH_REPORT.md` — before making architectural decisions, check this.  
@@ -48,7 +48,7 @@ These are absolute rules. Never violate them.
 
 | Mode | Auth mechanism | Vault storage | Guard |
 |---|---|---|---|
-| **Daemon** | `daemon.unlock()` → session token in `SecureKeyStore` | Rust daemon (SQLCipher) | `keyStore.hasToken === true` |
+| **Daemon** | `daemon.unlock()` → session token in `SecureKeyStore` | Rust daemon via gRPC bridge | `keyStore.hasToken === true` |
 | **Server** | `POST /api/auth/login` → `_pwd_sess` + `_pwd_csrf` cookies | AES-256-GCM encrypted files in `auth_data/` | `_pwd_csrf` cookie present (JS-readable) |
 | **Unauthenticated** | — | — | Redirect to `/login` |
 
@@ -65,7 +65,7 @@ These are absolute rules. Never violate them.
 | `src/router.tsx` | All routes, lazy-loaded pages, `AuthedLayout` guard |
 | `src/types.ts` | Core TypeScript types: `Folder`, `Credential`, `AssetHolder`, `Notification` |
 | `src/i18n.ts` | i18next setup: `en`/`fr`, HTTP backend loads from `/locales/{{lng}}/translation.json` |
-| `server.js` | Express: CSP nonce middleware, WebSocket proxy (`/ws`), setup API, static assets |
+| `server.js` | Express: CSP nonce middleware, gRPC proxy (`/api/rpc`), setup API, static assets |
 | `auth.js` | All `/api/auth/*` and `/api/vault/*` routes, JWE session management, scrypt hashing |
 | `vite.config.ts` | Vite config: `@/` alias, manual chunks, sourcemaps off in prod |
 | `ecosystem.config.cjs` | PM2 cluster config (all CPUs, 1 GB memory ceiling) |

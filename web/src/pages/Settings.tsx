@@ -365,6 +365,9 @@ export default function Settings() {
         return;
       }
       await writeEncryptedLocal('email_server_config', JSON.stringify(emailServerForm));
+      // Update UI immediately after local write — don't wait for the server sync
+      setEmailServerConfig(emailServerForm);
+      setIsEmailServerModalOpen(false);
       // Also persist to server so login OTP emails use the configured SMTP
       try {
         await apiFetch('/api/vault/smtp-config', {
@@ -383,8 +386,6 @@ export default function Settings() {
       } catch (e) {
         console.warn('[smtp-config] Server persist failed:', e);
       }
-      setEmailServerConfig(emailServerForm);
-      setIsEmailServerModalOpen(false);
       addNotification({ title: t('settings.emailServerSaved', 'SMTP Saved'), message: t('settings.emailServerSavedDesc', 'Email server configuration saved.'), type: 'success' });
     } catch { setEmailServerError(t('settings.emailServerSaveFailed', 'Failed to save configuration.')); }
     finally { setIsSavingEmailServer(false); }
@@ -462,6 +463,8 @@ export default function Settings() {
     setImportError('');
     try {
       const result = await importFromFile(file);
+      const untitled = t('settings.importUntitled', 'Untitled');
+      result.credentials = result.credentials.map(c => c.service === 'Untitled' ? { ...c, service: untitled } : c);
       setImportResult(result); setImportFileName(file.name);
       setImportMode('merge'); setIsImportModalOpen(true);
     } catch (err) {
@@ -492,6 +495,8 @@ export default function Settings() {
     try {
       const result = await importFromFile(pendingEncryptedFile, importPassphrase);
       if (result.credentials.length === 0) { setImportPassphraseError(t('settings.importNoCredentials', 'No credentials found in file.')); return; }
+      const untitled = t('settings.importUntitled', 'Untitled');
+      result.credentials = result.credentials.map(c => c.service === 'Untitled' ? { ...c, service: untitled } : c);
       setPendingEncryptedFile(null); setImportPassphrase('');
       setImportResult(result); setImportFileName(pendingEncryptedFile.name);
       setImportMode('merge'); setIsImportModalOpen(true);
