@@ -184,4 +184,14 @@ if (process.env.PG_TEST_URL) {
     process.env.DATABASE_URL = process.env.PG_TEST_URL;
     process.env.PGSSL = 'disable';
   });
+
+  // Dual-write: file is primary (reads + authoritative writes), Postgres mirrored.
+  // All assertions read from the file primary; mirror failures must never break a request.
+  suite('dual backend (file primary + postgres mirror)', (dataDir) => {
+    process.env.VAULT_BACKEND = 'dual';
+    process.env.KMS_PROVIDER = 'local';
+    process.env.LOCAL_KMS_KEY = process.env.LOCAL_KMS_KEY || randomBytes(32).toString('hex');
+    process.env.DATABASE_URL = process.env.PG_TEST_URL;
+    process.env.PGSSL = 'disable';
+  });
 }
