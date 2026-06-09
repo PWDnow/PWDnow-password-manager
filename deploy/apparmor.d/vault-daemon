@@ -12,9 +12,16 @@
   /var/lib/vault-daemon/*.cuckoo r,
   /var/lib/vault-daemon/*.cuckoo.sha256 r,
 
-  # Unix socket
+  # Runtime dir (sd_notify, pid, optional token file)
   /run/vault-daemon/ rw,
-  /run/vault-daemon/vault.sock rw,
+  /run/vault-daemon/** rw,
+
+  # gRPC peer-auth token (env file, optional)
+  /etc/vault-daemon/grpc.env r,
+
+  # gRPC listener (loopback TCP). Replaces the former Unix-socket-only model.
+  network inet  stream,
+  network inet6 stream,
 
   # System libraries — specific filenames, glob only for arch suffix
   /usr/lib/@{multiarch}/libsodium.so.* mr,
@@ -35,7 +42,10 @@
   audit deny @{PROC}/sys/kernel/random/uuid r,
   deny /proc/*/mem rw,
   deny /proc/*/maps r,
-  deny network,
+  # Only inet/inet6 stream (gRPC) is permitted above; hard-deny everything else
+  # (raw/packet sockets etc.). A blanket `deny network` would override the allows.
+  deny network raw,
+  deny network packet,
   deny /etc/shadow r,
   deny /etc/passwd r,
   deny /root/** rw,

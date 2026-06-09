@@ -57,17 +57,20 @@ export class FileVaultRepository {
     });
   }
 
-  // fn(user) mutates the matched user in place; helper returns fn's return value,
-  // or null if no user matched (no write performed).
+  // fn(user) mutates the matched user in place. If fn returns false, the write is
+  // skipped (and `false` is returned). If no user matched, returns null (no write).
+  // Otherwise returns fn's return value (or the id when fn returns undefined).
   async updateUserById(id, fn) {
-    let ret = null, matched = false;
+    let ret, matched = false;
     await this.withUserTransaction((users) => {
       const u = users.find(x => x.id === id);
-      if (!u) return false;            // skip save
+      if (!u) return false;            // no user → skip save
       matched = true;
       ret = fn(u);
+      return ret;                      // propagate fn's false to skip save
     });
-    return matched ? ret : null;
+    if (!matched) return null;
+    return ret === undefined ? id : ret;
   }
 
   async deleteUserById(id) {

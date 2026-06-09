@@ -46,7 +46,6 @@ export const FORMATS: FormatDef[] = [
   { id:'keeper-csv',      label:'Keeper CSV',       manager:'Keeper',      group:'online', canImport:true,  canExport:true,  exportExt:'csv',  exportMime:'text/csv',         importExts:['csv'] },
   { id:'dashlane-json',   label:'Dashlane JSON',    manager:'Dashlane',    group:'online', canImport:true,  canExport:true,  exportExt:'json', exportMime:'application/json', importExts:['json'] },
   { id:'dashlane-csv',    label:'Dashlane CSV',     manager:'Dashlane',    group:'online', canImport:true,  canExport:false,                                                  importExts:['csv'] },
-  { id:'dashlane-dash',   label:'Dashlane (.dash)', manager:'Dashlane',    group:'online', canImport:false, canExport:false, importExts:['dash'], exportNote:'Export to JSON/CSV from Dashlane first.' },
   { id:'nordpass-csv',    label:'NordPass CSV',     manager:'NordPass',    group:'online', canImport:true,  canExport:true,  exportExt:'csv',  exportMime:'text/csv',         importExts:['csv'] },
   { id:'lastpass-csv',    label:'LastPass CSV',     manager:'LastPass',    group:'online', canImport:true,  canExport:true,  exportExt:'csv',  exportMime:'text/csv',         importExts:['csv'] },
   { id:'protonpass-json', label:'Proton Pass JSON', manager:'Proton Pass', group:'online', canImport:true,  canExport:true,  exportExt:'json', exportMime:'application/json', importExts:['json'] },
@@ -60,18 +59,22 @@ export const FORMATS: FormatDef[] = [
   { id:'keepass-kdbx',    label:'KeePass / KeePassXC (.kdbx)', manager:'KeePass', group:'offline', canImport:true, canExport:true, exportExt:'xml', exportMime:'text/xml', importExts:['kdbx'], needsPassphrase:true, exportNote:'Supported natively. Exporting as KeePass XML.' },
   { id:'keepass-kdb',     label:'KeePass v1 (.kdb)', manager:'KeePass', group:'offline', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['kdb'], exportNote:'Legacy format. Exporting as KeePass CSV instead.' },
   { id:'roboform-csv',    label:'RoboForm CSV',     manager:'RoboForm',    group:'offline', canImport:true, canExport:true,  exportExt:'csv',  exportMime:'text/csv',         importExts:['csv'] },
-  { id:'roboform-rbp',    label:'RoboForm (.rbp)',  manager:'RoboForm',    group:'offline', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['rbp'], exportNote:'Proprietary format. Exporting as RoboForm CSV instead.' },
+  { id:'roboform-rfp',    label:'RoboForm (.rfp / .rfo)', manager:'RoboForm', group:'offline', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['rfp', 'rfo'], exportNote:'Proprietary RoboForm format. Export as CSV from RoboForm first.' },
   { id:'enpass-json',     label:'Enpass JSON',      manager:'Enpass',      group:'offline', canImport:true, canExport:false,                                                  importExts:['json'] },
   { id:'enpass-csv',      label:'Enpass CSV',       manager:'Enpass',      group:'offline', canImport:true, canExport:true,  exportExt:'csv',  exportMime:'text/csv',         importExts:['csv'] },
   { id:'enpass-enpassdb', label:'Enpass (.enpassdb)', manager:'Enpass',    group:'offline', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['enpassdb'], exportNote:'SQLCipher encrypted. Exporting as Enpass CSV instead.' },
+  { id:'enpass-epb',      label:'Enpass Encrypted Backup (.epb)', manager:'Enpass', group:'offline', canImport:false, canExport:false, importExts:['epb'], exportNote:'Enpass encrypted backup. Decrypt in Enpass first, then export as JSON or CSV.' },
   { id:'buttercup-json',  label:'Buttercup JSON',   manager:'Buttercup',   group:'offline', canImport:true, canExport:true,  exportExt:'json', exportMime:'application/json', importExts:['json'], exportNote:'Unzip .bcup before importing' },
+  { id:'buttercup-bcup',  label:'Buttercup (.bcup)', manager:'Buttercup',  group:'offline', canImport:false, canExport:false, importExts:['bcup'], exportNote:'Encrypted Buttercup vault. Open in Buttercup, export as unencrypted JSON first.' },
   { id:'passwordsafe-csv',label:'Password Safe CSV', manager:'Password Safe', group:'offline', canImport:true, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['csv'] },
   { id:'passwordsafe-psafe3',label:'Password Safe (.psafe3)', manager:'Password Safe', group:'offline', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['psafe3'], exportNote:'Exporting as Password Safe CSV instead.' },
   { id:'passwordsafe-dat',label:'Password Safe v2 (.dat)', manager:'Password Safe', group:'offline', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['dat'], exportNote:'Legacy format. Exporting as Password Safe CSV instead.' },
   { id:'stickypassword-xml',label:'Sticky Password XML', manager:'Sticky Password', group:'offline', canImport:true, canExport:true, exportExt:'xml', exportMime:'text/xml', importExts:['xml'] },
   { id:'stickypassword-spdb',label:'Sticky Password (.spdb)', manager:'Sticky Password', group:'offline', canImport:false, canExport:true, exportExt:'xml', exportMime:'text/xml', importExts:['spdb'], exportNote:'Exporting as Sticky Password XML instead.' },
+  { id:'msecure-csv',     label:'mSecure CSV',      manager:'mSecure',     group:'offline', canImport:true,  canExport:false,                                                  importExts:['csv'] },
+  { id:'safeincloud-xml', label:'SafeInCloud XML',  manager:'SafeInCloud', group:'offline', canImport:true,  canExport:false,                                                  importExts:['xml'] },
   { id:'norton-csv',      label:'Norton Password Mgr CSV', manager:'Norton Password Mgr', group:'online', canImport:true, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['csv'] },
-  { id:'norton-dat',      label:'Norton Password Mgr (.dat)', manager:'Norton Password Mgr', group:'online', canImport:false, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['dat'], exportNote:'Exporting as Norton CSV instead.' },
+  { id:'truekey-csv',     label:'True Key CSV',     manager:'True Key',    group:'online',  canImport:true,  canExport:false,                                                  importExts:['csv'] },
   // ── Browsers ─────────────────────────────────────────────────────────────────
   { id:'chrome-csv',      label:'Chrome / Edge CSV',     manager:'Google Chrome', group:'browser', canImport:true, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['csv'] },
   { id:'firefox-csv',     label:'Firefox CSV',            manager:'Firefox',       group:'browser', canImport:true, canExport:true, exportExt:'csv', exportMime:'text/csv', importExts:['csv'] },
@@ -380,6 +383,87 @@ export function importDashlaneCSV(text: string): ImportResult {
 
 export function importRoboForm(text: string): ImportResult {
   return csvImport(text, { title:'name', url:'url', username:['login','username'], password:['pwd','password'], notes:'note', folder:'folder' }, 'roboform-csv');
+}
+
+export function importMSecure(text: string): ImportResult {
+  // mSecure v3/4: Account Type, Description, Notes, Username, Password, Email, Website, 2FA Key
+  // mSecure v5+:  Type, Description, Notes, Username, Password, Email, Website, OTP
+  return csvImport(text, {
+    title:    ['description', 'title', 'name'],
+    url:      ['website', 'url', 'web'],
+    username: ['username', 'login', 'email'],
+    password: 'password',
+    notes:    ['notes', 'note'],
+    otp:      ['2fa key', 'otp', 'totp'],
+    folder:   ['account type', 'type', 'group', 'category'],
+  }, 'msecure-csv');
+}
+
+export function importSafeInCloud(text: string): ImportResult {
+  // SafeInCloud XML: <database> root, <card title="…"> children, <field name="Login"> etc.
+  const credentials: Credential[] = [];
+  for (const cm of text.matchAll(/<card\b([^>]*)>([\s\S]*?)<\/card>/gi)) {
+    const attrStr = cm[1];
+    const body    = cm[2];
+    const titleAttr = attrStr.match(/\btitle="([^"]*)"/i);
+    const title = titleAttr ? titleAttr[1] : xmlInnerText(body, 'name');
+    if (!title) continue;
+    const fields: Record<string, string> = {};
+    for (const fm of body.matchAll(/<field\b[^>]*\bname="([^"]*)"[^>]*>\s*<value>([\s\S]*?)<\/value>/gi)) {
+      fields[fm[1].toLowerCase()] = fm[2];
+    }
+    const username = fields['login'] ?? fields['username'] ?? fields['email'] ?? fields['user name'] ?? '';
+    const password = fields['password'] ?? '';
+    if (!username && !password) continue;
+    const url    = fields['website'] ?? fields['url'] ?? fields['web site'] ?? '';
+    const otp    = fields['one-time password'] ?? fields['totp'] ?? fields['2fa key'] ?? '';
+    const notes  = xmlInnerText(body, 'notes');
+    credentials.push({
+      ...defaults(),
+      id:          generateUUID(),
+      service:     title,
+      url,
+      username,
+      password,
+      description: notes || undefined,
+      otpSecret:   otp ? (extractOtpSecret(otp) ?? otp) : undefined,
+    } as Credential);
+  }
+  return { credentials, detectedFormat: 'safeincloud-xml' };
+}
+
+export function importTrueKey(text: string): ImportResult {
+  // True Key CSV: kind, name, url, username, password, extra, two_factor, totp, autologin, breach
+  // Filter to kind='login' rows only.
+  const rows = parseCSV(text);
+  if (rows.length < 2) return { credentials: [], detectedFormat: 'truekey-csv' };
+  const headers = rows[0].map(h => h.toLowerCase().trim());
+  const ki  = headers.indexOf('kind');
+  const ti  = headers.indexOf('name');
+  const ui  = headers.indexOf('url');
+  const uni = headers.indexOf('username');
+  const pi  = headers.indexOf('password');
+  const ni  = headers.indexOf('extra');
+  const oi  = headers.indexOf('totp');
+  const credentials: Credential[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (ki >= 0 && row[ki] && row[ki].toLowerCase() !== 'login') continue;
+    const title = ti >= 0 ? (row[ti] ?? '').trim() : '';
+    if (!title) continue;
+    const otpRaw = oi >= 0 ? (row[oi] ?? '') : '';
+    credentials.push({
+      ...defaults(),
+      id:          generateUUID(),
+      service:     title || 'Untitled',
+      url:         ui  >= 0 ? (row[ui]  ?? '') : '',
+      username:    uni >= 0 ? (row[uni] ?? '') : '',
+      password:    pi  >= 0 ? (row[pi]  ?? '') : '',
+      description: ni  >= 0 ? (row[ni]  ?? '') || undefined : undefined,
+      otpSecret:   otpRaw ? (extractOtpSecret(otpRaw) ?? otpRaw) : undefined,
+    } as Credential);
+  }
+  return { credentials, detectedFormat: 'truekey-csv' };
 }
 
 export function importProtonPass(text: string): ImportResult {
@@ -984,7 +1068,11 @@ export async function importFromFile(file: File, passphrase?: string): Promise<I
 
   const text = await file.text();
 
-  if (ext === 'xml') return importKeePassXML(text);
+  if (ext === 'xml') {
+    // SafeInCloud has a <database> root with <card> children; KeePass uses <KeePassFile>.
+    if (/<database\b/i.test(text) && /<card\b/i.test(text)) return importSafeInCloud(text);
+    return importKeePassXML(text);
+  }
 
   if (ext === '1pux') {
     // .1pux is a ZIP - extract export.data
@@ -1002,8 +1090,10 @@ export async function importFromFile(file: File, passphrase?: string): Promise<I
       if (!passphrase) throw new Error('ENCRYPTED_PWDNOW');
       return importPWDnow(await decryptPWDnowExport(text, passphrase));
     }
-    // Bitwarden
-    if ('items' in obj) return importBitwardenJSON(text);
+    // PWDnow unencrypted — must come before Dashlane (both have 'credentials' key)
+    if (obj['app'] === 'PWDnow') return importPWDnow(text);
+    // Bitwarden — always has 'encrypted' boolean; check it before Enpass (both have 'items')
+    if ('items' in obj && 'encrypted' in obj) return importBitwardenJSON(text);
     // Dashlane
     if ('credentials' in obj && Array.isArray(obj['credentials']) && (obj['credentials'][0] as Record<string,unknown>)?.['url'] !== undefined) return importDashlaneJSON(text);
     // Keeper
@@ -1037,6 +1127,8 @@ export async function importFromFile(file: File, passphrase?: string): Promise<I
     if (first.includes('login') && first.includes('pwd')) return importRoboForm(text);
     if (first.includes('secret name') || first.includes('account name')) return importZoho(text);
     if (first.includes('title') && first.includes('username') && first.includes('password') && first.includes('url')) return importPassbolt(text);
+    if (first.includes('account type') || first.includes('2fa key')) return importMSecure(text);
+    if (first.includes('autologin') || (first.includes('kind') && first.includes('two_factor'))) return importTrueKey(text);
     if (first.includes('name') && first.includes('url') && first.includes('username')) return importChrome(text);
     // fallback: treat as Chrome/generic CSV
     return importChrome(text);

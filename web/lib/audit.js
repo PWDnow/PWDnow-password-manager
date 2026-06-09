@@ -33,8 +33,8 @@ export function loadIpPolicy() {
 
 export function auditLogPath(uid) { return path.join(userVaultDir(uid), 'audit_log.enc'); }
 
-export function loadAuditLog(uid) {
-  const events = readEncryptedFile(auditLogPath(uid), userInfo(uid, 'audit_log'), []);
+export async function loadAuditLog(uid) {
+  const events = (await ctx.vaultRepository.getResource(uid, 'audit_log')) ?? [];
   // Verify HMAC integrity chain to detect log excision or tampering.
   if (events.length > 0) {
     const key = derivedKey('audit/chain');
@@ -56,8 +56,8 @@ export function loadAuditLog(uid) {
   return events;
 }
 
-export function saveAuditLog(uid, events) {
-  writeEncryptedFile(auditLogPath(uid), userInfo(uid, 'audit_log'), events);
+export async function saveAuditLog(uid, events) {
+  await ctx.vaultRepository.setResource(uid, 'audit_log', events);
 }
 
 export function compactIpInfo(record) {
@@ -142,11 +142,13 @@ async function flushAuditQueue() {
 
 async function processAuditEvent(uid, event) {
   const dir = userVaultDir(uid);
-  if (!existsSync(dir)) return;
-
+  // File backend: serialize appends with the per-user-dir lock when the dir exists.
+  // Postgres backend: no local dir — the repo UPSERT is the unit of consistency.
   let release = null;
   try {
-    release = await lock(dir, { retries: { retries: 20, minTimeout: 100, maxTimeout: 1000 } });
+    if (existsSync(dir)) {
+      release = await lock(dir, { retries: { retries: 20, minTimeout: 100, maxTimeout: 1000 } });
+    }
 
     let enriched = { ...event };
     // Enrich loopback IPs with the server's real outbound public IP.
@@ -161,7 +163,7 @@ async function processAuditEvent(uid, event) {
       }
     }
 
-    const events = loadAuditLog(uid);
+    const events = await loadAuditLog(uid);
     const lastEvent = events[events.length - 1];
     const prevHash = lastEvent?.hash || '0'.repeat(64);
 
@@ -174,7 +176,7 @@ async function processAuditEvent(uid, event) {
 
     // Ring-buffer cap: 2000 events max to avoid excessive I/O overhead on every append.
     const trimmed = events.length > 2000 ? events.slice(events.length - 2000) : events;
-    saveAuditLog(uid, trimmed);
+    await saveAuditLog(uid, trimmed);
   } finally {
     if (release) await release().catch(() => {});
   }

@@ -4,24 +4,14 @@
     "ast_hash": "8827451c4e35790dd3f3538c265e7d15",
     "semantic_hash": ""
   },
-  "/home/pwd-vm/PWDnow/web/test_argon2.js": {
-    "mtime": 1779162890.4185407,
-    "ast_hash": "f3763881171e553b5eba246c98b8753b",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/test_login_flow.sh": {
-    "mtime": 1779162890.4190094,
-    "ast_hash": "bee4e65bacbb57fcf0b1dfa35bad7707",
-    "semantic_hash": ""
-  },
   "/home/pwd-vm/PWDnow/web/metadata.json": {
     "mtime": 1779162890.389845,
     "ast_hash": "76caa8162ddff95af3df7bc36d5cc53c",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/server.js": {
-    "mtime": 1779829373.2600005,
-    "ast_hash": "e3800dfc0b87013c6cebca39e48a406d",
+    "mtime": 1779849752.3460045,
+    "ast_hash": "a512d6075067c02ea763814dc01b0e0c",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/package.json": {
@@ -29,64 +19,19 @@
     "ast_hash": "90734bcae5f57936e0e0fee91a6b827d",
     "semantic_hash": ""
   },
-  "/home/pwd-vm/PWDnow/web/test-console2.js": {
-    "mtime": 1779162890.4130054,
-    "ast_hash": "7f73273a5cf894f42b9a119005d9fe90",
-    "semantic_hash": ""
-  },
   "/home/pwd-vm/PWDnow/web/vite.config.ts": {
     "mtime": 1779759420.4090004,
     "ast_hash": "b2e3a1dd3d15e07d8a68bae008431e33",
     "semantic_hash": ""
   },
-  "/home/pwd-vm/PWDnow/web/test_hash.js": {
-    "mtime": 1779162890.418876,
-    "ast_hash": "ca63062e0ba3005334fe3e231b21653b",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/test-daemon-reachable.js": {
-    "mtime": 1779162890.4132395,
-    "ast_hash": "e92b71e08ca7ec4d78cf515a839ee723",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/run_debug.js": {
-    "mtime": 1779162890.4050012,
-    "ast_hash": "8575008bea4d4abff6c390fa22cca88e",
-    "semantic_hash": ""
-  },
   "/home/pwd-vm/PWDnow/web/auth.js": {
-    "mtime": 1779571696.797005,
-    "ast_hash": "e92ac4dabdae5f9537f1ca26383c1525",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/decrypt_test.js": {
-    "mtime": 1779162890.3873174,
-    "ast_hash": "e3603e839ece41c9f84b1697f8cfd4df",
+    "mtime": 1780003274.8370006,
+    "ast_hash": "8bf283919069c0cd0d1b6720201c2dfb",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/ipIntelligence.js": {
     "mtime": 1779162890.3895376,
     "ast_hash": "75f49fae9a530c73600ae5eae0ce3833",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/test_crypto_logic.js": {
-    "mtime": 1779162890.4187655,
-    "ast_hash": "8ebd8c14eadf14988f85b8d699cd8b90",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/test-console.js": {
-    "mtime": 1779162890.4128625,
-    "ast_hash": "710e7b1e787ac50bc720feb3908658a8",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/reset_vault.js": {
-    "mtime": 1779162890.4050012,
-    "ast_hash": "719c2dc1536acdaaf202070e9e1e90a3",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/test-kdbx.js": {
-    "mtime": 1779162890.4132395,
-    "ast_hash": "fce42ecbda5e780fc5a5ad2c9c33e5f8",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/playwright.config.ts": {
@@ -139,11 +84,6 @@
     "ast_hash": "ca7f303ac6af6fbc2cfbc5c917da7867",
     "semantic_hash": ""
   },
-  "/home/pwd-vm/PWDnow/web/e2e/repro_v2.spec.ts": {
-    "mtime": 1777863907.0,
-    "ast_hash": "994ebb0a12a6f6189142be6b6608883b",
-    "semantic_hash": ""
-  },
   "/home/pwd-vm/PWDnow/web/e2e/mfa.spec.ts": {
     "mtime": 1777772872.0,
     "ast_hash": "373f48b7fa7aa675cb46ae508a03c5cc",
@@ -157,11 +97,6 @@
   "/home/pwd-vm/PWDnow/web/e2e/test-fixes.spec.ts": {
     "mtime": 1778207570.9020016,
     "ast_hash": "58a01b42ea11746d7a2efb7665e0dbd5",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/e2e/repro_v3.spec.ts": {
-    "mtime": 1777866149.0,
-    "ast_hash": "ca7844fb22ffa5df4559fb46d8d0bfc2",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/e2e/test-wang.spec.ts": {
@@ -209,11 +144,6 @@
     "ast_hash": "dafdc47a59e3f7ef40ebd72c5f1699d8",
     "semantic_hash": ""
   },
-  "/home/pwd-vm/PWDnow/web/e2e/repro_folder_bug.spec.ts": {
-    "mtime": 1779578850.8250082,
-    "ast_hash": "c360964338f2fafab76dad8e9f839a94",
-    "semantic_hash": ""
-  },
   "/home/pwd-vm/PWDnow/web/tests/test_c01_login.js": {
     "mtime": 1778939299.0180001,
     "ast_hash": "a7fe0816658d58341cd639a36e9c1bd4",
@@ -239,159 +169,19 @@
     "ast_hash": "a182bb49d1e3a0b02f922940d34be958",
     "semantic_hash": ""
   },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/tests_senior.rs": {
-    "mtime": 1779335512.3328454,
-    "ast_hash": "187694480733b9411f530a792491845e",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/main.rs": {
-    "mtime": 1779335512.3327787,
-    "ast_hash": "fe1e4e1167771080add8313f2d17e5f2",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/error.rs": {
-    "mtime": 1779335512.3327408,
-    "ast_hash": "a4f9fbe8a034747896a550d2b33a8236",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/mod.rs": {
-    "mtime": 1779335512.3314388,
-    "ast_hash": "f2c4a1bc75c01134265b96e1c6806324",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/blind_index.rs": {
-    "mtime": 1779335512.3311002,
-    "ast_hash": "47c09d3be360316ea217bf73b922159c",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/self_test.rs": {
-    "mtime": 1779335512.33113,
-    "ast_hash": "04175334cfb03bd687dda4a4e2858ef3",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/sign.rs": {
-    "mtime": 1779335512.3314776,
-    "ast_hash": "f6aade98a4882a3d00c6b8248a89f9c3",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/hsm.rs": {
-    "mtime": 1779335512.33152,
-    "ast_hash": "87692a3e65019a6359c721f969eea5e4",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/policy.rs": {
-    "mtime": 1779335512.3316097,
-    "ast_hash": "5ba5a1c455f83fa8fb8192e0f0347bd6",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/xchacha20.rs": {
-    "mtime": 1779335512.3309727,
-    "ast_hash": "f82faa023a3fc228d27e791d7cb9cfce",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/tpm.rs": {
-    "mtime": 1779335512.331563,
-    "ast_hash": "3d0c8afdab61bbdbd158a823b89b2f1c",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/secure_store.rs": {
-    "mtime": 1779335512.3313706,
-    "ast_hash": "087baeb51a4387498b806efa4426efce",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/aes_gcm.rs": {
-    "mtime": 1779335512.3310363,
-    "ast_hash": "e62a6f5fbb2804f172818ccc1e1141d7",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/hibp.rs": {
-    "mtime": 1779335512.3312736,
-    "ast_hash": "f355ffe410bf2fa4b7316bcdc2079185",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/kdf.rs": {
-    "mtime": 1779335512.3314042,
-    "ast_hash": "f5dad8d4e2448b27ca64b92de29e02ce",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/kdf_tune.rs": {
-    "mtime": 1779335512.3312118,
-    "ast_hash": "f6acbc5b1533083fa46c1fed7a5d1b51",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/crypto/kem.rs": {
-    "mtime": 1779335512.331174,
-    "ast_hash": "5a0fd2dd78a879e56013f7ab3cc94b0f",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/ipc/mod.rs": {
-    "mtime": 1779335512.3317897,
-    "ast_hash": "b5a1e99445e570b1fb8588d5e4d4f7ae",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/ipc/protocol.rs": {
-    "mtime": 1779335512.3316991,
-    "ast_hash": "32ac36732f07cb6b88f86cd952776b3b",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/ipc/socket.rs": {
-    "mtime": 1779335512.3318372,
-    "ast_hash": "2740307af4006b6af8790236a311d26c",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/sync/mod.rs": {
-    "mtime": 1779335512.3303916,
-    "ast_hash": "a73614236cc5f4c2ee17910f46c18dd6",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/sync/cloudflare.rs": {
-    "mtime": 1779335512.3302267,
-    "ast_hash": "5d04e981347e044e47fa5fdc96f739a5",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/auth/totp.rs": {
-    "mtime": 1779335512.330703,
-    "ast_hash": "9a343ff3097ec47912338508ea00bf95",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/auth/pqc_auth.rs": {
-    "mtime": 1779335512.3307717,
-    "ast_hash": "e96165525373ea4009c11d8c50ea7367",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/auth/mod.rs": {
-    "mtime": 1779335512.330821,
-    "ast_hash": "303b1ed80e70503b508ae0d66123f75f",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/auth/session.rs": {
-    "mtime": 1779335512.3306234,
-    "ast_hash": "335a227471a05107f81cdfb131d51706",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/auth/fido2_sys.rs": {
-    "mtime": 1779335512.3308704,
-    "ast_hash": "9848e7b9ca1f104e243138aafd7420e9",
-    "semantic_hash": ""
-  },
-  "/home/pwd-vm/PWDnow/web/daemon_src_tmp/auth/fido2.rs": {
-    "mtime": 1779335512.3305247,
-    "ast_hash": "6a602985b38e3c3e2273a7b9a0571a54",
-    "semantic_hash": ""
-  },
   "/home/pwd-vm/PWDnow/web/routes/vaultRoutes.js": {
     "mtime": 1779571680.5150049,
     "ast_hash": "9ed788c3c1bea114214a7f436b3d0bec",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/routes/authRoutes.js": {
-    "mtime": 1779655247.5001404,
-    "ast_hash": "fe37c4dcdd910efe22cada042fff0fa8",
+    "mtime": 1780003316.5660007,
+    "ast_hash": "d5f8d4155da4accafdbbc9644a646ee1",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/types.ts": {
-    "mtime": 1779670623.6340053,
-    "ast_hash": "ac26a669f46dd7db7181d79dfcac1f8d",
+    "mtime": 1779851861.9610054,
+    "ast_hash": "fedda0e4b8d08924fef8bcd69ffa8b39",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/vite-env.d.ts": {
@@ -545,8 +335,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/utils/passwordStrength.ts": {
-    "mtime": 1779585876.7454433,
-    "ast_hash": "38bfa5c96bcda393efe2e66bff666870",
+    "mtime": 1779848420.297004,
+    "ast_hash": "7db4d4ae307c29dfc3f977323fafc837",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/utils/api.ts": {
@@ -580,68 +370,68 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/id.json": {
-    "mtime": 1779766755.227003,
-    "ast_hash": "27fd544c2461f60f3c505bd680b91b6f",
+    "mtime": 1779846852.701003,
+    "ast_hash": "04771463dfea72b1e2cfde4475339da6",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/pt.json": {
-    "mtime": 1779766755.234003,
-    "ast_hash": "4473c443c28cafdef3f62da05f1c1d38",
+    "mtime": 1779846852.7090032,
+    "ast_hash": "2d640155d5c3a57d9c14e8c303f0415b",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/hi.json": {
-    "mtime": 1779766755.225003,
-    "ast_hash": "6998e14a1b16a2bd0d36dfa959686b35",
+    "mtime": 1779846852.6990032,
+    "ast_hash": "0366a085cb81b244f8120779f38b2c48",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/ar.json": {
-    "mtime": 1779766755.208003,
-    "ast_hash": "1a3f711d3e2cb5731f47e17a52a963cf",
+    "mtime": 1779846852.6960032,
+    "ast_hash": "42e44d228c79c2c335b78287654e5d25",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/ko.json": {
-    "mtime": 1779766755.232003,
-    "ast_hash": "a17001cce6bb2b5b837307d073fe9983",
+    "mtime": 1779846852.707003,
+    "ast_hash": "1c6e8a23a4d5301163496bf6026c6ff4",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/zh.json": {
-    "mtime": 1779766755.2390032,
-    "ast_hash": "289dc62e651e3dba3022cac8c63ef81e",
+    "mtime": 1779846852.7130032,
+    "ast_hash": "0c2c7dce01416a02f43cb08373964e13",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/de.json": {
-    "mtime": 1779766755.215003,
-    "ast_hash": "022d376e962217f3bf55644ae0c93d03",
+    "mtime": 1779846852.691003,
+    "ast_hash": "cec5af2697d7c72706fca02273d7785c",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/fr.json": {
-    "mtime": 1779834316.7650006,
-    "ast_hash": "49aeb4338e87ec503aaf3c07b49c9a97",
+    "mtime": 1779846852.6890032,
+    "ast_hash": "50c1889735c8989f74d339c9712c04fc",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/ru.json": {
-    "mtime": 1779766755.237003,
-    "ast_hash": "c6526c391dd9ed32741a10336e71e099",
+    "mtime": 1779846852.711003,
+    "ast_hash": "fdaf26e833bfadc409e30b6595da0883",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/it.json": {
-    "mtime": 1779766755.228003,
-    "ast_hash": "12e8d231a9ee2675ee4c3671690646c6",
+    "mtime": 1779846852.7030032,
+    "ast_hash": "02be618c9f5e4f8a304eaac2af654064",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/ja.json": {
-    "mtime": 1779766755.230003,
-    "ast_hash": "403f54751a4be1042802080b29dda092",
+    "mtime": 1779846852.7050033,
+    "ast_hash": "1b42efc4236bda0c67ce2775db37c6a2",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/en.json": {
-    "mtime": 1779834308.6860006,
-    "ast_hash": "749964ce1de387a01fb4c7788ce806e1",
+    "mtime": 1779846852.6860032,
+    "ast_hash": "556c8c0e52e96c4411ab1e5aefea9135",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/locales/es.json": {
-    "mtime": 1779766755.2200031,
-    "ast_hash": "c337a4a8042d7e3ad9c7ceac11409550",
+    "mtime": 1779846852.694003,
+    "ast_hash": "b4a98e9bcaefb9494219390e773f34f5",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/workers/argon2.worker.ts": {
@@ -705,8 +495,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/components/CreateFolderModal.tsx": {
-    "mtime": 1779753242.8650002,
-    "ast_hash": "2d9a54250936dfd442bb34093fb940d8",
+    "mtime": 1780089229.9020007,
+    "ast_hash": "57c2220c4549bb91a31d896cae3df0a6",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/components/UserAvatar.tsx": {
@@ -755,8 +545,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/AddCredential.tsx": {
-    "mtime": 1779834354.9770007,
-    "ast_hash": "0c15a13a5ac18426bb2cb28121256050",
+    "mtime": 1780023973.2500105,
+    "ast_hash": "1f3cefb4dbc4932028376f7a75582cc2",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Vault.tsx": {
@@ -770,8 +560,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings.tsx": {
-    "mtime": 1779746800.9535158,
-    "ast_hash": "876f1098b4ad62b192e95f93785901bd",
+    "mtime": 1780023737.3190105,
+    "ast_hash": "b9d35a45b17c5eab4e38cb47fa9674d3",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/VaultHealth.tsx": {
@@ -785,8 +575,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Login.tsx": {
-    "mtime": 1779829374.5540004,
-    "ast_hash": "d3747bf1a9f8bfaa601bbc90d73a0176",
+    "mtime": 1780023712.6210103,
+    "ast_hash": "0717b6528bbbb549f9daaa03785977a0",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/BreachMonitor.tsx": {
@@ -800,8 +590,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/ManageFolders.tsx": {
-    "mtime": 1779585697.143465,
-    "ast_hash": "294d30243c93c12c73b7f062ee18ad3c",
+    "mtime": 1780090117.0500011,
+    "ast_hash": "edc786e1d2769b0316957d62f143f9d6",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/AssetHolder.tsx": {
@@ -840,8 +630,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/MfaModalContent.tsx": {
-    "mtime": 1779766680.809003,
-    "ast_hash": "6b19aad17ff910dc05bd555559c995e8",
+    "mtime": 1779852055.1450057,
+    "ast_hash": "4c3c98d9de04192bbaa7de712ef9a99f",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/SharesModal.tsx": {
@@ -850,8 +640,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/index.tsx": {
-    "mtime": 1779745650.9490013,
-    "ast_hash": "cff0a3cab70215d60bd77f2f30947280",
+    "mtime": 1779852015.4050057,
+    "ast_hash": "ac8081feab593e5edcaf6bca1f6b2265",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/ProfileSection.tsx": {
@@ -860,13 +650,13 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/MfaSection.tsx": {
-    "mtime": 1779745630.0300012,
-    "ast_hash": "6a4e5e0d7dd6b6826fbc7052744fda32",
+    "mtime": 1779851973.9310057,
+    "ast_hash": "db38d4376337a6ea86a1bc0721429b45",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/SecurityModesSection.tsx": {
-    "mtime": 1779745624.2750013,
-    "ast_hash": "3680e5dafd2213b5845c971880f23d79",
+    "mtime": 1780023725.5340104,
+    "ast_hash": "44c223afc773a62a6a7a7eb2995e22e5",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/hooks/useSecurityModes.ts": {
@@ -875,8 +665,8 @@
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/hooks/useMfaSetup.ts": {
-    "mtime": 1779766728.4902008,
-    "ast_hash": "dbaa78ce511f5666ec792685b193981c",
+    "mtime": 1779849818.2640045,
+    "ast_hash": "67e083188cf30fb55b83cfd573399419",
     "semantic_hash": ""
   },
   "/home/pwd-vm/PWDnow/web/src/pages/Settings/hooks/useAuditLog.ts": {
@@ -987,6 +777,41 @@
   "/home/pwd-vm/PWDnow/web/src/utils/passwordEntropy.ts": {
     "mtime": 1779834027.0820005,
     "ast_hash": "4468cc85f5b48ae9a481a2d61d690d5c",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/lib/smtpConfig.js": {
+    "mtime": 1780003109.3150005,
+    "ast_hash": "a6f41a18b82c16905a7ae07716176db6",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/tests/smtpConfig.test.js": {
+    "mtime": 1780003063.1480005,
+    "ast_hash": "aecb8406b94a2699d4a69631b18ac55a",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/src/utils/cardUtils.ts": {
+    "mtime": 1779848430.0260038,
+    "ast_hash": "dadbd921a9c6c4143c6bf61ca855cb82",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/src/utils/autofill.ts": {
+    "mtime": 1780088979.9410005,
+    "ast_hash": "83534b781eeb6685bbed836852d2bc24",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/.superpowers/brainstorm/51667-1779841433/content/card-form-overview.html": {
+    "mtime": 1779841480.6890006,
+    "ast_hash": "e57c8e554841f8d43e7b9327737e6a04",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/.superpowers/brainstorm/51667-1779841433/content/card-form-overview-v2.html": {
+    "mtime": 1779841584.9820006,
+    "ast_hash": "2c77fd39823a9b89d829ba1eb8c23c99",
+    "semantic_hash": ""
+  },
+  "/home/pwd-vm/PWDnow/web/docs/superpowers/plans/2026-05-28-smtp-env-config-autofill.md": {
+    "mtime": 1780002266.9290001,
+    "ast_hash": "10fb919682a92687d7bcb53e70fbd07b",
     "semantic_hash": ""
   }
 }

@@ -285,6 +285,10 @@ interface CredentialFormState {
   title: string; username: string; url: string; password: string;
   otpSecret: string; otpAlgorithm: 'SHA1' | 'SHA256' | 'SHA512'; otpDigits: number;
   description: string; accountType: string;
+  // Login identifier type + phone-as-identifier state
+  usernameType: 'username' | 'email' | 'phone';
+  loginPhoneIso: string;
+  loginPhoneValue: string;
   // Expiry
   expiryEnabled: boolean; expiryValue: number;
   expiryUnit: 'days' | 'months' | 'years'; expiryNotifyEmail: boolean;
@@ -385,7 +389,34 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     cardCvv: initialData?.cardCvv || '',
     cardBillingAddress: initialData?.cardBillingAddress || '',
     title: initialData?.service || '',
-    username: initialData?.username === 'No username' ? '' : (initialData?.username || ''),
+    username: (() => {
+      const u = initialData?.username;
+      if (!u || u === 'No username') return '';
+      // Strip the stored phone number so it doesn't bleed into the text field
+      if (/^\+\d/.test(u.trim())) return '';
+      return u;
+    })(),
+    usernameType: (() => {
+      const u = initialData?.username;
+      if (!u || u === 'No username') return 'username';
+      if (/^\+\d/.test(u.trim())) return 'phone';
+      if (u.includes('@')) return 'email';
+      return 'username';
+    })() as 'username' | 'email' | 'phone',
+    loginPhoneIso: (() => {
+      const u = initialData?.username;
+      if (!u || u === 'No username') return 'US';
+      const match = COUNTRIES.find(c => u.startsWith(c.code));
+      return match?.iso || 'US';
+    })(),
+    loginPhoneValue: (() => {
+      const u = initialData?.username;
+      if (!u || u === 'No username') return '';
+      const match = COUNTRIES.find(c => u.startsWith(c.code));
+      if (match) return u.replace(match.code, '').trim();
+      if (/^\+?\d/.test(u.trim())) return u.trim();
+      return '';
+    })(),
     url: initialData?.url || '',
     password: initialData?.password || '',
     otpSecret: initialData?.otpSecret || '',
@@ -445,6 +476,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
     credentialType, rpId, rpName, credentialId, userHandle, authenticatorName, backedUp,
     noteContent, cardholderName, cardNumber, cardExpiry, cardCvv, cardBillingAddress,
     title, username, url, password, otpSecret, description, accountType,
+    usernameType, loginPhoneIso, loginPhoneValue,
     expiryEnabled, expiryValue, expiryUnit, expiryNotifyEmail,
     folderId: selectedFolder, tags, phoneNumbers, kba, u2fKeys,
   } = formState;
@@ -905,7 +937,13 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                 id: initialData?.id || generateUUID(),
                 service: title,
                 url: formattedUrl,
-                username: username.trim() || 'No username',
+                username: usernameType === 'phone'
+                  ? (() => {
+                      const country = COUNTRIES.find(c => c.iso === loginPhoneIso);
+                      const full = `${country?.code || '+1'} ${loginPhoneValue}`.trim();
+                      return full || 'No username';
+                    })()
+                  : (username.trim() || 'No username'),
                 password: password,
                 status: strength.label,
                 statusColor: `${strength.color} ${strength.bg} ${strength.border} ${strength.dot} ${strength.bar}`,
@@ -1244,38 +1282,121 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
             {credentialType === 'login' && <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-3 relative">
-                <label htmlFor="username" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.usernameLabel', 'Username / Email')}</label>
-                <input 
-                  id="username"
-                  type="text" 
-                  value={username}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    dispatch({ type: 'setField', field: 'username', value: val });
-                    // Regex validation: must have @ and a dot in domain, and no spaces
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (val && !emailRegex.test(val)) {
-                      setUsernameError('Invalid email format');
-                    } else {
-                      setUsernameError(null);
+                {/* Identifier type selector */}
+                <div className="flex gap-2 items-center">
+                  {(['username', 'email', 'phone'] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        dispatch({ type: 'setField', field: 'usernameType', value: type });
+                        setUsernameError(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${usernameType === type ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'}`}
+                    >
+                      {type === 'username' ? t('addCredential.typeUsername', 'Username')
+                       : type === 'email' ? t('addCredential.typeEmail', 'Email')
+                       : t('addCredential.typePhone', 'Phone')}
+                    </button>
+                  ))}
+                </div>
+
+                <label htmlFor="username" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                  {usernameType === 'username' ? t('addCredential.usernameOnlyLabel', 'Username')
+                   : usernameType === 'email' ? t('addCredential.emailLabel', 'Email')
+                   : t('addCredential.phoneLabel', 'Phone Number')}
+                </label>
+
+                {usernameType === 'phone' ? (
+                  <div className="flex gap-3 relative">
+                    <PhoneCountrySelect
+                      value={loginPhoneIso}
+                      onChange={(iso) => {
+                        dispatch({ type: 'setField', field: 'loginPhoneIso', value: iso });
+                        dispatch({ type: 'setField', field: 'loginPhoneValue', value: formatPhoneNumber(loginPhoneValue, iso) });
+                      }}
+                      countries={COUNTRIES}
+                    />
+                    <div className="relative flex-1">
+                      <input
+                        id="username"
+                        type="tel"
+                        value={loginPhoneValue}
+                        onChange={(e) => dispatch({ type: 'setField', field: 'loginPhoneValue', value: formatPhoneNumber(e.target.value, loginPhoneIso) })}
+                        onFocus={() => setShowPhoneSuggestions('login-id')}
+                        onBlur={() => setTimeout(() => setShowPhoneSuggestions(null), 200)}
+                        placeholder={COUNTRIES.find(c => c.iso === loginPhoneIso)?.format?.toLowerCase() || '0000000000'}
+                        aria-label="Phone number for login"
+                        className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none"
+                      />
+                      <AnimatePresence>
+                        {showPhoneSuggestions === 'login-id' && assetHolder.phoneNumbers.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-surface-container-low border border-outline-variant/10 rounded-xl shadow-lg overflow-hidden z-50"
+                          >
+                            {assetHolder.phoneNumbers.map((phone, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                  const match = COUNTRIES.find(c => phone.startsWith(c.code));
+                                  if (match) {
+                                    dispatch({ type: 'setField', field: 'loginPhoneIso', value: match.iso });
+                                    dispatch({ type: 'setField', field: 'loginPhoneValue', value: phone.replace(match.code, '').trim() });
+                                  } else {
+                                    dispatch({ type: 'setField', field: 'loginPhoneValue', value: phone });
+                                  }
+                                  setShowPhoneSuggestions(null);
+                                }}
+                                className="w-full text-left px-6 py-3 hover:bg-surface-container-low transition-colors text-sm font-bold text-black dark:text-white"
+                              >
+                                {phone}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      dispatch({ type: 'setField', field: 'username', value: val });
+                      if (usernameType === 'email') {
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        setUsernameError(val && !emailRegex.test(val) ? t('addCredential.invalidEmail', 'Invalid email format') : null);
+                      } else {
+                        setUsernameError(null);
+                      }
+                    }}
+                    onFocus={() => { if (usernameType === 'email') setShowEmailSuggestions(true); }}
+                    onBlur={() => {
+                      setTimeout(() => setShowEmailSuggestions(false), 200);
+                      if (usernameType === 'email' && username.includes('@')) {
+                        const cleaned = username.replace(/[^\w@.-]/g, '');
+                        if (cleaned !== username) dispatch({ type: 'setField', field: 'username', value: cleaned });
+                      }
+                    }}
+                    placeholder={
+                      usernameType === 'email'
+                        ? t('assetHolder.emailPlaceholder', 'name@example.com')
+                        : t('addCredential.usernamePlaceholder', 'e.g. john_doe')
                     }
-                  }}
-                  onFocus={() => setShowEmailSuggestions(true)}
-                  onBlur={() => {
-                    setTimeout(() => setShowEmailSuggestions(false), 200);
-                    // Clean up email: remove non-essential characters if it looks like an email
-                    if (username.includes('@')) {
-                      const cleaned = username.replace(/[^\w@.-]/g, '');
-                      if (cleaned !== username) dispatch({ type: 'setField', field: 'username', value: cleaned });
-                    }
-                  }}
-                  placeholder={t('assetHolder.emailPlaceholder', 'name@example.com')}
-                  aria-label="Username or Email"
-                  autoComplete={BROWSER_AUTOFILL ? 'username' : 'off'}
-                  className={`w-full px-6 py-4 bg-surface-container-low rounded-xl text-black dark:text-white placeholder:text-outline-variant focus:ring-2 transition-all outline-none ${usernameError ? 'border border-red-500 focus:ring-red-500/20' : 'border border-black/15 dark:border-white/15 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30'}`}
-                />
+                    aria-label="Username or Email"
+                    autoComplete={BROWSER_AUTOFILL ? 'username' : 'off'}
+                    className={`w-full px-6 py-4 bg-surface-container-low rounded-xl text-black dark:text-white placeholder:text-outline-variant focus:ring-2 transition-all outline-none ${usernameError ? 'border border-red-500 focus:ring-red-500/20' : 'border border-black/15 dark:border-white/15 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30'}`}
+                  />
+                )}
+
                 {usernameError && (
-                  <motion.p 
+                  <motion.p
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-[10px] font-bold text-red-600 uppercase tracking-wider"
@@ -1283,13 +1404,14 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     {usernameError}
                   </motion.p>
                 )}
+
                 <AnimatePresence>
-                  {showEmailSuggestions && assetHolder.emails.length > 0 && (
+                  {usernameType === 'email' && showEmailSuggestions && assetHolder.emails.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute top-full left-0 w-full mt-2 bg-white border border-outline-variant/10 rounded-xl shadow-lg overflow-hidden z-50"
+                      className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-surface-container-low border border-outline-variant/10 rounded-xl shadow-lg overflow-hidden z-50"
                     >
                       {assetHolder.emails.map((email, i) => (
                         <button
@@ -1308,7 +1430,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   )}
                 </AnimatePresence>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-3 self-end">
                 <label htmlFor="website-url" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.urlLabel', 'Website URL')}</label>
                 <input 
                   id="website-url"

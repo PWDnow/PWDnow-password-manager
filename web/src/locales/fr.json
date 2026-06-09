@@ -815,6 +815,7 @@
     "exportFailed": "L'export a échoué.",
     "exportWarningEncrypted": "AES-256-GCM · PBKDF2-SHA-256 · 600 000 itérations. Conservez la phrase secrète — indispensable à la réimportation.",
     "exportWarningCleartext": "Identifiants exportés en clair pour compatibilité. Supprimez le fichier après migration.",
+    "importUntitled": "Sans titre",
     "importFailed": "Échec de l'analyse du fichier.",
     "importNoCredentials": "Aucun identifiant trouvé dans le fichier.",
     "importWrongPassphrase": "Phrase secrète incorrecte ou fichier corrompu.",

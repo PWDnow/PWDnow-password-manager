@@ -157,12 +157,12 @@ export class SecureKeyStore {
         if (!rawArr) return null;
         const raw = new Uint8Array(rawArr);
         if (isEnc) {
-          return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+          return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
         } else {
           return crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']);
         }
       };
-      
+
       if (data.localKeyV1 && !this.#localKeyV1) importKey(data.localKeyV1, true).then(k => this.#localKeyV1 = k);
       if (data.sigKeyV1 && !this.#sigKeyV1) importKey(data.sigKeyV1, false).then(k => this.#sigKeyV1 = k);
       if (data.localKeyV2 && !this.#localKeyV2) importKey(data.localKeyV2, true).then(k => this.#localKeyV2 = k);
@@ -187,7 +187,7 @@ export class SecureKeyStore {
         if (!rawArr) return null;
         const raw = new Uint8Array(rawArr);
         if (isEnc) {
-          return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+          return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
         } else {
           return await crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']);
         }
@@ -279,7 +279,7 @@ export async function hkdfV2Bind(master: Uint8Array, saltHex: string, token: str
   const macBytes = hkdf(sha384, master, saltBytes, macInfo, 48); // SHA-384 HMAC key = 48 bytes
 
   const [encKey, sigKey] = await Promise.all([
-    crypto.subtle.importKey('raw', aesBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']),
+    crypto.subtle.importKey('raw', aesBytes, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']),
     crypto.subtle.importKey('raw', macBytes, { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']),
   ]);
 
@@ -323,7 +323,7 @@ export async function deriveLocalKeys(
       ),
     );
     const [encKey, sigKey] = await Promise.all([
-      crypto.subtle.importKey('raw', raw.slice(0, 32), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']),
+      crypto.subtle.importKey('raw', raw.slice(0, 32), { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']),
       crypto.subtle.importKey('raw', raw.slice(32, 64), { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']),
     ]);
     raw.fill(0);
@@ -379,7 +379,7 @@ export async function deriveV1Only(
     ),
   );
   const [encKey, sigKey] = await Promise.all([
-    crypto.subtle.importKey('raw', raw.slice(0, 32), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']),
+    crypto.subtle.importKey('raw', raw.slice(0, 32), { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']),
     crypto.subtle.importKey('raw', raw.slice(32, 64), { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']),
   ]);
   raw.fill(0);

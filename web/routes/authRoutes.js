@@ -163,8 +163,8 @@ export async function verifyPassword(hashOrLegacy, password, legacySaltHex) {
       return await argon2.verify(hashOrLegacy, password);
     }
     if (!hashOrLegacy || !legacySaltHex) {
-      const DUMMY_HASH = '$argon2id$v=19$m=131072,t=3,p=1$c29tZXNhbHQ$c29tZWhhc2hvdXRwdXQ';
-      await argon2.verify(DUMMY_HASH, password).catch(() => {});
+      const dummy = await getDummyArgon2Hash();
+      await argon2.verify(dummy, password).catch(() => {});
       return false;
     }
     const hash = scryptHash(password, legacySaltHex);
@@ -176,29 +176,29 @@ export async function verifyPassword(hashOrLegacy, password, legacySaltHex) {
 
 // ── MFA brute-force lockout ────────────────────────────────────────────────────
 
-const _mfaFailedAttempts = new Map(); // userId → { count, lockedUntil }
-const MFA_MAX_ATTEMPTS  = 5;
-const MFA_LOCKOUT_MS    = 10 * 60 * 1000;
+const MFA_MAX_ATTEMPTS = 5;
+const MFA_LOCKOUT_MS   = 10 * 60 * 1000;
+const MFA_WINDOW_MS    = 15 * 60 * 1000;
 
-export function isMfaLocked(userId) {
-  const e = _mfaFailedAttempts.get(userId);
-  if (!e?.lockedUntil) return false;
-  if (Date.now() >= e.lockedUntil) { _mfaFailedAttempts.delete(userId); return false; }
-  return true;
+export async function isMfaLocked(userId) {
+  const val = await ctx.stateStore.get(`mfa:lock:${userId}`);
+  return !!val;
 }
 
-export function recordMfaFailure(userId) {
-  const e = _mfaFailedAttempts.get(userId) ?? { count: 0, lockedUntil: 0 };
-  e.count++;
-  if (e.count >= MFA_MAX_ATTEMPTS) {
-    e.lockedUntil = Date.now() + MFA_LOCKOUT_MS;
-    e.count = 0;
+export async function recordMfaFailure(userId) {
+  const countKey = `mfa:fail:${userId}`;
+  const count = await ctx.stateStore.incrExpire(countKey, MFA_WINDOW_MS);
+  if (count >= MFA_MAX_ATTEMPTS) {
+    await ctx.stateStore.set(`mfa:lock:${userId}`, '1', MFA_LOCKOUT_MS);
+    await ctx.stateStore.del(countKey);
   }
-  _mfaFailedAttempts.set(userId, e);
 }
 
-export function clearMfaFailure(userId) {
-  _mfaFailedAttempts.delete(userId);
+export async function clearMfaFailure(userId) {
+  await Promise.all([
+    ctx.stateStore.del(`mfa:fail:${userId}`),
+    ctx.stateStore.del(`mfa:lock:${userId}`),
+  ]);
 }
 
 // ── Partial MFA token store ────────────────────────────────────────────────────
@@ -566,30 +566,21 @@ export async function sendOtpEmail(smtpCfg, toEmail, code, purpose, emailCtx = {
 // ── readUserBlob / writeUserBlob helpers ───────────────────────────────────────
 // Shared with vaultRoutes.js via export.
 
-export function readUserBlob(uid, name, fallback) {
-  const filePath = userVaultFile(uid, name);
-  const info = userInfo(uid, name);
-  if (!existsSync(filePath)) return fallback;
-  const raw = readFileSync(filePath);
-  const pt = decryptBlob(info, raw);
-  return JSON.parse(pt.toString('utf8'));
+// All vault-resource IO funnels through ctx.vaultRepository so the storage backend
+// (file or Postgres) is swappable. These helpers are async; every caller awaits them.
+export async function readUserBlob(uid, name, fallback) {
+  const v = await ctx.vaultRepository.getResource(uid, name);
+  return v ?? fallback;
 }
 
-export function readUserBlobAsync(uid, name, fallback) {
-  // Thin async wrapper delegating to readEncryptedFile (which is already async-capable).
-  return import('../lib/fileCrypto.js').then(({ readEncryptedFileAsync }) =>
-    readEncryptedFileAsync(userVaultFile(uid, name), userInfo(uid, name), fallback)
-  );
+// Retained name for callers; identical to readUserBlob (already async/repo-backed).
+export const readUserBlobAsync = readUserBlob;
+
+export async function writeUserBlob(uid, name, value) {
+  await ctx.vaultRepository.setResource(uid, name, value);
 }
 
-export function writeUserBlob(uid, name, value) {
-  writeEncryptedFile(userVaultFile(uid, name), userInfo(uid, name), value);
-}
-
-export async function writeUserBlobAsync(uid, name, value) {
-  const { writeEncryptedFileAsync } = await import('../lib/fileCrypto.js');
-  return writeEncryptedFileAsync(userVaultFile(uid, name), userInfo(uid, name), value);
-}
+export const writeUserBlobAsync = writeUserBlob;
 
 // ── Server-side wipe helpers ───────────────────────────────────────────────────
 // Exported so vaultRoutes.js can call performServerWipe.
@@ -622,23 +613,18 @@ export async function performServerWipe(userId) {
     secureOverwriteDir(dir);
     rmSync(dir, { recursive: true, force: true });
   }
-  await withUsersLock(async (users) => {
-    const idx = users.findIndex(x => x.id === userId);
-    if (idx !== -1) users.splice(idx, 1);
-  });
+  await ctx.vaultRepository.deleteUserById(userId);
 }
 
 // ── Route mounter ─────────────────────────────────────────────────────────────
 
 export function mountAuthRoutes(app) {
 
-  app.get('/api/auth/me', authMiddleware, (req, res) => {
+  app.get('/api/auth/me', authMiddleware, async (req, res) => {
     if (!req.user) return res.json({ authenticated: false });
-    const users = loadUsers();
-    const u = users.find(x => x.id === req.user.id);
+    const u = await ctx.vaultRepository.findUserById(req.user.id);
     if (!u) return res.json({ authenticated: false });
-    const profile = readEncryptedFile(userVaultFile(u.id, 'profile'), userInfo(u.id, 'profile'),
-      { firstName: '', lastName: '', email: '' });
+    const profile = await readUserBlob(u.id, 'profile', { firstName: '', lastName: '', email: '' });
     res.json({
       authenticated: true,
       user: {
@@ -663,7 +649,7 @@ export function mountAuthRoutes(app) {
     if (password.length < 12) return res.status(400).json({ error: 'weak_password' });
 
     const emailHash = hashEmail(email);
-    if (loadUsers().some(x => x.emailHash === emailHash)) {
+    if (await ctx.vaultRepository.findUserByEmailHash(emailHash)) {
       return res.status(409).json({ error: 'email_taken' });
     }
 
@@ -672,18 +658,16 @@ export function mountAuthRoutes(app) {
     catch (e) { return res.status(e.status || 500).json({ error: e.message }); }
     const id = randomBytes(16).toString('hex');
 
-    const conflict = await withUsersLock(async (users) => {
-      if (users.some(x => x.emailHash === emailHash)) return 'taken';
-      users.push({ id, emailHash, passwordHash: hash, salt: null, cryptoSalt: cryptoSalt || null, createdAt: Date.now() });
-    });
-    if (conflict === 'taken') return res.status(409).json({ error: 'email_taken' });
-    mkdirSync(userVaultDir(id), { recursive: true, mode: 0o700 });
-    writeEncryptedFile(userVaultFile(id, 'profile'), userInfo(id, 'profile'),
-      { firstName, lastName, email: email.trim() });
-    writeEncryptedFile(userVaultFile(id, 'credentials'), userInfo(id, 'credentials'), []);
-    writeEncryptedFile(userVaultFile(id, 'folders'), userInfo(id, 'folders'), []);
-    writeEncryptedFile(userVaultFile(id, 'asset_holder'), userInfo(id, 'asset_holder'),
-      { emails: [], phoneNumbers: [], u2fKeys: [] });
+    try {
+      await ctx.vaultRepository.insertUser({ id, emailHash, passwordHash: hash, salt: null, cryptoSalt: cryptoSalt || null, createdAt: Date.now() });
+    } catch (e) {
+      if (e.code === 'USER_EXISTS') return res.status(409).json({ error: 'email_taken' });
+      throw e;
+    }
+    await writeUserBlob(id, 'profile', { firstName, lastName, email: email.trim() });
+    await writeUserBlob(id, 'credentials', []);
+    await writeUserBlob(id, 'folders', []);
+    await writeUserBlob(id, 'asset_holder', { emails: [], phoneNumbers: [], u2fKeys: [] });
 
     const { token, jti } = await issueJwt(id);
     const csrf = randomBytes(24).toString('hex');
@@ -710,12 +694,10 @@ export function mountAuthRoutes(app) {
               if (typeof hints[k] !== 'boolean') continue;
               sanitized[k] = hints[k];
             }
-            const found = await withUsersLock(async (users) => {
-              const userIndex = users.findIndex(x => x.id === req.user.id);
-              if (userIndex === -1) return false;
-              users[userIndex].loginHints = sanitized;
+            const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+              u.loginHints = sanitized;
             });
-            if (found === false) return res.status(401).json({ error: 'user_not_found' });
+            if (found === null) return res.status(401).json({ error: 'user_not_found' });
             return res.json({ ok: true });
           });
         });
@@ -729,9 +711,8 @@ export function mountAuthRoutes(app) {
 
     if (typeof email !== 'string') return res.status(400).json({ error: 'invalid_input' });
     const emailHash = hashEmail(email);
-    const users = loadUsers();
-    const u = users.find(x => x.emailHash === emailHash);
-    
+    const u = await ctx.vaultRepository.findUserByEmailHash(emailHash);
+
     // V-26-04 Fix: Always return a uniform structure to prevent user enumeration.
     // Registered and unregistered users must be indistinguishable here.
     const defaults = { 
@@ -769,16 +750,14 @@ export function mountAuthRoutes(app) {
     }
     let finalSalt = null;
     let stored = false;
-    const found = await withUsersLock(async (users) => {
-      const userIndex = users.findIndex(x => x.id === req.user.id);
-      if (userIndex === -1) return false;
-      if (!users[userIndex].cryptoSalt) {
-        users[userIndex].cryptoSalt = cryptoSalt;
+    const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      if (!u.cryptoSalt) {
+        u.cryptoSalt = cryptoSalt;
         stored = true;
       }
-      finalSalt = users[userIndex].cryptoSalt;
+      finalSalt = u.cryptoSalt;
     });
-    if (found === false) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ error: 'user_not_found' });
     if (stored && process.env.NODE_ENV !== 'production') {
       console.log(`[auth] Stored cryptoSalt for user ${req.user.id}`);
     }
@@ -793,8 +772,7 @@ export function mountAuthRoutes(app) {
     }
     const emailHash = hashEmail(email);
 
-    const usersSnapshot = loadUsers();
-    const uSnapshot = usersSnapshot.find(x => x.emailHash === emailHash);
+    const uSnapshot = await ctx.vaultRepository.findUserByEmailHash(emailHash);
     const duressArmed = !!(uSnapshot && uSnapshot.duressEnforce && uSnapshot.duressEnforce.armed);
 
     const clientIdentity = deriveClientIdentity(req, fingerprint);
@@ -839,9 +817,7 @@ export function mountAuthRoutes(app) {
       await Promise.all(failOps);
 
       if (uSnapshot) {
-        await withUsersLock(async (freshUsers) => {
-          const fu = freshUsers.find(x => x.id === uSnapshot.id);
-          if (!fu) return false;
+        await ctx.vaultRepository.updateUserById(uSnapshot.id, (fu) => {
           const fpEntry = makeFingerprintLogEntry(clientIdentity, fingerprint, req, false);
           fu.fingerprintLog = mergeFingerprintLog(fu.fingerprintLog, fpEntry);
         });
@@ -850,9 +826,8 @@ export function mountAuthRoutes(app) {
       let duressRemaining = null;
       let duressWipe = false;
       if (uSnapshot && duressArmed) {
-        await withUsersLock(async (freshUsers) => {
-          const fu = freshUsers.find(x => x.id === uSnapshot.id);
-          if (!fu || !fu.duressEnforce || !fu.duressEnforce.armed) return false;
+        await ctx.vaultRepository.updateUserById(uSnapshot.id, (fu) => {
+          if (!fu.duressEnforce || !fu.duressEnforce.armed) return false;
           const max = Math.max(1, Math.min(20, Number(fu.duressEnforce.maxAttempts) || 3));
           const prev = Number(fu.duressFailureCount) || 0;
           const next = prev + 1;
@@ -878,9 +853,7 @@ export function mountAuthRoutes(app) {
     await Promise.all([resetAccountFailures(emailHash), resetFingerprintFailures(clientIdentity)]);
 
     let finalU = null;
-    await withUsersLock(async (freshUsers) => {
-      const fu = freshUsers.find(x => x.id === uSnapshot.id);
-      if (!fu) return false;
+    await ctx.vaultRepository.updateUserById(uSnapshot.id, (fu) => {
       if (recoveryConsumed) {
         fu.recoveryKeyHash = null;
         fu.recoveryKeySalt = null;
@@ -907,7 +880,7 @@ export function mountAuthRoutes(app) {
     if (mfaEnforce.totp  === true) mfaMethods.push('totp');
     if (mfaEnforce.email === true) mfaMethods.push('email');
 
-    const mfaCfg = readUserBlob(u.id, 'mfa_config', {});
+    const mfaCfg = await readUserBlob(u.id, 'mfa_config', {});
     const hasHardwareMfa = (
       (mfaCfg.webauthn?.enabled && (mfaCfg.webauthn?.credentials?.length ?? 0) > 0) ||
       (mfaCfg.passkey?.enabled  && (mfaCfg.passkey?.credentials?.length  ?? 0) > 0) ||
@@ -919,14 +892,14 @@ export function mountAuthRoutes(app) {
     }
 
     if (mfaMethods.length > 0) {
-      if (isMfaLocked(u.id)) {
+      if (await isMfaLocked(u.id)) {
         return res.status(429).json({ ok: false, error: 'mfa_locked' });
       }
       const partialToken = await issueMfaToken(u.id);
       if (mfaMethods.includes('email')) {
         const otp = await storeEmailOtp(partialToken);
-        const profile  = readUserBlob(u.id, 'profile', { email: '' });
-        const smtpCfg  = readUserBlob(u.id, 'smtp_config', null) ?? getEnvSmtpConfig();
+        const profile  = await readUserBlob(u.id, 'profile', { email: '' });
+        const smtpCfg  = (await readUserBlob(u.id, 'smtp_config', null)) ?? getEnvSmtpConfig();
         const toEmail  = typeof profile.email === 'string' ? profile.email.trim() : '';
         if (toEmail && smtpCfg) {
           const emailCtx = {
@@ -958,13 +931,12 @@ export function mountAuthRoutes(app) {
     const userId = await consumeMfaToken(partialToken);
     if (!userId) return res.status(401).json({ ok: false, error: 'invalid_or_expired_mfa_token' });
 
-    const users = loadUsers();
-    const u = users.find(x => x.id === userId);
+    const u = await ctx.vaultRepository.findUserById(userId);
     if (!u) return res.status(401).json({ ok: false, error: 'user_not_found' });
 
     const mfaEnforce = u.mfaEnforce || {};
 
-    if (isMfaLocked(u.id)) {
+    if (await isMfaLocked(u.id)) {
       return res.status(429).json({ ok: false, error: 'mfa_locked' });
     }
 
@@ -972,7 +944,7 @@ export function mountAuthRoutes(app) {
       const code = totpCode ?? emailCode;
       if (typeof code !== 'string') return res.status(401).json({ ok: false, error: 'mfa_required' });
       if (!await verifyTotpCode(u.mfaTotpSecret, code)) {
-        recordMfaFailure(u.id);
+        await recordMfaFailure(u.id);
         appendAuditEvent(u.id, { action: 'mfa_failed', ip: getClientIp(req), success: false });
         return res.status(401).json({ ok: false, error: 'invalid_mfa_code' });
       }
@@ -982,7 +954,7 @@ export function mountAuthRoutes(app) {
       }
       const stored = await consumeEmailOtp(partialToken);
       if (!stored) {
-        recordMfaFailure(u.id);
+        await recordMfaFailure(u.id);
         appendAuditEvent(u.id, { action: 'mfa_failed', ip: getClientIp(req), success: false });
         return res.status(401).json({ ok: false, error: 'invalid_mfa_code' });
       }
@@ -990,13 +962,13 @@ export function mountAuthRoutes(app) {
       const match = supplied.length === stored.length &&
         timingSafeEqual(Buffer.from(supplied), Buffer.from(stored));
       if (!match) {
-        recordMfaFailure(u.id);
+        await recordMfaFailure(u.id);
         appendAuditEvent(u.id, { action: 'mfa_failed', ip: getClientIp(req), success: false });
         return res.status(401).json({ ok: false, error: 'invalid_mfa_code' });
       }
     }
 
-    clearMfaFailure(u.id);
+    await clearMfaFailure(u.id);
     const { token, jti } = await issueJwt(userId);
     const csrf = randomBytes(24).toString('hex');
     setSessionCookies(req, res, token, csrf);
@@ -1016,8 +988,7 @@ export function mountAuthRoutes(app) {
     const crockfordRegex = /^[0-9A-HJKMNP-TV-Z]+$/i;
     if (!crockfordRegex.test(cleanKey)) return res.status(400).json({ error: 'invalid_charset' });
 
-    const usersSnap = loadUsers();
-    const uSnap = usersSnap.find(x => x.id === req.user.id);
+    const uSnap = await ctx.vaultRepository.findUserById(req.user.id);
     if (!uSnap) return res.status(401).json({ error: 'user_not_found' });
 
     const verified = await verifyPassword(uSnap.passwordHash, password, uSnap.salt);
@@ -1025,16 +996,14 @@ export function mountAuthRoutes(app) {
 
     const hash = await hashPassword(recoveryKey);
 
-    const found = await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
-      if (users[idx].passwordHash !== uSnap.passwordHash) {
+    const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      if (u.passwordHash !== uSnap.passwordHash) {
         throw Object.assign(new Error('password_changed_concurrently'), { status: 409 });
       }
-      users[idx].recoveryKeyHash = hash;
-      users[idx].recoveryKeySalt = null;
-      users[idx].recoveryKeyGeneratedAt = Date.now();
-      users[idx].recoveryKeyExpiresAt = Date.now() + 90 * 24 * 60 * 60 * 1000;
+      u.recoveryKeyHash = hash;
+      u.recoveryKeySalt = null;
+      u.recoveryKeyGeneratedAt = Date.now();
+      u.recoveryKeyExpiresAt = Date.now() + 90 * 24 * 60 * 60 * 1000;
     }).catch(err => {
       if (err && err.status === 409) {
         res.status(409).json({ error: 'password_changed' });
@@ -1043,12 +1012,12 @@ export function mountAuthRoutes(app) {
       throw err;
     });
     if (found === 'handled') return;
-    if (found === false) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ error: 'user_not_found' });
     res.json({ ok: true });
   });
 
-  app.get('/api/auth/fingerprints', authMiddleware, requireAuth, (req, res) => {
-    const u = loadUsers().find(x => x.id === req.user.id);
+  app.get('/api/auth/fingerprints', authMiddleware, requireAuth, async (req, res) => {
+    const u = await ctx.vaultRepository.findUserById(req.user.id);
     if (!u) return res.status(401).json({ error: 'user_not_found' });
     const list = Array.isArray(u.fingerprintLog) ? u.fingerprintLog : [];
     res.json({ ok: true, fingerprints: list.slice().sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0)) });
@@ -1057,15 +1026,13 @@ export function mountAuthRoutes(app) {
   app.delete('/api/auth/fingerprints/:id', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const targetId = String(req.params.id || '');
     if (!/^[0-9a-f]{4,128}$/i.test(targetId)) return res.status(400).json({ error: 'invalid_id' });
-    const found = await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
-      const log = Array.isArray(users[idx].fingerprintLog) ? users[idx].fingerprintLog : [];
+    const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      const log = Array.isArray(u.fingerprintLog) ? u.fingerprintLog : [];
       const before = log.length;
-      users[idx].fingerprintLog = log.filter(e => e.id !== targetId);
-      if (users[idx].fingerprintLog.length === before) return false;
+      u.fingerprintLog = log.filter(e => e.id !== targetId);
+      if (u.fingerprintLog.length === before) return false;
     });
-    if (found === false) return res.status(404).json({ error: 'not_found' });
+    if (found === null || found === false) return res.status(404).json({ error: 'not_found' });
     await resetFingerprintFailures(targetId);
     res.json({ ok: true });
   });
@@ -1077,16 +1044,15 @@ export function mountAuthRoutes(app) {
     try {
       const { password } = req.body || {};
       if (typeof password !== 'string') return res.status(400).json({ error: 'invalid_input' });
-      const users = loadUsers();
-      const u = users.find(x => x.id === req.user.id);
+      const u = await ctx.vaultRepository.findUserById(req.user.id);
       if (!u) return res.status(401).json({ error: 'user_not_found' });
-      if (isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
+      if (await isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
       const authenticated = await verifyPassword(u.passwordHash, password, u.salt);
       if (!authenticated) {
-        recordMfaFailure(u.id);
+        await recordMfaFailure(u.id);
         return res.json({ ok: false });
       }
-      clearMfaFailure(u.id);
+      await clearMfaFailure(u.id);
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ error: 'server_error' });
@@ -1100,8 +1066,7 @@ export function mountAuthRoutes(app) {
     }
     if (newPassword.length < 12) return res.status(400).json({ error: 'weak_password' });
 
-    const usersSnap = loadUsers();
-    const uSnap = usersSnap.find(x => x.id === req.user.id);
+    const uSnap = await ctx.vaultRepository.findUserById(req.user.id);
     if (!uSnap) return res.status(401).json({ error: 'user_not_found' });
 
     const authenticated = await verifyPassword(uSnap.passwordHash, oldPassword, uSnap.salt);
@@ -1109,16 +1074,14 @@ export function mountAuthRoutes(app) {
 
     const newHash = await hashPassword(newPassword);
 
-    const found = await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
-      if (users[idx].passwordHash !== uSnap.passwordHash) {
+    const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      if (u.passwordHash !== uSnap.passwordHash) {
         throw Object.assign(new Error('password_changed_concurrently'), { status: 409 });
       }
-      users[idx].salt = null;
-      users[idx].passwordHash = newHash;
-      users[idx].passwordChangedAt = Date.now();
-      users[idx].revocationEpoch = (Number(users[idx].revocationEpoch) || 0) + 1;
+      u.salt = null;
+      u.passwordHash = newHash;
+      u.passwordChangedAt = Date.now();
+      u.revocationEpoch = (Number(u.revocationEpoch) || 0) + 1;
     }).catch(err => {
       if (err && err.status === 409) {
         res.status(409).json({ error: 'password_changed' });
@@ -1127,18 +1090,18 @@ export function mountAuthRoutes(app) {
       throw err;
     });
     if (found === 'handled') return;
-    if (found === false) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ error: 'user_not_found' });
 
     await withUserDirLock(req.user.id, async () => {
-      saveSessions(req.user.id, []);
+      await ctx.vaultRepository.saveSessions(req.user.id, []);
     });
 
     appendAuditEvent(req.user.id, { action: 'password_changed', ip: getClientIp(req), ipInfo: compactIpInfo(req.ipRecord), userAgent: req.headers['user-agent'] || '', success: true, riskFlags: req.ipRecord?.riskFlags ?? [] });
     res.json({ ok: true });
   });
 
-  app.get('/api/auth/sessions', authMiddleware, requireAuth, (req, res) => {
-    const list = loadSessions(req.user.id)
+  app.get('/api/auth/sessions', authMiddleware, requireAuth, async (req, res) => {
+    const list = (await ctx.vaultRepository.loadSessions(req.user.id))
       .slice()
       .sort((a, b) => b.timestamp - a.timestamp)
       .map(({ jti: _jti, ...rest }) => rest);
@@ -1146,14 +1109,12 @@ export function mountAuthRoutes(app) {
   });
 
   app.post('/api/auth/sessions/revoke-others', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    await withUsersLock(async (users) => {
-      const idx = users.findIndex(x => x.id === req.user.id);
-      if (idx === -1) return false;
-      users[idx].revocationEpoch = (Number(users[idx].revocationEpoch) || 0) + 1;
+    await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
+      u.revocationEpoch = (Number(u.revocationEpoch) || 0) + 1;
     });
     await withUserDirLock(req.user.id, async () => {
-      const list = loadSessions(req.user.id).filter(s => s.jti === req.user.jti);
-      saveSessions(req.user.id, list);
+      const list = (await ctx.vaultRepository.loadSessions(req.user.id)).filter(s => s.jti === req.user.jti);
+      await ctx.vaultRepository.saveSessions(req.user.id, list);
     });
     res.json({ ok: true });
   });
@@ -1161,8 +1122,8 @@ export function mountAuthRoutes(app) {
   app.post('/api/auth/logout', authMiddleware, requireCsrf, async (req, res) => {
     if (req.user) {
       await withUserDirLock(req.user.id, async () => {
-        const list = loadSessions(req.user.id).filter(s => s.jti !== req.user.jti);
-        saveSessions(req.user.id, list);
+        const list = (await ctx.vaultRepository.loadSessions(req.user.id)).filter(s => s.jti !== req.user.jti);
+        await ctx.vaultRepository.saveSessions(req.user.id, list);
       });
       appendAuditEvent(req.user.id, { action: 'logout', ip: getClientIp(req), ipInfo: compactIpInfo(req.ipRecord), userAgent: req.headers['user-agent'] || '', success: true, riskFlags: req.ipRecord?.riskFlags ?? [] });
     }
@@ -1315,7 +1276,7 @@ export function mountAuthRoutes(app) {
       sendCount: sendCount + 1, windowStart, lastSentAt: now,
     });
 
-    const smtpCfg = readUserBlob(req.user.id, 'smtp_config', null) ?? getEnvSmtpConfig();
+    const smtpCfg = (await readUserBlob(req.user.id, 'smtp_config', null)) ?? getEnvSmtpConfig();
     try {
       const setupCtx = {
         ip: getClientIp(req),

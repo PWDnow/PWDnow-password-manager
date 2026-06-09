@@ -813,6 +813,7 @@
     "exportFailed": "Export failed.",
     "exportWarningEncrypted": "AES-256-GCM · PBKDF2-SHA-256 · 600 000 iterations. Keep the passphrase — required to re-import.",
     "exportWarningCleartext": "Credentials exported in cleartext for compatibility. Delete the file after migration.",
+    "importUntitled": "Untitled",
     "importFailed": "Failed to parse file.",
     "importNoCredentials": "No credentials found in file.",
     "importWrongPassphrase": "Wrong passphrase or corrupted file.",

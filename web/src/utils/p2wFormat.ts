@@ -723,6 +723,14 @@ export async function importFromP2W(
     if (t     < ARGON2_MIN_T      || t     > ARGON2_MAX_T)     throw new Error(FAIL_MSG);
     if (p     < ARGON2_MIN_P      || p     > ARGON2_MAX_P)     throw new Error(FAIL_MSG);
 
+    // V-26-03 Fix: Pre-MAC Resource Budget.
+    // Argon2id is expensive. We must not commit massive RAM/CPU to a file 
+    // whose HMAC has not yet been verified. We enforce a 'Safe Pre-Check' 
+    // limit of 64 MiB (log2M=16) and t=2 for unverified files.
+    if (log2M > 16 || t > 2) {
+      throw new Error(FAIL_MSG);
+    }
+
     const payloadLen = dv.getUint32(NZ + HDR_SIZE + HEADER_MAC_SIZE, false);
     if (NZ + HDR_SIZE + HEADER_MAC_SIZE + PAYLOAD_LEN_SIZE + payloadLen + FILE_MAC_SIZE !== file.length)
       throw new Error(FAIL_MSG);

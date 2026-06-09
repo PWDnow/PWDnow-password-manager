@@ -52,10 +52,14 @@ ml-dsa = "0.1.0-rc.9"
 x448 = { version = "0.14.0-pre.9", features = ["static_secrets", "getrandom"] }
 pbkdf2 = "0.12.2"
 hmac = "0.12.1"
+tonic = "0.14.6"
+prost = "0.14.4"
+tonic-prost = "0.14.6"
 
 [build-dependencies]
 bindgen  = "0.72"
 pkg-config = "0.3"
+tonic-prost-build = "0.14.6"
 
 [features]
 default        = ["pq-hybrid-1024"]

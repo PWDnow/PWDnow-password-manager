@@ -54,7 +54,7 @@ cargo clippy -- -D warnings
 ```bash
 npm run dev        # Vite dev server on :3000 (HMR, no daemon needed)
 npm run build      # production build → dist/
-npm start          # Express server serving dist/ + WebSocket proxy
+npm start          # Express server serving dist/ + gRPC bridge
 npm run test       # vitest run (all)
 npx vitest run src/utils/crypto.test.ts   # single test file
 npm run lint       # tsc --noEmit
@@ -70,8 +70,8 @@ npm run pm2:logs
 ### Environment (from `web/`)
 
 Copy `.env.example` to `.env`. Key variables:
-- `GEMINI_API_KEY` — injected into the frontend at build time via `vite.config.ts` `define`
-- `VAULT_ORIGIN` — allowed WebSocket origin for production (e.g. `https://vault.example.com`)
+- `DAEMON_GRPC_ADDR` — Daemon gRPC address (default `127.0.0.1:50051`)
+- `VAULT_ORIGIN` — allowed origin for production (e.g. `https://vault.example.com`)
 - `BIND_HOST` — defaults to `127.0.0.1`; set to `0.0.0.0` for LAN access
 
 ---
@@ -91,13 +91,13 @@ master_password + YubiKey HMAC-SHA256  →  Argon2id  →  512-bit master materi
   VMK       →  decrypt per-credential DEK  →  decrypt credential blob
 ```
 
-**IPC**: Unix socket at `/run/vault-daemon/vault.sock`. Every connection is authenticated via `SO_PEERCRED` (UID must match the vault owner). Protocol: 4-byte big-endian length-prefixed msgpack frames (`rmp_serde`).
+**IPC**: gRPC on `127.0.0.1:50051`. Protocol defined in `proto/vault.proto`.
 
-**Session tokens**: issued at unlock, passed as `session_token` field in every authenticated request. Token tied to UID and auto-expires after 15 minutes of idle.
+**Session tokens**: issued at unlock, passed in metadata in every authenticated request. Token tied to UID and auto-expires after 15 minutes of idle.
 
 **Key modules**:
-- `daemon/src/ipc/socket.rs` — connection loop, `dispatch()`, macros `auth_then!` / `with_db!` / `with_vmk_db!`
-- `daemon/src/ipc/protocol.rs` — `Request` / `Response` enums (source of truth for the wire protocol)
+- `daemon/src/ipc/grpc_server.rs` — gRPC implementation, `VaultService`
+- `daemon/src/ipc/protocol.rs` — Request/Response mapping to gRPC types
 - `daemon/src/vault/state.rs` — `DaemonState`, mlock'd VMK, session store, idle timer
 - `daemon/src/crypto/` — Argon2id, XChaCha20-Poly1305, AES-GCM, X25519/ML-KEM KEM, HIBP Cuckoo filter
 - `daemon/src/vault/credentials.rs` — encrypted credential CRUD with per-item DEKs

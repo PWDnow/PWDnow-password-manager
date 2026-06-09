@@ -1,5 +1,4 @@
 import { logger } from './logger';
-import { encode, decode } from '@msgpack/msgpack';
 import { keyStore } from '../crypto/keystore';
 import type { Folder, Credential, AssetHolder } from '../types';
 import i18n from '../i18n';
@@ -86,119 +85,19 @@ function uuidOutOptional(id: string | null | undefined): Uint8Array | null {
 // ── DaemonClient ─────────────────────────────────────────────────────────────
 
 /**
- * Communicates with the vault daemon via the WebSocket proxy at `/ws`.
+ * Communicates with the vault daemon via the Express gRPC bridge at `POST /api/rpc`.
  *
- * Protocol: each send is a binary WebSocket message containing a msgpack-encoded
- * `Request`.  The server responds with a single msgpack-encoded `Response`.
- * Requests are serialised (one in-flight at a time per connection).
+ * Protocol: each call POSTs `{ method, payload }` as JSON; the server forwards it
+ * to the daemon over gRPC (tonic, 127.0.0.1:50051) and returns `{ status, data }`.
+ * Byte fields cross the JSON boundary as number arrays (see `convertArraysToBuffers`
+ * / `convertBuffersToArrays` in server.js). `connect()`/`disconnect()` are no-ops
+ * retained for API compatibility with the former WebSocket transport.
  */
 export class DaemonClient {
-  #ws: WebSocket | null = null;
-  /** FIFO queue of pending promise callbacks, matched to responses in order. */
-  #queue: Array<{ resolve: (r: unknown) => void; reject: (e: Error) => void }> = [];
-  #connected = false;
-  /** Epoch ms before which we skip connect attempts (set after a failed connect). */
-  #unavailableUntil: number = 0;
-  #connectPromise: Promise<void> | null = null;
+  #connected = true;
 
-  // ── Connection ────────────────────────────────────────────────────────────
-
-  /**
-   * Open a WebSocket connection to the proxy.
-   * Resolves when the socket is open, rejects if the connection fails within 5s.
-   * After a failure, fast-rejects for 30 s to avoid blocking callers on every attempt.
-   */
-  connect(url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`): Promise<void> {
-    if (this.#connected) return Promise.resolve();
-    if (this.#connectPromise) return this.#connectPromise;
-    if (Date.now() < this.#unavailableUntil) {
-      return Promise.reject(new Error(i18n.t('common.daemonNotReachable', 'Vault daemon is not reachable.')));
-    }
-    
-    this.#connectPromise = new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(url);
-      ws.binaryType = 'arraybuffer';
-      // Tracks whether the connect() promise has already settled so that
-      // late-firing onclose / ping-catch callbacks don't double-reject.
-      let connectSettled = false;
-
-      const settle = (fn: () => void) => {
-        if (!connectSettled) { connectSettled = true; clearTimeout(timer); fn(); }
-      };
-
-      const rejectWithCooldown = (err: Error) => {
-        this.#unavailableUntil = Date.now() + 30_000;
-        settle(() => reject(err));
-      };
-
-      const timer = setTimeout(() => {
-        settle(() => { ws.close(); rejectWithCooldown(new Error(i18n.t('common.daemonConnectTimeout', 'Vault daemon connection timed out.'))); });
-      }, 5000);
-
-      ws.onerror = () => rejectWithCooldown(new Error(i18n.t('common.daemonConnectionError', 'Vault daemon connection error.')));
-
-      ws.onclose = () => {
-        this.#connected = false;
-        if (!connectSettled) {
-          rejectWithCooldown(new Error('daemon not reachable'));
-        }
-        for (const pending of this.#queue) {
-          pending.reject(new Error(i18n.t('common.daemonConnectionClosed', 'Vault daemon connection closed.')));
-        }
-        this.#queue = [];
-      };
-
-      ws.onmessage = (event: MessageEvent<ArrayBuffer>) => {
-        const next = this.#queue.shift();
-        if (!next) return;
-        try {
-          const resp = decode(new Uint8Array(event.data)) as Record<string, unknown>;
-          if (resp['status'] === 'Error') {
-            // MED-06: sanitize error messages - map internal codes to generic UI messages
-            // so internal state details are not leaked to the browser.
-            const data = resp['data'] as Record<string, unknown> | undefined;
-            const code = String(data?.['code'] ?? '');
-            const msg = String(data?.['message'] ?? '');
-            logger.warn('[Daemon Error]', { code, msg });
-            
-            const SAFE_MESSAGES: Record<string, string> = {
-              'InvalidPassword': i18n.t('common.daemonAuthFailed',       'Authentication failed.'),
-              'VaultLocked':     i18n.t('common.daemonVaultLocked',      'Vault is locked. Please unlock first.'),
-              'SessionExpired':  i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
-              'NotFound':        i18n.t('common.daemonNotFound',         'Item not found.'),
-              'AlreadyExists':   i18n.t('common.daemonAlreadyExists',    'Item already exists.'),
-              'InvalidInput':    i18n.t('common.daemonInvalidInput',     'Invalid input provided.'),
-              '401':             i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
-            };
-            const safeMsg = SAFE_MESSAGES[code] ?? i18n.t('common.daemonOperationFailed', 'Operation failed. Please try again.');
-            next.reject(new Error(safeMsg));
-          } else {
-            next.resolve(resp);
-          }
-        } catch (e) {
-          next.reject(e instanceof Error ? e : new Error(String(e)));
-        }
-      };
-
-      ws.onopen = () => {
-        this.#ws = ws;
-        this.#connected = true;
-        // Send a Ping to confirm the daemon unix-socket is actually reachable.
-        // If the proxy accepted the WS but the daemon binary isn't running,
-        // the socket error closes the WS before the pong arrives - onclose
-        // fires, settle() rejects, and connect() throws just like a plain
-        // connection failure, so callers fall through cleanly to localStorage.
-        this.ping()
-          .then(() => { this.#unavailableUntil = 0; settle(() => resolve()); })
-          .catch(() => rejectWithCooldown(new Error('daemon not reachable')));
-      };
-    });
-
-    this.#connectPromise.catch(() => {}).finally(() => {
-      this.#connectPromise = null;
-    });
-
-    return this.#connectPromise;
+  connect(): Promise<void> {
+    return Promise.resolve();
   }
 
   get isConnected(): boolean {
@@ -206,55 +105,58 @@ export class DaemonClient {
   }
 
   disconnect(): void {
-    this.#ws?.close();
-    this.#connected = false;
+    // No-op for HTTP
   }
-
-  // ── Low-level request/response ────────────────────────────────────────────
 
   private async request<T = unknown>(
     cmd: string,
     payload?: unknown,
     timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
   ): Promise<T> {
-    if (!this.#ws || !this.#connected) {
-      if (keyStore.hasToken) {
-        try {
-          await this.connect();
-        } catch {
-          throw new Error('daemon not connected');
-        }
-      } else {
-        throw new Error('daemon not connected');
-      }
-    }
-    return new Promise<T>((resolve, reject) => {
-      // On timeout we cannot simply drop the queued entry - responses are
-      // matched FIFO by order, so removing one from the middle would misalign
-      // every subsequent response. Instead we tear down the socket; the
-      // onclose handler drains all pending with a generic rejection, and the
-      // caller reconnects.
-      const timer = setTimeout(() => {
-        reject(new Error(`daemon request timed out: ${cmd}`));
-        try { this.#ws?.close(4000, 'rpc timeout'); } catch { /* already closing */ }
-      }, timeoutMs);
-      this.#queue.push({
-        resolve: (r) => { clearTimeout(timer); resolve(r as T); },
-        reject:  (e) => { clearTimeout(timer); reject(e); },
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch('/api/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: cmd, payload }),
+        signal: controller.signal,
       });
-      const frame: Record<string, unknown> = { cmd };
-      if (payload !== undefined) frame['payload'] = payload;
-      this.#ws!.send(encode(frame));
-    });
+      const data = await resp.json();
+      if (data.status === 'Error') {
+        const errData = data.data as Record<string, unknown> | undefined;
+        const code = String(errData?.['code'] ?? '');
+        const msg = String(errData?.['message'] ?? '');
+        logger.warn('[Daemon Error]', { code, msg });
+        
+        const SAFE_MESSAGES: Record<string, string> = {
+          'InvalidPassword': i18n.t('common.daemonAuthFailed',       'Authentication failed.'),
+          'VaultLocked':     i18n.t('common.daemonVaultLocked',      'Vault is locked. Please unlock first.'),
+          'SessionExpired':  i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
+          'NotFound':        i18n.t('common.daemonNotFound',         'Item not found.'),
+          'AlreadyExists':   i18n.t('common.daemonAlreadyExists',    'Item already exists.'),
+          'InvalidInput':    i18n.t('common.daemonInvalidInput',     'Invalid input provided.'),
+          '401':             i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
+        };
+        const safeMsg = SAFE_MESSAGES[code] ?? i18n.t('common.daemonOperationFailed', 'Operation failed. Please try again.');
+        throw new Error(safeMsg);
+      }
+      return data as T;
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        throw new Error(`daemon request timed out: ${cmd}`);
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  /** Extract the typed `.data` field from a daemon response. */
   private async rpc<T>(cmd: string, payload?: unknown, timeoutMs?: number): Promise<T> {
     const resp = await this.request<{ status: string; data: T }>(cmd, payload, timeoutMs);
-    return (resp as { status: string; data: T }).data;
+    return resp.data;
   }
 
-  /** Like rpc(), but the daemon response `.data` is a UTF-8 JSON byte array. */
   private async rpcJson<T>(cmd: string, payload?: unknown): Promise<T> {
     const data = await this.rpc<Uint8Array | number[]>(cmd, payload);
     const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);

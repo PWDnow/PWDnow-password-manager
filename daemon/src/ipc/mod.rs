@@ -1,2 +1,2 @@
 pub mod protocol;
-pub mod socket;
+pub mod grpc_server;

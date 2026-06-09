@@ -147,7 +147,10 @@ export default function Vault() {
   const [itemToDelete, setItemToDelete] = useState<Credential | null>(null);
   const [deleteInput, setDeleteInput] = useState('');
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('q') ?? '';
+  });
   const [clipboardCountdown, setClipboardCountdown] = useState<number | null>(null);
   const [clipboardLabel, setClipboardLabel] = useState('');
 
@@ -288,11 +291,20 @@ export default function Vault() {
     setItemToEdit(cred);
     setIsAdding(false);
     // Clear the state so refreshing the page doesn't re-open the form.
-    const safePath = (location.pathname.startsWith('/') && !location.pathname.startsWith('//')) 
-      ? location.pathname 
+    const safePath = (location.pathname.startsWith('/') && !location.pathname.startsWith('//'))
+      ? location.pathname
       : '/vault';
     navigate(safePath, { replace: true, state: {} });
   }, [location.state, credentials]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the search box in sync with the ?q= URL param. The useState initializer
+  // for `searchTerm` only runs on first mount; when the header's global search
+  // navigates to /vault?q=<term> while this page is already mounted, React Router
+  // does not remount the component, so the new query would otherwise be ignored.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q') ?? '';
+    setSearchTerm(q);
+  }, [location.search]);
 
   const handleCopyUsername = async (username: string, id: number | string) => {
     if (!username || username === 'No username') return;
