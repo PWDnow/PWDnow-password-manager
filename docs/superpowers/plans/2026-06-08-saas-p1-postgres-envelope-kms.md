@@ -1454,9 +1454,22 @@ git commit -m "feat(p1d): idempotent auth_data → Postgres backfill migrator (p
 
 ---
 
-## Task D3: Cutover runbook (documentation task — no code)
+## Task D3: Cutover runbook
 
-- [ ] **Step 1: Append the runbook to this plan / ops docs**
+> **Implementation status (2026-06-08):** P1.A–P1.D implemented on branch
+> `saas-p1-postgres-envelope-kms`. Verified: KMS+Envelope tests (9/9), Postgres repo
+> contract (10/10), and an HTTP integration suite driving the *real* auth+vault routes
+> end-to-end (register→login→me→CRUD→duress→password-change+revocation→logout) green on
+> **both** the file and Postgres backends. Browser E2E (`comprehensive-platform.spec.ts`)
+> must be run by restarting the dev instance with the branch (the live instance reuses
+> ports 1234/51234 and runs the old binary — see the scalability-grpc-migration memo).
+>
+> **Known P1 limitations (documented, not bugs):** secure-sharing (per-share files in a
+> subdir) and the cross-user public-scan endpoints (`/api/share/:id`, `/api/emergency/request/:token`)
+> remain file-backed; under Postgres they degrade to 404 rather than clustering. The
+> global `mfa_pending.enc` partial-MFA store stays file-backed (P2/StateStore territory).
+> Per-credential row normalization is deferred. Password-bound DEK wrap (`kms+pw`) is
+> schema-ready and default-off (optional sub-plan).
 
 Production cutover sequence (zero-downtime, reversible):
 1. Provision Postgres + Vault Transit key (`vault write -f transit/keys/pwdnow-dek type=aes256-gcm96`).

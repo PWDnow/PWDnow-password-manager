@@ -8,6 +8,10 @@ export const ctx = {
   derivedKeyCache: new Map(),
   /** @type {import('./stateStore.js').InMemoryStateStore | import('./redisStateStore.js').RedisStateStore} */
   stateStore: null,
-  /** @type {import('./vaultRepository.js').FileVaultRepository} */
+  /** @type {import('./vaultRepository.js').FileVaultRepository | import('./postgresVaultRepository.js').PostgresVaultRepository | import('./dualWriteVaultRepository.js').DualWriteVaultRepository} */
   vaultRepository: null,
+  /** @type {import('./envelope.js').Envelope | null} */
+  envelope: null,
+  /** KMS provider (KmsProvider) or null in file mode */
+  kms: null,
 };
