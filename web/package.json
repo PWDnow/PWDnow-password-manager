@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "migrate": "node-pg-migrate -m migrations -j js",
+    "migrate:up": "node-pg-migrate up -m migrations -j js",
     "test": "vitest run src/",
     "test:race": "PLAYWRIGHT_INCLUDE_RACE=1 playwright test --grep @race",
     "prestart": "node scripts/check-deps.js",
