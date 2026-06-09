@@ -47,6 +47,37 @@ export class FileVaultRepository {
     return users.find(u => u.id === id) ?? null;
   }
 
+  async insertUser(user) {
+    return this.withUserTransaction((users) => {
+      if (users.some(u => u.emailHash === user.emailHash)) {
+        const e = new Error('user exists'); e.code = 'USER_EXISTS'; throw e;
+      }
+      users.push(user);
+      return user.id;
+    });
+  }
+
+  // fn(user) mutates the matched user in place; helper returns fn's return value,
+  // or null if no user matched (no write performed).
+  async updateUserById(id, fn) {
+    let ret = null, matched = false;
+    await this.withUserTransaction((users) => {
+      const u = users.find(x => x.id === id);
+      if (!u) return false;            // skip save
+      matched = true;
+      ret = fn(u);
+    });
+    return matched ? ret : null;
+  }
+
+  async deleteUserById(id) {
+    await this.withUserTransaction((users) => {
+      const i = users.findIndex(u => u.id === id);
+      if (i === -1) return false;
+      users.splice(i, 1);
+    });
+  }
+
   async loadSessions(uid) {
     return _loadSessions(uid);
   }
