@@ -52,7 +52,28 @@ export async function initAuth({ dataDir }) {
   }
 
   // ── VaultRepository ────────────────────────────────────────────────────────
-  ctx.vaultRepository = new FileVaultRepository(ctx.DATA_DIR);
+  // Backend selection: VAULT_BACKEND = 'file' (default, self-host) | 'postgres' | 'dual'.
+  const backend = (process.env.VAULT_BACKEND || 'file').toLowerCase();
+  const fileRepo = new FileVaultRepository(ctx.DATA_DIR);
+  if (backend === 'file') {
+    ctx.vaultRepository = fileRepo;
+  } else {
+    const { createKmsProvider } = await import('./lib/kms/kmsProvider.js');
+    const { Envelope } = await import('./lib/envelope.js');
+    const { PostgresVaultRepository } = await import('./lib/postgresVaultRepository.js');
+    ctx.kms = await createKmsProvider();
+    ctx.envelope = new Envelope(ctx.kms);
+    const pgRepo = new PostgresVaultRepository(ctx.envelope);
+    if (backend === 'postgres') {
+      ctx.vaultRepository = pgRepo;
+    } else if (backend === 'dual') {
+      const { DualWriteVaultRepository } = await import('./lib/dualWriteVaultRepository.js');
+      ctx.vaultRepository = new DualWriteVaultRepository(fileRepo, pgRepo); // file primary
+    } else {
+      throw new Error(`unknown VAULT_BACKEND: ${backend}`);
+    }
+    console.log(`[VaultRepository] backend=${backend} kms=${process.env.KMS_PROVIDER || 'local'}`);
+  }
 
   // Pre-warm to avoid mid-request outbound network calls on the first login.
   _getServerPublicIp().catch(() => {});
