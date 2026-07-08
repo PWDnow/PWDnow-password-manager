@@ -22,7 +22,7 @@ function detectOSFromUA(ua: string): string {
   if (/iPhone|iPad/i.test(ua)) return 'iOS';
   if (/Android/i.test(ua)) return 'Android';
   if (/Linux/i.test(ua)) return 'Linux';
-  return 'Unknown OS';
+  return i18n.t('common.unknownOS', 'Unknown OS');
 }
 
 async function detectBrowserFromUA(ua: string): Promise<string> {
@@ -37,7 +37,7 @@ async function detectBrowserFromUA(ua: string): Promise<string> {
   if (/Chrome\/\d/i.test(ua) && !/Chromium/i.test(ua)) return 'Chrome';
   if (/Firefox\/\d/i.test(ua)) return 'Firefox';
   if (/Safari\/\d/i.test(ua)) return 'Safari';
-  return 'Unknown Browser';
+  return i18n.t('common.unknownBrowser', 'Unknown Browser');
 }
 
 async function readSessions(): Promise<LoginSession[]> {

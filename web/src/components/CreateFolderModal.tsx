@@ -18,29 +18,32 @@ interface CreateFolderModalProps {
 
 const PREDEFINED_ICONS = Object.entries(ICON_MAP).map(([name, icon]) => ({ name, icon }));
 
-const TEMPLATES = [
-  'Personal Finance',
-  'Banking',
-  'Investment',
-  'Cryptocurrency',
-  'Gaming',
-  'Streaming Services',
-  'Emails',
-  'Social Media',
-  'Shopping',
-  'Health & Medical',
-  'Travel',
-  'Work & Office',
-  'Developer Tools',
-  'Cloud Services',
-  'Education',
-  'Communication',
-  'Entertainment',
-  'Security & VPN',
-  'Utilities',
-  'Government',
-  'Family',
-  'Insurance',
+// id -> English fallback. The button click sets the folder title to the
+// *translated* label (t() below) so the created folder name matches the
+// user's UI language, not always English.
+const TEMPLATES: { id: string; fallback: string }[] = [
+  { id: 'personalFinance',   fallback: 'Personal Finance' },
+  { id: 'banking',           fallback: 'Banking' },
+  { id: 'investment',        fallback: 'Investment' },
+  { id: 'cryptocurrency',    fallback: 'Cryptocurrency' },
+  { id: 'gaming',            fallback: 'Gaming' },
+  { id: 'streamingServices', fallback: 'Streaming Services' },
+  { id: 'emails',            fallback: 'Emails' },
+  { id: 'socialMedia',       fallback: 'Social Media' },
+  { id: 'shopping',          fallback: 'Shopping' },
+  { id: 'healthMedical',     fallback: 'Health & Medical' },
+  { id: 'travel',            fallback: 'Travel' },
+  { id: 'workOffice',        fallback: 'Work & Office' },
+  { id: 'developerTools',    fallback: 'Developer Tools' },
+  { id: 'cloudServices',     fallback: 'Cloud Services' },
+  { id: 'education',         fallback: 'Education' },
+  { id: 'communication',     fallback: 'Communication' },
+  { id: 'entertainment',     fallback: 'Entertainment' },
+  { id: 'securityVpn',       fallback: 'Security & VPN' },
+  { id: 'utilities',         fallback: 'Utilities' },
+  { id: 'government',        fallback: 'Government' },
+  { id: 'family',            fallback: 'Family' },
+  { id: 'insurance',         fallback: 'Insurance' },
 ];
 
 export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: CreateFolderModalProps) {
@@ -60,8 +63,8 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
 
   if (!isOpen) return null;
 
-  const handleTemplateClick = (template: string) => {
-    setTitle(template);
+  const handleTemplateClick = (label: string) => {
+    setTitle(label);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,7 +112,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="presentation">
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -118,17 +121,20 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
           className="absolute inset-0 bg-[#000000]/40"
         />
         <motion.div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-folder-title"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative bg-surface w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-outline-variant/10 flex flex-col max-h-[90vh]"
         >
           <div className="flex items-center justify-between p-6 border-b border-outline-variant/10">
-            <h2 className="text-2xl font-headline font-black tracking-tight">Create Folder</h2>
-            <button 
+            <h2 id="create-folder-title" className="text-2xl font-headline font-black tracking-tight">{t('sidebar.createFolder', 'Create Folder')}</h2>
+            <button
               onClick={onClose}
               className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
-              aria-label="Close modal"
+              aria-label={t('common.close', 'Close')}
             >
               <X size={24} />
             </button>
@@ -139,7 +145,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
               {/* Folder Name */}
               <div>
                 <label htmlFor="folder-title" className="block text-xs font-black uppercase tracking-widest text-on-surface-variant mb-2">
-                  Folder Name
+                  {t('folders.createModal.folderName', 'Folder Name')}
                 </label>
                 <input
                   id="folder-title"
@@ -151,21 +157,24 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                   className="w-full bg-white dark:bg-surface-container-high border border-on-surface-variant/50 dark:border-outline-variant/30 rounded-xl px-4 py-3 text-black dark:text-white font-medium focus:outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
                   required
                 />
-                
+
                 {/* Templates */}
                 <div className="mt-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">{t('vault.templates', 'Templates')}</p>
                   <div className="flex flex-wrap gap-2">
-                    {TEMPLATES.map((template) => (
-                      <button
-                        key={template}
-                        type="button"
-                        onClick={() => handleTemplateClick(template)}
-                        className="text-xs font-medium px-3 py-1.5 bg-surface-container-high hover:bg-black hover:text-white rounded-full transition-colors"
-                      >
-                        {template}
-                      </button>
-                    ))}
+                    {TEMPLATES.map((template) => {
+                      const label = t(`folders.templates.${template.id}`, template.fallback);
+                      return (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => handleTemplateClick(label)}
+                          className="text-xs font-medium px-3 py-1.5 bg-surface-container-high hover:bg-black hover:text-white rounded-full transition-colors"
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -173,7 +182,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
               {/* Folder Description */}
               <div>
                 <label htmlFor="folder-desc" className="block text-xs font-black uppercase tracking-widest text-on-surface-variant mb-2">
-                  Description
+                  {t('folders.createModal.description', 'Description')}
                 </label>
                 <textarea
                   id="folder-desc"
@@ -188,7 +197,7 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
               {/* Icon Selection */}
               <div>
                 <label id="folder-icon-label" className="block text-xs font-black uppercase tracking-widest text-on-surface-variant mb-3">
-                  Folder Icon
+                  {t('folders.createModal.folderIcon', 'Folder Icon')}
                 </label>
                 <div className="grid grid-cols-5 sm:grid-cols-8 gap-3 mb-4" role="radiogroup" aria-labelledby="folder-icon-label">
                   {PREDEFINED_ICONS.map((item) => (
@@ -246,9 +255,9 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
                     className="flex items-center gap-2 px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest rounded-lg text-sm font-bold transition-colors"
                   >
                     <Upload size={16} />
-                    Upload Custom SVG
+                    {t('folders.createModal.uploadCustomSvg', 'Upload Custom SVG')}
                   </button>
-                  <p className="text-xs text-on-surface-variant">SVG files only</p>
+                  <p className="text-xs text-on-surface-variant">{t('folders.createModal.svgFilesOnly', 'SVG files only')}</p>
                 </div>
               </div>
             </form>
@@ -260,14 +269,14 @@ export default function CreateFolderModal({ isOpen, onClose, onAddFolder }: Crea
               onClick={onClose}
               className="px-6 py-3 rounded-lg font-bold text-sm hover:bg-surface-container-high transition-colors"
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               form="create-folder-form"
               className="px-8 py-3 bg-black text-white rounded-lg font-bold text-sm hover:bg-black/80 transition-colors"
             >
-              Create Folder
+              {t('sidebar.createFolder', 'Create Folder')}
             </button>
           </div>
         </motion.div>

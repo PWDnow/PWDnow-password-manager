@@ -180,22 +180,27 @@ export default function BreachMonitor() {
       />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="mb-12 relative overflow-hidden rounded-xl bg-primary-container text-white p-12">
+      {/* Static navy background + white text regardless of theme: the
+          primary-container/on-primary-container pair swaps to a bright blue
+          in dark mode, which cannot reach AAA contrast (7:1) with either
+          white or on-primary-container text against it - max achievable is
+          ~5.6:1 even with pure black. A fixed dark background sidesteps that. */}
+      <section className="mb-12 relative overflow-hidden rounded-xl bg-[#00174b] text-white p-12">
         <div className="relative z-10 max-w-2xl">
-          <div className="flex items-center gap-2 text-on-primary-container mb-4">
+          <div className="flex items-center gap-2 text-white mb-4">
             <AlertTriangle size={24} fill="currentColor" />
             <span className="font-headline font-extrabold text-sm uppercase tracking-[0.2em]">
               {t('breachMonitor.offlineCheck', 'Offline Breach Check')}
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-headline font-black tracking-tighter mb-4 leading-tight">
+          <h1 className="text-4xl md:text-5xl font-headline font-black tracking-tighter mb-4 leading-tight text-white">
             {scanState === 'done' && pwnedCount > 0
               ? t('breachMonitor.pwnedTitle', { count: pwnedCount, defaultValue: `${pwnedCount} Password${pwnedCount !== 1 ? 's' : ''} Found in Breaches` })
               : scanState === 'done'
               ? t('breachMonitor.allClear', 'All Clear - No Breached Passwords')
               : t('breachMonitor.scanTitle', 'Vault Password Breach Scan')}
           </h1>
-          <p className="text-surface-container-highest/70 text-lg mb-8 leading-relaxed">
+          <p className="text-white text-lg mb-8 leading-relaxed">
             {daemonConnected
               ? t('breachMonitor.daemonDesc', 'Checks every vault password against the local offline HIBP filter. Passwords never leave your device.')
               : t('breachMonitor.onlineDesc', 'Using the HIBP k-anonymity API - only the first 5 characters of your password hash are sent. Your passwords never leave your device in plaintext.')}
@@ -223,7 +228,7 @@ export default function BreachMonitor() {
             )}
           </div>
         </div>
-        <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-on-primary-container/30 to-transparent" />
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-white/10 to-transparent" />
         <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-error rounded-full blur-[60px] opacity-20" />
       </section>
 
@@ -360,14 +365,14 @@ export default function BreachMonitor() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Plan A */}
           <div className={`rounded-2xl p-6 border-2 transition-all ${
-            daemonConnected ? 'border-green-500/40 bg-green-50 dark:bg-green-950/20' : 'border-outline-variant/20 bg-surface-container-low opacity-60'
+            daemonConnected ? 'border-green-500/40 bg-green-50 dark:bg-green-950/20' : 'border-outline-variant/20 bg-surface-container-low'
           }`}>
             <div className="flex items-center gap-3 mb-3">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${daemonConnected ? 'bg-green-600 text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
                 <Database size={16} />
               </div>
               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${daemonConnected ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                {daemonConnected ? 'Active' : 'Offline'}
+                {daemonConnected ? t('breachMonitor.statusActive', 'Active') : t('breachMonitor.statusOffline', 'Offline')}
               </span>
             </div>
             <h3 className="font-bold text-sm mb-1">{t('breachMonitor.planA', 'Plan A - Local HIBP Filter')}</h3>
@@ -382,8 +387,8 @@ export default function BreachMonitor() {
               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
                 <Wifi size={16} />
               </div>
-              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                {!daemonConnected ? 'Active' : 'Fallback'}
+              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-200">
+                {!daemonConnected ? t('breachMonitor.statusActive', 'Active') : t('breachMonitor.statusFallback', 'Fallback')}
               </span>
             </div>
             <h3 className="font-bold text-sm mb-1">{t('breachMonitor.planB', 'Plan B - HIBP k-Anonymity API')}</h3>
@@ -396,8 +401,8 @@ export default function BreachMonitor() {
               <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center">
                 <Terminal size={16} />
               </div>
-              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-                {wordlist ? 'Custom' : 'Bundled'}
+              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200">
+                {wordlist ? t('breachMonitor.statusCustom', 'Custom') : t('breachMonitor.statusBundled', 'Bundled')}
               </span>
             </div>
             <h3 className="font-bold text-sm mb-1">{t('breachMonitor.planC', 'Plan C - Common Password List')}</h3>
@@ -492,7 +497,7 @@ export default function BreachMonitor() {
             <p className="text-sm font-semibold text-on-surface-variant text-center">
               {t('breachMonitor.dropFile', 'Drop .txt file here or click to browse')}
             </p>
-            <p className="text-xs text-on-surface-variant/60">rockyou.txt, darkweb2017.txt, etc.</p>
+            <p className="text-xs text-on-surface-variant">rockyou.txt, darkweb2017.txt, etc.</p>
           </div>
         )}
         <input
@@ -519,7 +524,7 @@ export default function BreachMonitor() {
                 <ShieldCheck size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-sm">{t('breachMonitor.offlineFilter', 'Offline Filter')}</h4>
+                <h3 className="font-bold text-sm">{t('breachMonitor.offlineFilter', 'Offline Filter')}</h3>
                 <p className="text-xs text-on-surface-variant">
                   {t('breachMonitor.offlineFilterDesc', '900 M+ breached passwords stored in an 8 GB Cuckoo filter, queried entirely on-device.')}
                 </p>
@@ -530,7 +535,7 @@ export default function BreachMonitor() {
                 <Lock size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-sm">{t('breachMonitor.hashedComparisons', 'SHA-1 Hashed Comparisons')}</h4>
+                <h3 className="font-bold text-sm">{t('breachMonitor.hashedComparisons', 'SHA-1 Hashed Comparisons')}</h3>
                 <p className="text-xs text-on-surface-variant">
                   {t('breachMonitor.hashedComparisonsDesc', 'Only the hash is compared against the filter. Your plaintext password never leaves the daemon process.')}
                 </p>

@@ -128,15 +128,24 @@ export class DaemonClient {
         const code = String(errData?.['code'] ?? '');
         const msg = String(errData?.['message'] ?? '');
         logger.warn('[Daemon Error]', { code, msg });
-        
+
+        // `code` here is the numeric gRPC status code (grpc-js `error.code`,
+        // e.g. 16 = UNAUTHENTICATED, 3 = INVALID_ARGUMENT), NOT the old
+        // string variant names ('InvalidPassword', 'NotFound', ...) used by
+        // the pre-gRPC msgpack/socket.rs protocol. Keying this map by those
+        // string names meant every branch was permanently unreachable —
+        // every daemon error, including a routine expired session, silently
+        // fell through to the generic fallback below. See tonic::Code in
+        // daemon/src/ipc/grpc_server.rs for the codes the daemon emits.
         const SAFE_MESSAGES: Record<string, string> = {
-          'InvalidPassword': i18n.t('common.daemonAuthFailed',       'Authentication failed.'),
-          'VaultLocked':     i18n.t('common.daemonVaultLocked',      'Vault is locked. Please unlock first.'),
-          'SessionExpired':  i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
-          'NotFound':        i18n.t('common.daemonNotFound',         'Item not found.'),
-          'AlreadyExists':   i18n.t('common.daemonAlreadyExists',    'Item already exists.'),
-          'InvalidInput':    i18n.t('common.daemonInvalidInput',     'Invalid input provided.'),
-          '401':             i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'),
+          '16': i18n.t('common.daemonSessionExpired',   'Session expired. Please unlock again.'), // UNAUTHENTICATED
+          '7':  i18n.t('common.daemonAuthFailed',       'Authentication failed.'),                // PERMISSION_DENIED
+          '5':  i18n.t('common.daemonNotFound',         'Item not found.'),                        // NOT_FOUND
+          '6':  i18n.t('common.daemonAlreadyExists',    'Item already exists.'),                    // ALREADY_EXISTS
+          '3':  i18n.t('common.daemonInvalidInput',     'Invalid input provided.'),                 // INVALID_ARGUMENT
+          '9':  i18n.t('common.daemonVaultLocked',      'Vault is locked. Please unlock first.'),   // FAILED_PRECONDITION
+          '14': i18n.t('common.daemonUnavailable',      'Vault daemon is unavailable. Please try again.'), // UNAVAILABLE
+          '401': i18n.t('common.daemonSessionExpired',  'Session expired. Please unlock again.'),   // legacy HTTP bridge code, kept for compat
         };
         const safeMsg = SAFE_MESSAGES[code] ?? i18n.t('common.daemonOperationFailed', 'Operation failed. Please try again.');
         throw new Error(safeMsg);
@@ -199,7 +208,7 @@ export class DaemonClient {
     credentialId: Uint8Array, authData: Uint8Array, signature: Uint8Array,
     clientDataHash: Uint8Array,
   ): Promise<void> {
-    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    type UnlockData = { session_token: string; wipe_ticket_ciphertext?: number[]; wipe_ticket_nonce?: number[] };
     const data = await this.rpc<UnlockData>('UnlockWithPasskey', {
       credential_id: Array.from(credentialId),
       auth_data: Array.from(authData),
@@ -207,8 +216,8 @@ export class DaemonClient {
       client_data_hash: Array.from(clientDataHash),
     });
     if (!data?.session_token) throw new Error('no session token in unlock response');
-    if (data.wipe_ticket?.length) {
-      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    if (data.wipe_ticket_ciphertext?.length && data.wipe_ticket_nonce?.length) {
+      keyStore.storeWipeTicket(new Uint8Array(data.wipe_ticket_ciphertext), new Uint8Array(data.wipe_ticket_nonce));
     }
     keyStore.store(data.session_token);
   }
@@ -218,36 +227,43 @@ export class DaemonClient {
    * Stores the returned session token in the SecureKeyStore.
    */
   async unlock(password: string, yubiKeyResponse?: Uint8Array): Promise<void> {
-    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    type UnlockData = { session_token: string; wipe_ticket_ciphertext?: number[]; wipe_ticket_nonce?: number[] };
     const data = await this.rpc<UnlockData>('Unlock', {
       password: Array.from(new TextEncoder().encode(password)),
       yubikey_response: yubiKeyResponse ? Array.from(yubiKeyResponse) : null,
     });
     if (!data?.session_token) throw new Error('no session token in unlock response');
-    if (data.wipe_ticket?.length) {
-      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    if (data.wipe_ticket_ciphertext?.length && data.wipe_ticket_nonce?.length) {
+      keyStore.storeWipeTicket(new Uint8Array(data.wipe_ticket_ciphertext), new Uint8Array(data.wipe_ticket_nonce));
     }
     keyStore.store(data.session_token);
   }
 
   // ── Quick Unlock ──────────────────────────────────────────────────────────
 
-  async quickUnlockEnroll(password: string, dbk: Uint8Array): Promise<void> {
+  async quickUnlockEnroll(
+    password: string,
+    dbk: Uint8Array,
+    credentialId: Uint8Array = new Uint8Array(0),
+    pubKeyCbor: Uint8Array = new Uint8Array(0),
+  ): Promise<void> {
     await this.request('QuickUnlockEnroll', {
       session_token: this.token,
       password: Array.from(new TextEncoder().encode(password)),
+      credential_id: Array.from(credentialId),
+      pub_key_cbor: Array.from(pubKeyCbor),
       dbk: Array.from(dbk),
     });
   }
 
   async quickUnlock(dbk: Uint8Array): Promise<void> {
-    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    type UnlockData = { session_token: string; wipe_ticket_ciphertext?: number[]; wipe_ticket_nonce?: number[] };
     const data = await this.rpc<UnlockData>('QuickUnlock', {
       dbk: Array.from(dbk),
     });
     if (!data?.session_token) throw new Error('no session token in unlock response');
-    if (data.wipe_ticket?.length) {
-      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    if (data.wipe_ticket_ciphertext?.length && data.wipe_ticket_nonce?.length) {
+      keyStore.storeWipeTicket(new Uint8Array(data.wipe_ticket_ciphertext), new Uint8Array(data.wipe_ticket_nonce));
     }
     keyStore.store(data.session_token);
   }
@@ -266,13 +282,13 @@ export class DaemonClient {
   }
 
   async unlockWithRecoveryKey(recoveryKey: string): Promise<void> {
-    type UnlockData = { session_token: string; wipe_ticket?: number[] };
+    type UnlockData = { session_token: string; wipe_ticket_ciphertext?: number[]; wipe_ticket_nonce?: number[] };
     const data = await this.rpc<UnlockData>('UnlockWithRecoveryKey', {
       recovery_key: Array.from(new TextEncoder().encode(recoveryKey)),
     });
     if (!data?.session_token) throw new Error('no session token in recovery unlock response');
-    if (data.wipe_ticket?.length) {
-      localStorage.setItem(WIPE_TICKET_KEY, data.wipe_ticket.map(b => b.toString(16).padStart(2, '0')).join(''));
+    if (data.wipe_ticket_ciphertext?.length && data.wipe_ticket_nonce?.length) {
+      keyStore.storeWipeTicket(new Uint8Array(data.wipe_ticket_ciphertext), new Uint8Array(data.wipe_ticket_nonce));
     }
     keyStore.store(data.session_token);
   }
@@ -283,11 +299,11 @@ export class DaemonClient {
    * The daemon overwrites vault files in 7 passes then exits.
    * Call wipeVaultData() immediately after to also clear the browser side.
    */
-  async forensicWipe(ticket: Uint8Array): Promise<void> {
+  async forensicWipe(ticket: { ct: Uint8Array; nonce: Uint8Array }): Promise<void> {
     try {
       await this.request(
         'ForensicWipe',
-        { wipe_ticket: Array.from(ticket) },
+        { wipe_ticket_ciphertext: Array.from(ticket.ct), wipe_ticket_nonce: Array.from(ticket.nonce) },
         10_000,
       );
     } catch {
@@ -553,6 +569,34 @@ export class DaemonClient {
     } finally {
       enc.fill(0);
     }
+  }
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+
+  /**
+   * Retrieve the daemon's BLAKE3-chained audit log.
+   * Returns raw JSON bytes from the daemon as a parsed array.
+   */
+  async getAuditLog(limit = 50, offset = 0): Promise<unknown[]> {
+    const bytes = await this.rpc<number[]>('GetAuditLog', {
+      session_token: this.token,
+      limit,
+      offset,
+    });
+    if (!bytes || !bytes.length) return [];
+    try {
+      return JSON.parse(new TextDecoder().decode(new Uint8Array(bytes)));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Verify the BLAKE3 integrity chain of the daemon's audit log.
+   * Throws if the chain is broken (tampering detected).
+   */
+  async verifyAuditChain(): Promise<void> {
+    await this.request('VerifyAuditChain', { session_token: this.token });
   }
 }
 
