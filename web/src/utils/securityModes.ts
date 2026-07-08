@@ -3,6 +3,7 @@ import { getCsrfToken, apiFetch, hasServerSession as _hasServerSession, ApiError
 import { hashPassword, generateUUID } from './crypto';
 import { daemon, WIPE_TICKET_KEY } from './daemonClient'; // kept for legacy localStorage cleanup
 import { readDecryptedLocal } from './localCrypto';
+import { keyStore, argon2idOffThread } from '../crypto/keystore';
 import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
@@ -241,7 +242,7 @@ async function saveTravelModeConfig(cfg: TravelModeConfig): Promise<void> {
 /** Minimal interface so securityModes does not directly import DaemonClient (avoids circular deps). */
 export interface ForensicWipeable {
   isConnected: boolean;
-  forensicWipe(ticket: Uint8Array): Promise<void>;
+  forensicWipe(ticket: { ct: Uint8Array; nonce: Uint8Array }): Promise<void>;
 }
 
 /**
@@ -260,10 +261,9 @@ export async function wipeVaultData(daemonInstance?: ForensicWipeable, serverPas
   // Phase 1: daemon-side forensic wipe (files on disk)
   if (daemonInstance?.isConnected) {
     try {
-      const stored = localStorage.getItem('_sys_vk_tkv');
-      if (stored) {
-        const ticketBytes = new Uint8Array(stored.match(/../g)!.map(h => parseInt(h, 16)));
-        await daemonInstance.forensicWipe(ticketBytes);
+      const ticket = keyStore.getWipeTicket();
+      if (ticket) {
+        await daemonInstance.forensicWipe(ticket);
       }
     } catch { /* non-fatal - continue with browser wipe */ }
   }
@@ -294,6 +294,8 @@ export async function wipeVaultData(daemonInstance?: ForensicWipeable, serverPas
     } catch {}
   }
 
+  localStorage.removeItem(WIPE_TICKET_KEY);
+  keyStore.clear();
   localStorage.clear();
   sessionStorage.clear();
 
@@ -357,9 +359,8 @@ async function syncDuressEnforce(armed: boolean, maxAttempts: number): Promise<v
 
 export async function armDuressMode(duressPassword: string, maxAttempts: number): Promise<void> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const { argon2idAsync } = await import('@noble/hashes/argon2.js');
   // #29-FIX: raise Argon2id params to 256 MiB / t=3 to match the KDF floor (CWE-312).
-  const hash = await argon2idAsync(new TextEncoder().encode(duressPassword), salt, { m: 256 * 1024, t: 3, p: 1, dkLen: 32 });
+  const hash = await argon2idOffThread(new TextEncoder().encode(duressPassword), salt, { m: 256 * 1024, t: 3, p: 1, dkLen: 32 });
 
   const hashHex = Array.from(hash, b => b.toString(16).padStart(2, '0')).join('');
   const saltHex = Array.from(salt, b => b.toString(16).padStart(2, '0')).join('');
@@ -429,9 +430,13 @@ export async function checkIsDuressPassword(entered: string): Promise<boolean> {
   const t = tMatch ? parseInt(tMatch[1]) : 2;
   const p = pMatch ? parseInt(pMatch[1]) : 1;
 
-  const { argon2idAsync } = await import('@noble/hashes/argon2.js');
+  // This runs at the top of Login.tsx handleLogin on EVERY login while duress
+  // is armed, so it must stay on the off-main-thread WASM path — the pure-JS
+  // @noble Argon2id at m=256 MiB costs ~14 s and freezes the password form.
+  // Argon2id output is deterministic (RFC 9106): hashes armed by older
+  // @noble-based builds verify unchanged.
   const salt = hexToBytes(saltHex);
-  const hash = await argon2idAsync(new TextEncoder().encode(entered), salt, { m, t, p, dkLen: 32 });
+  const hash = await argon2idOffThread(new TextEncoder().encode(entered), salt, { m, t, p, dkLen: 32 });
   const enteredHashHex = Array.from(hash, b => b.toString(16).padStart(2, '0')).join('');
 
   return timingSafeHash(enteredHashHex, hashHex);
@@ -511,8 +516,7 @@ async function deriveTravelKeyBytes(password: string, saltHex: string, version: 
   
   if (version === 2) {
     if (subtleAvailable()) {
-       const { argon2idAsync } = await import('@noble/hashes/argon2.js');
-       return await argon2idAsync(pwBytes, saltBytes, { m: 64 * 1024, t: 2, p: 1, dkLen: 32 });
+       return await argon2idOffThread(pwBytes, saltBytes, { m: 64 * 1024, t: 2, p: 1, dkLen: 32 });
     }
     // Non-secure context fallback - PBKDF2 600k (A-04 requirement)
     return pbkdf2(sha256, pwBytes, saltBytes, { c: 600_000, dkLen: 32 });

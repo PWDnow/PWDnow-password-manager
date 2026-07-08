@@ -402,4 +402,42 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
       expect(getDuressModeConfig().attemptsRemaining).toBe(0);
     }, 180000);
   });
+
+  describe('Duress check login-path cost', () => {
+    // The duress check runs FIRST and serially in Login.tsx handleLogin, so its
+    // cost is added to every login while Duress Mode is armed. The pure-JS
+    // @noble Argon2id at m=256 MiB / t=3 costs ~14 s on commodity hardware
+    // (the reported "20-second login"); the hash-wasm path at identical params
+    // costs ~1 s. Budget is deliberately loose to stay CI-safe while still
+    // failing hard if the pure-JS implementation ever creeps back in.
+    it('checkIsDuressPassword stays within a WASM-scale budget at production params', async () => {
+      await armDuressMode('Duress123!', 5);
+
+      const t0 = performance.now();
+      expect(await checkIsDuressPassword('Duress123!')).toBe(true);
+      expect(await checkIsDuressPassword('NotTheDuressPw!')).toBe(false);
+      const elapsed = performance.now() - t0;
+
+      expect(elapsed).toBeLessThan(8000); // 2 checks; pure-JS would need ~28 s
+    }, 180000);
+
+    // Hashes armed by older builds were produced by @noble/hashes argon2idAsync.
+    // Argon2id is deterministic (RFC 9106), so the WASM implementation must
+    // verify them byte-for-byte. Fixture generated with @noble at
+    // m=4096,t=3,p=1 — params are parsed from the PHC string, so the small
+    // fixture exercises the same code path as a production 256 MiB hash.
+    it('verifies a PHC hash produced by the legacy @noble implementation', async () => {
+      const legacyPhc = '$argon2id$v=19$m=4096,t=3,p=1$00112233445566778899aabbccddeeff$56711f06dd322bfb122c2e4cb32dd99916748e49488f37cf80fc5c6800d214e1';
+      localStorage.setItem('duress_mode_config', JSON.stringify({
+        armed: true,
+        passwordHash: legacyPhc,
+        maxAttempts: 5,
+        attemptsRemaining: 5,
+        salt: '00112233445566778899aabbccddeeff',
+      }));
+
+      expect(await checkIsDuressPassword('legacy-duress-pw')).toBe(true);
+      expect(await checkIsDuressPassword('wrong-password')).toBe(false);
+    }, 60000);
+  });
 });
