@@ -27,6 +27,8 @@ export class SecureKeyStore {
   #sigKeyV2: CryptoKey | null = null;
   #v2Salt: Uint8Array | null = null;
 
+  #wipeTicket: { ct: Uint8Array; nonce: Uint8Array } | null = null;
+
   // Decrypt-only fallback: PBKDF2 key derived from a *legacy* `_lk_salt` that
   // differs from the server-stored `cryptoSalt`. Older accounts may have data
   // encrypted with this key. New writes always use the canonical v1 key.
@@ -85,6 +87,16 @@ export class SecureKeyStore {
     return this.#legacyKeyV1;
   }
 
+  storeWipeTicket(ct: Uint8Array, nonce: Uint8Array): void {
+    this.#wipeTicket = { ct, nonce };
+    this.persistToSessionStorage();
+  }
+
+  getWipeTicket(): { ct: Uint8Array; nonce: Uint8Array } | null {
+    if (!this.#wipeTicket) this.restoreFromSessionStorage();
+    return this.#wipeTicket;
+  }
+
   clear(): void {
     if (this.#token) {
       crypto.getRandomValues(this.#token);
@@ -95,6 +107,7 @@ export class SecureKeyStore {
     this.#localKeyV2 = null;
     this.#sigKeyV2 = null;
     this.#legacyKeyV1 = null;
+    this.#wipeTicket = null;
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem('_pwd_ks');
     }
@@ -106,12 +119,32 @@ export class SecureKeyStore {
   }
 
   // ── Session Storage Persistence ───────────────────────────────────────────
-  // To satisfy the user's explicit demand that a page refresh does not log them out,
-  // we serialize the CryptoKeys into sessionStorage.
-  
+  // To satisfy the requirement that a page refresh does not log the user out,
+  // the session token and derived local keys are serialized across a refresh.
+  //
+  // D2 fix: previously this wrote the raw session token and exported raw AES/
+  // HMAC key bytes to `sessionStorage['_pwd_ks']` as plaintext JSON — any
+  // same-origin XSS could read that entry directly and obtain a long-lived,
+  // directly-usable copy of the vault decryption key and daemon session
+  // token, independent of (and without racing) the in-memory `#token` field.
+  //
+  // Now the entire payload is AES-GCM-encrypted under a wrapping key that is
+  // generated non-extractable and stored as a CryptoKey object (not raw
+  // bytes) in IndexedDB via structured clone. `sessionStorage` therefore only
+  // ever holds ciphertext: an XSS payload that reads it gets nothing usable
+  // outside the page, and cannot `exportKey()` the non-extractable wrapping
+  // key to exfiltrate it.
+
   private async persistToSessionStorage() {
     if (typeof sessionStorage === 'undefined') return;
     try {
+      // The forensic-wipe capability ticket is deliberately NOT persisted here.
+      // It authorizes an unauthenticated ForensicWipe RPC on possession alone;
+      // persisting it would allow any XSS that can read sessionStorage to
+      // trigger an irrecoverable vault wipe. Keeping it in-memory-only means it
+      // is available for the same-page-load duress-wipe flow (Login.tsx) but
+      // does not survive a refresh. A post-refresh wipe falls back to the
+      // server+browser wipe path, which is the accepted trade-off (RPC-01).
       const data: {
         token?: number[];
         v2Salt?: number[];
@@ -122,67 +155,78 @@ export class SecureKeyStore {
       } = {};
       if (this.#token) data.token = Array.from(this.#token);
       if (this.#v2Salt) data.v2Salt = Array.from(this.#v2Salt);
-      
+
       const exportKey = async (k: CryptoKey | null) => {
         if (!k) return null;
         const exported = await crypto.subtle.exportKey('raw', k);
         return Array.from(new Uint8Array(exported));
       };
-      
+
       data.localKeyV1 = await exportKey(this.#localKeyV1);
       data.sigKeyV1 = await exportKey(this.#sigKeyV1);
       data.localKeyV2 = await exportKey(this.#localKeyV2);
       data.sigKeyV2 = await exportKey(this.#sigKeyV2);
-      
-      sessionStorage.setItem('_pwd_ks', JSON.stringify(data));
+
+      const sealed = await sealForSessionStorage(JSON.stringify(data));
+      if (sealed) {
+        sessionStorage.setItem('_pwd_ks', sealed);
+      } else {
+        // Wrapping key unavailable (e.g. IndexedDB blocked) — do not fall
+        // back to plaintext persistence.
+        sessionStorage.removeItem('_pwd_ks');
+      }
     } catch (e) {
       logger.warn('Failed to persist keys to sessionStorage', e);
     }
   }
 
   private _isRestoring = false;
-  
+
   private restoreFromSessionStorage() {
     if (typeof sessionStorage === 'undefined' || this._isRestoring) return;
     const stored = sessionStorage.getItem('_pwd_ks');
     if (!stored) return;
-    
-    try {
-      this._isRestoring = true;
-      const data = JSON.parse(stored);
-      if (data.token) this.#token = new Uint8Array(data.token);
-      if (data.v2Salt) this.#v2Salt = new Uint8Array(data.v2Salt);
-      
-      const importKey = async (rawArr: number[], isEnc: boolean) => {
-        if (!rawArr) return null;
-        const raw = new Uint8Array(rawArr);
-        if (isEnc) {
-          return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
-        } else {
-          return crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']);
-        }
-      };
 
-      if (data.localKeyV1 && !this.#localKeyV1) importKey(data.localKeyV1, true).then(k => this.#localKeyV1 = k);
-      if (data.sigKeyV1 && !this.#sigKeyV1) importKey(data.sigKeyV1, false).then(k => this.#sigKeyV1 = k);
-      if (data.localKeyV2 && !this.#localKeyV2) importKey(data.localKeyV2, true).then(k => this.#localKeyV2 = k);
-      if (data.sigKeyV2 && !this.#sigKeyV2) importKey(data.sigKeyV2, false).then(k => this.#sigKeyV2 = k);
-    } catch (e) {
-      logger.warn('Failed to restore keys from sessionStorage', e);
-    } finally {
-      this._isRestoring = false;
-    }
+    this._isRestoring = true;
+    unsealFromSessionStorage(stored)
+      .then(json => {
+        if (!json) return;
+        const data = JSON.parse(json);
+        if (data.token) this.#token = new Uint8Array(data.token);
+        if (data.v2Salt) this.#v2Salt = new Uint8Array(data.v2Salt);
+        // The wipe ticket is intentionally never persisted — see persistToSessionStorage().
+
+        const importKey = async (rawArr: number[], isEnc: boolean) => {
+          if (!rawArr) return null;
+          const raw = new Uint8Array(rawArr);
+          if (isEnc) {
+            return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+          } else {
+            return crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']);
+          }
+        };
+
+        if (data.localKeyV1 && !this.#localKeyV1) importKey(data.localKeyV1, true).then(k => this.#localKeyV1 = k);
+        if (data.sigKeyV1 && !this.#sigKeyV1) importKey(data.sigKeyV1, false).then(k => this.#sigKeyV1 = k);
+        if (data.localKeyV2 && !this.#localKeyV2) importKey(data.localKeyV2, true).then(k => this.#localKeyV2 = k);
+        if (data.sigKeyV2 && !this.#sigKeyV2) importKey(data.sigKeyV2, false).then(k => this.#sigKeyV2 = k);
+      })
+      .catch(e => logger.warn('Failed to restore keys from sessionStorage', e))
+      .finally(() => { this._isRestoring = false; });
   }
-  
+
   public async restoreAsync(): Promise<void> {
     if (typeof sessionStorage === 'undefined') return;
     const stored = sessionStorage.getItem('_pwd_ks');
     if (!stored) return;
     try {
-      const data = JSON.parse(stored);
+      const json = await unsealFromSessionStorage(stored);
+      if (!json) return;
+      const data = JSON.parse(json);
       if (data.token) this.#token = new Uint8Array(data.token);
       if (data.v2Salt) this.#v2Salt = new Uint8Array(data.v2Salt);
-      
+      // The wipe ticket is intentionally never persisted — see persistToSessionStorage().
+
       const importKey = async (rawArr: number[], isEnc: boolean) => {
         if (!rawArr) return null;
         const raw = new Uint8Array(rawArr);
@@ -192,7 +236,7 @@ export class SecureKeyStore {
           return await crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-384' }, true, ['sign', 'verify']);
         }
       };
-      
+
       if (data.localKeyV1 && !this.#localKeyV1) this.#localKeyV1 = await importKey(data.localKeyV1, true);
       if (data.sigKeyV1 && !this.#sigKeyV1) this.#sigKeyV1 = await importKey(data.sigKeyV1, false);
       if (data.localKeyV2 && !this.#localKeyV2) this.#localKeyV2 = await importKey(data.localKeyV2, true);
@@ -203,28 +247,129 @@ export class SecureKeyStore {
   }
 }
 
+// ── D2: non-extractable wrapping key for sessionStorage persistence ─────────
+// A single AES-GCM-256 wrapping key is generated `extractable: false` and
+// stored as a CryptoKey object (structured clone, not raw bytes) in
+// IndexedDB. Everything persisted to sessionStorage is encrypted under this
+// key, so the sessionStorage entry is ciphertext-only.
+
+const IDB_NAME = 'pwdn_keystore';
+const IDB_STORE = 'keys';
+const IDB_KEY = 'wrap';
+
+let _wrapKeyPromise: Promise<CryptoKey | null> | null = null;
+
+function getWrappingKey(): Promise<CryptoKey | null> {
+  if (!_wrapKeyPromise) _wrapKeyPromise = loadOrCreateWrappingKey();
+  return _wrapKeyPromise;
+}
+
+function loadOrCreateWrappingKey(): Promise<CryptoKey | null> {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise(resolve => {
+    const openReq = indexedDB.open(IDB_NAME, 1);
+    openReq.onupgradeneeded = () => {
+      openReq.result.createObjectStore(IDB_STORE);
+    };
+    openReq.onerror = () => resolve(null);
+    openReq.onsuccess = () => {
+      const db = openReq.result;
+      const readTx = db.transaction(IDB_STORE, 'readonly');
+      const getReq = readTx.objectStore(IDB_STORE).get(IDB_KEY);
+      getReq.onerror = () => { db.close(); resolve(null); };
+      getReq.onsuccess = () => {
+        if (getReq.result) {
+          db.close();
+          resolve(getReq.result as CryptoKey);
+          return;
+        }
+        crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+          .then(key => {
+            const writeTx = db.transaction(IDB_STORE, 'readwrite');
+            writeTx.objectStore(IDB_STORE).put(key, IDB_KEY);
+            writeTx.oncomplete = () => { db.close(); resolve(key); };
+            writeTx.onerror = () => { db.close(); resolve(key); };
+          })
+          .catch(() => { db.close(); resolve(null); });
+      };
+    };
+  });
+}
+
+async function sealForSessionStorage(plaintext: string): Promise<string | null> {
+  const key = await getWrappingKey();
+  if (!key) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)),
+  );
+  return JSON.stringify({ iv: Array.from(iv), ct: Array.from(ct) });
+}
+
+async function unsealFromSessionStorage(stored: string): Promise<string | null> {
+  const key = await getWrappingKey();
+  if (!key) return null;
+  const { iv, ct } = JSON.parse(stored) as { iv: number[]; ct: number[] };
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(iv) },
+    key,
+    new Uint8Array(ct),
+  );
+  return new TextDecoder().decode(plain);
+}
+
 /** Singleton keystore - one per browser tab. */
 export const keyStore = new SecureKeyStore();
 
-// Clear all in-memory key material when the tab is discarded or hidden.
-if (typeof window !== 'undefined') {
-  // We remove the generic pagehide/visibilitychange clearing here
-  // because it causes users to lose their decryption keys on every page refresh,
-  // resulting in an "automatic logout" experience in server mode.
-  // Real security wiping should be tied to explicit logout or session expiration.
+// KEY-01: bounded-grace tab-hide clearing.
+//
+// Hiding the tab starts a 5-minute grace timer; becoming visible again cancels
+// it. A page refresh re-populates keys from the encrypted sessionStorage blob
+// well within the grace window. A tab that stays hidden for the full window
+// gets its keys wiped from both memory and sessionStorage.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _envGraceMs = parseInt((import.meta as any).env?.VITE_HIDDEN_CLEAR_GRACE_MS || '300000', 10);
+const HIDDEN_CLEAR_GRACE_MS = isNaN(_envGraceMs) ? 5 * 60 * 1000 : _envGraceMs; // 5 minutes default
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  let hiddenClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cancelHiddenClear = () => {
+    if (hiddenClearTimer !== null) {
+      clearTimeout(hiddenClearTimer);
+      hiddenClearTimer = null;
+    }
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      cancelHiddenClear();
+      hiddenClearTimer = setTimeout(() => {
+        hiddenClearTimer = null;
+        keyStore.clear();
+      }, HIDDEN_CLEAR_GRACE_MS);
+    } else {
+      cancelHiddenClear();
+    }
+  });
+
+  // A genuine tab close/navigate-away destroys sessionStorage for this tab
+  // regardless; nothing further to do here beyond cancelling the timer so it
+  // doesn't fire against a torn-down page.
+  window.addEventListener('pagehide', cancelHiddenClear);
 }
 
-// VITE_ARGON2_FAST=1 selects reduced params for CI/unit tests (4 MiB, t=1).
-// Production builds use Level-5-compliant parameters that still complete in
-// under one second on a modern device.
-//
-// Compliance: 128 MiB / t=3 / p=1 exceeds the OWASP ASVS 5.0 / Password
-// Storage Cheat Sheet (2024) highest-assurance recommendation (m>=46 MiB /
-// t>=1 / p>=1) by ~2.8x memory. NIST SP 800-63B-4 AAL3 names Argon2id as
-// acceptable and does not pin specific m/t/p. CNSA 2.0 / SP 800-132 does
-// not pin Argon2id parameters either.
+// VITE_ARGON2_FAST=1 selects reduced parameters for CI/unit tests (4 MiB, t=1).
+// Production builds use Level-5-compliant parameters (128 MiB / t=3 / p=1)
+// that exceed OWASP ASVS 5.0 highest-assurance recommendations by ~2.8x memory
+// and complete in under one second on modern hardware.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const _ARGON2_FAST = (import.meta as any).env?.VITE_ARGON2_FAST === '1';
+const _isProd = (import.meta as any).env?.PROD;
+const _hasFast = (import.meta as any).env?.VITE_ARGON2_FAST === '1';
+if (_isProd && _hasFast) {
+  throw new Error('VITE_ARGON2_FAST is forbidden in production builds');
+}
+const _ARGON2_FAST = !_isProd && _hasFast;
 
 /** Default parameters for LocalCryptoEnvelope v2 (L5). */
 export const V2_M_LOG2 = _ARGON2_FAST ? 12 : 17; // 4 MiB (test) / 128 MiB (prod)
@@ -249,7 +394,7 @@ export async function deriveArgon2idMaster(password: string, saltHex: string): P
   const pwdBytes = enc.encode(password);
   
   const m_cost = 1 << V2_M_LOG2;
-  const master = await runArgon2idMaster(pwdBytes, saltBytes, {
+  const master = await argon2idOffThread(pwdBytes, saltBytes, {
     m: m_cost,
     t: V2_T,
     p: V2_P,
@@ -337,10 +482,9 @@ export async function deriveLocalKeys(
     return await hkdfV2Bind(master, saltHex, token);
   };
 
-  // v1 (PBKDF2 / WebCrypto) is the canonical browser-side key — it MUST succeed.
-  // v2 (Argon2id / WASM) is a defense-in-depth upgrade; if WASM is blocked
-  // (CSP without 'wasm-unsafe-eval') or otherwise unavailable, we still want
-  // v1 so the user can read/write encrypted localStorage and server vault data.
+  // v1 (PBKDF2 / WebCrypto) is the canonical browser-side key and MUST succeed.
+  // v2 (Argon2id / WASM) is a defense-in-depth upgrade; if WASM is blocked or
+  // unavailable, v1 alone is sufficient to read/write encrypted data.
   const [v1Result, v2Result] = await Promise.allSettled([deriveV1(), deriveV2()]);
   if (v1Result.status === 'rejected') throw v1Result.reason;
   const v2 = v2Result.status === 'fulfilled' ? v2Result.value : null;
@@ -387,9 +531,8 @@ export async function deriveV1Only(
 }
 
 // ── Off-main-thread Argon2id ────────────────────────────────────────────────
-// Single long-lived worker per tab; one Argon2id derivation in flight at a
-// time (login is already serialised). Falls back to in-thread WASM in test /
-// Node environments where Worker is unavailable.
+// Single long-lived worker per tab; one derivation in flight at a time.
+// Falls back to in-thread WASM in test/Node environments where Worker is unavailable.
 
 let _kdfWorker: Worker | null = null;
 let _kdfWorkerProbed = false;
@@ -412,7 +555,15 @@ async function getKdfWorker(): Promise<Worker | null> {
   }
 }
 
-async function runArgon2idMaster(
+/**
+ * Run Argon2id off the main thread (shared kdf worker), falling back to
+ * in-thread hash-wasm where Workers are unavailable (tests / Node). Exported
+ * for other password-verification paths (duress, travel mode): the pure-JS
+ * @noble implementation costs >10 s at the 256 MiB production params and
+ * freezes the login form, while hash-wasm computes the identical RFC 9106
+ * output in ~1 s.
+ */
+export async function argon2idOffThread(
   password: Uint8Array,
   salt: Uint8Array,
   opts: { t: number; m: number; p: number; dkLen: number },
