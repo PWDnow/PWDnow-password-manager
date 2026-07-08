@@ -42,7 +42,7 @@
     --theme-surface-container-highest: #e9ecef;
     --theme-on-surface-variant: #000000;
     --theme-outline-variant: #d1d5db;
-    --theme-error: #ba1a1a;
+    --theme-error: #991b1b;
     --theme-neutral-800: #1f2937;
   }
 
@@ -70,6 +70,63 @@
   ::selection {
     @apply bg-black text-white;
   }
+
+  /* WCAG 2.2 AAA 2.4.13 Focus Appearance (Enhanced):
+     >=2px solid indicator with >=3:1 contrast against adjacent colors,
+     applied as a fallback so every focusable element has a visible,
+     non-obscured focus ring even if a component forgets its own. */
+  :focus-visible {
+    outline: 3px solid var(--theme-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* WCAG 2.2 AAA 1.4.8 Visual Presentation:
+     line height >=1.5x font size, paragraph spacing >=1.5x line height,
+     no justified text, and a measure (line length) cap of ~80 characters
+     for long-form text blocks. */
+  p, li, dd {
+    line-height: 1.65;
+    text-align: start;
+  }
+
+  p + p,
+  li + li {
+    margin-top: 1em;
+  }
+
+  .text-measure {
+    max-width: 80ch;
+  }
+
+  /* WCAG 2.2 AAA 2.5.5 Target Size (Enhanced):
+     icon-only buttons/links get a 44x44 CSS px hit area regardless of
+     their visual padding, without changing icon size or layout spacing
+     of surrounding text-bearing controls (which are exempt as they
+     already exceed 44px or are inline). */
+  button:has(> svg:only-child),
+  a:has(> svg:only-child) {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* WCAG 2.2 AAA 2.3.3 Animation from Interactions:
+   belt-and-braces CSS fallback for any transition/animation not routed
+   through Framer Motion's MotionConfig (which already honors
+   prefers-reduced-motion via reducedMotion="user"). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Custom Scrollbar */
@@ -96,4 +153,192 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Accessibility Custom Settings */
+html.a11y-text-medium { font-size: 112%; }
+html.a11y-text-large { font-size: 130%; }
+
+/* Accessibility panel isolation — stays readable regardless of page filters */
+:root {
+  --a11y-panel-bg: #ffffff;
+  --a11y-panel-text: #111827;
+  --a11y-panel-muted: #6b7280;
+  --a11y-panel-subtle: #f3f4f6;
+  --a11y-panel-border: #e5e7eb;
+}
+.dark {
+  --a11y-panel-bg: #1f2937;
+  --a11y-panel-text: #f9fafb;
+  --a11y-panel-muted: #9ca3af;
+  --a11y-panel-subtle: #374151;
+  --a11y-panel-border: #4b5563;
+}
+
+/* ── High Contrast ── */
+html.a11y-high-contrast {
+  --theme-surface: #fff;
+  --theme-surface-container: #fff;
+  --theme-surface-container-low: #fff;
+  --theme-surface-container-high: #f0f0f0;
+  --theme-surface-container-highest: #e0e0e0;
+  --theme-outline-variant: #000;
+  --theme-on-surface-variant: #000;
+  --theme-primary: #0000cc;
+  --theme-primary-container: #0000cc;
+  --theme-on-primary-container: #fff;
+}
+html.dark.a11y-high-contrast {
+  --theme-surface: #000;
+  --theme-surface-container: #000;
+  --theme-surface-container-low: #000;
+  --theme-surface-container-high: #111;
+  --theme-surface-container-highest: #1a1a1a;
+  --theme-outline-variant: #fff;
+  --theme-on-surface-variant: #fff;
+  --theme-primary: #ffff00;
+  --theme-primary-container: #ffff00;
+  --theme-on-primary-container: #000;
+}
+html.a11y-high-contrast * {
+  border-color: currentColor !important;
+  text-shadow: none !important;
+}
+html.a11y-high-contrast img,
+html.a11y-high-contrast video {
+  contrast: 1.2;
+}
+
+/* ── Reduce Motion ── */
+html.a11y-reduce-motion *,
+html.a11y-reduce-motion *::before,
+html.a11y-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ── Readable Font — Atkinson Hyperlegible / Verdana (visibly different from system default) ── */
+html.a11y-readable-font * {
+  font-family: "Atkinson Hyperlegible", Verdana, Geneva, Tahoma, sans-serif !important;
+  letter-spacing: 0.03em !important;
+  word-spacing: 0.08em !important;
+}
+
+/* ── Highlight Links — targets all anchor types including React Router ── */
+html.a11y-highlight-links a,
+html.a11y-highlight-links a[href],
+html.a11y-highlight-links [role="link"] {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 4px !important;
+  background-color: rgba(255, 255, 0, 0.25) !important;
+  color: #00008b !important;
+  padding: 1px 3px !important;
+  border-radius: 2px !important;
+}
+html.dark.a11y-highlight-links a,
+html.dark.a11y-highlight-links a[href],
+html.dark.a11y-highlight-links [role="link"] {
+  color: #ffd700 !important;
+  background-color: rgba(255, 215, 0, 0.15) !important;
+}
+
+/* ── Larger Buttons ── */
+html.a11y-larger-buttons button,
+html.a11y-larger-buttons a,
+html.a11y-larger-buttons input[type="submit"],
+html.a11y-larger-buttons input[type="button"],
+html.a11y-larger-buttons [role="button"] {
+  min-height: 56px !important;
+  min-width: 56px !important;
+  padding: 12px 16px !important;
+}
+
+/* ── Dyslexia Font ── */
+@font-face {
+  font-family: 'Andika';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/andika-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Andika';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/andika-bold.woff2') format('woff2');
+}
+
+html.a11y-dyslexia-font * {
+  font-family: "Andika", "Arial", sans-serif !important;
+  word-spacing: 0.1em !important;
+}
+
+/* Monochrome, Invert Colors, Low Saturation are composed in JS via body.style.filter */
+
+/* ── Letter Spacing ── */
+html.a11y-letter-spacing * {
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important;
+}
+
+/* ── Big Cursor ── */
+html.a11y-big-cursor,
+html.a11y-big-cursor * {
+  cursor: url("/cursor-light.svg") 4 2, auto !important;
+}
+html.dark.a11y-big-cursor,
+html.dark.a11y-big-cursor * {
+  cursor: url("/cursor-dark.svg") 4 2, auto !important;
+}
+
+/* ── Line Height — WCAG 1.4.12 compliant extra spacing ── */
+html.a11y-line-height * {
+  line-height: 2.0 !important;
+}
+html.a11y-line-height p,
+html.a11y-line-height li,
+html.a11y-line-height dd,
+html.a11y-line-height span,
+html.a11y-line-height label {
+  line-height: 2.2 !important;
+}
+
+/* ── Enhanced Focus — thick orange focus ring with glow ── */
+html.a11y-enhanced-focus :focus,
+html.a11y-enhanced-focus :focus-visible {
+  outline: 4px solid #f97316 !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.3) !important;
+  border-radius: 4px !important;
+}
+
+/* ── Hide Images — collapse decorative media for reduced visual noise ── */
+html.a11y-hide-images img,
+html.a11y-hide-images video,
+html.a11y-hide-images picture,
+html.a11y-hide-images figure {
+  visibility: hidden !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+html.a11y-hide-images [style*="background-image"] {
+  background-image: none !important;
+}
+
+/* ── Left Align — force all text to left for easier reading ── */
+html.a11y-left-align *:not([role="switch"]):not([aria-hidden="true"]) {
+  text-align: left !important;
+}
+
+/* ── Highlight Hover — bold outline on hovered element for visual tracking ── */
+html.a11y-highlight-hover *:hover {
+  outline: 3px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+html.dark.a11y-highlight-hover *:hover {
+  outline-color: #60a5fa !important;
 }

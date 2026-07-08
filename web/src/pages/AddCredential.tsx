@@ -862,7 +862,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
         <div className="flex-1 p-10 lg:p-16 lg:border-r border-outline-variant/10 rounded-l-2xl">
           <div className="mb-10">
             <nav className="flex items-center gap-2 text-[10px] font-black tracking-[0.3em] text-on-surface-variant uppercase mb-4">
-              <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors" onClick={onCancel}>{t('sidebar.vault', 'Vault')}</span>
+              <button type="button" className="hover:text-black dark:hover:text-white cursor-pointer transition-colors" onClick={onCancel}>{t('sidebar.vault', 'Vault')}</button>
               <ChevronRight size={10} className="opacity-40" />
               <span className="text-black dark:text-white">{initialData ? t('addCredential.editTitle', 'Edit Credential') : t('addCredential.addTitle', 'Add New Credential')}</span>
             </nav>
@@ -1039,16 +1039,53 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
               <div className="space-y-8">
                 {/* Folder selector (all non-login types) */}
                 <div className="space-y-4 pt-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.folderAssignment', 'Folder Assignment')}</label>
-                  <div className="flex flex-wrap gap-3">
+                  <label htmlFor="input-2" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.folderAssignment', 'Folder Assignment')}</label>
+                  <div className="flex flex-wrap gap-3" role="radiogroup" aria-label={t('addCredential.folderAssignment', 'Folder Assignment')}>
                     {folders.map(folder => (
                       <button key={folder.id} type="button" onClick={() => dispatch({ type: 'setField', field: 'folderId', value: folder.id })}
+                        role="radio"
+                        aria-checked={selectedFolder === folder.id}
+                        aria-label={`Assign to ${folder.label} folder`}
                         className={`px-5 py-2.5 rounded-xl flex items-center gap-2 transition-all text-xs font-bold ${selectedFolder === folder.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-surface-container-high text-black dark:text-white hover:bg-surface-container-highest'}`}
                       >
                         {renderFolderIcon(folder, selectedFolder === folder.id)}
                         {folder.label}
                       </button>
                     ))}
+                    <div className="relative z-10" ref={folderOptionsRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowFolderOptions(!showFolderOptions)}
+                        aria-label="More folder options"
+                        aria-expanded={showFolderOptions}
+                        className={`p-2.5 border border-outline-variant/30 text-on-surface-variant rounded-xl hover:bg-surface-container-low transition-colors ${showFolderOptions ? 'bg-surface-container-low border-black' : ''}`}
+                      >
+                        <MoreHorizontal size={18} aria-hidden="true" />
+                      </button>
+                      <AnimatePresence>
+                        {showFolderOptions && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-surface-container-low rounded-2xl shadow-2xl border border-outline-variant/10 p-2 z-[100]"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowFolderOptions(false);
+                                if (onCreateFolder) onCreateFolder();
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-black dark:text-white hover:bg-surface-container-low rounded-xl transition-colors"
+                              aria-label="Create new folder"
+                            >
+                              <Plus size={16} aria-hidden="true" />
+                              {t('addCredential.createFolder', 'Create Folder')}
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
 
@@ -1061,38 +1098,44 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpId', 'Relying Party ID')}</label>
-                        <input type="text" value={rpId} onChange={e => dispatch({ type: 'setField', field: 'rpId', value: e.target.value })} placeholder="github.com"
+<input id="input-2" type="text" value={rpId} onChange={e => dispatch({ type: 'setField', field: 'rpId', value: e.target.value })} placeholder="github.com"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                       <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpName', 'Site Name')}</label>
-                        <input type="text" value={rpName} onChange={e => dispatch({ type: 'setField', field: 'rpName', value: e.target.value })} placeholder="GitHub"
+                        <label htmlFor="input-3" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.rpName', 'Site Name')}</label>
+<input id="input-3" type="text" value={rpName} onChange={e => dispatch({ type: 'setField', field: 'rpName', value: e.target.value })} placeholder="GitHub"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.credentialId', 'Credential ID (optional)')}</label>
-                        <input type="text" value={credentialId} onChange={e => dispatch({ type: 'setField', field: 'credentialId', value: e.target.value })} placeholder="base64url…"
+                        <label htmlFor="input-4" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.credentialId', 'Credential ID (optional)')}</label>
+<input id="input-4" type="text" value={credentialId} onChange={e => dispatch({ type: 'setField', field: 'credentialId', value: e.target.value })} placeholder="base64url…"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-mono text-sm outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                       <div className="space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.authenticatorName', 'Authenticator')}</label>
-                        <input type="text" value={authenticatorName} onChange={e => dispatch({ type: 'setField', field: 'authenticatorName', value: e.target.value })} placeholder="YubiKey 5C NFC"
+                        <label htmlFor="input-5" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.authenticatorName', 'Authenticator')}</label>
+<input id="input-5" type="text" value={authenticatorName} onChange={e => dispatch({ type: 'setField', field: 'authenticatorName', value: e.target.value })} placeholder="YubiKey 5C NFC"
                           className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant font-bold outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => dispatch({ type: 'setField', field: 'backedUp', value: !backedUp })}>
-                      {backedUp ? <ToggleRight size={28} className="text-black dark:text-white shrink-0" /> : <ToggleLeft size={28} className="text-on-surface-variant shrink-0" />}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={backedUp}
+                      className="flex items-center gap-3 cursor-pointer w-full text-left"
+                      onClick={() => dispatch({ type: 'setField', field: 'backedUp', value: !backedUp })}
+                    >
+                      {backedUp ? <ToggleRight size={28} className="text-black dark:text-white shrink-0" aria-hidden="true" /> : <ToggleLeft size={28} className="text-on-surface-variant shrink-0" aria-hidden="true" />}
                       <span className="text-sm font-bold">{t('addCredential.backedUp', 'Backed up (synced passkey)')}</span>
-                    </div>
+                    </button>
                   </div>
                 )}
 
                 {/* Secure note fields */}
                 {credentialType === 'secure_note' && (
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.noteContent', 'Note')} <span className="text-red-500">*</span></label>
+                    <label htmlFor="input-6" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.noteContent', 'Note')} <span className="text-red-500">*</span></label>
                     <textarea value={noteContent} onChange={e => dispatch({ type: 'setField', field: 'noteContent', value: e.target.value })} rows={12}
                       placeholder={t('addCredential.noteContentPlaceholder', 'Write your secure note here…')}
                       className="w-full px-6 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white placeholder:text-outline-variant resize-y outline-none focus:ring-2 focus:ring-on-primary-container/20 transition-all" />
@@ -1117,7 +1160,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
                             {t('addCredential.cardholderName', 'Cardholder Name')}
                           </label>
-                          <input
+<input id="input-6"
                             type="text"
                             value={cardholderName}
                             onChange={e => dispatch({ type: 'setField', field: 'cardholderName', value: e.target.value })}
@@ -1128,7 +1171,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
                         {/* Card Number with live BIN detection + Luhn */}
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                          <label htmlFor="input-7" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
                             {t('addCredential.cardNumber', 'Card Number')}
                           </label>
                           <div
@@ -1265,7 +1308,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
                           {t('addCredential.cardBillingAddress', 'Billing Address (optional)')}
                         </label>
-                        <input
+<input id="input-7"
                           type="text"
                           value={cardBillingAddress}
                           onChange={e => dispatch({ type: 'setField', field: 'cardBillingAddress', value: e.target.value })}
@@ -1554,10 +1597,10 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   >
                     <div className="flex items-end gap-3">
                       <div className="flex-1">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant mb-2 block">
+                        <label htmlFor="input-10" className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant mb-2 block">
                           {t('addCredential.expiryEvery', 'Every')}
                         </label>
-                        <input
+<input id="input-10"
                           type="number"
                           min={1}
                           max={1000}
@@ -1609,7 +1652,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">{t('addCredential.tagsLabel', 'Tags')}</label>
-                <p className="text-[10px] text-on-surface-variant/60 mt-1">Select all security features stored with this credential.</p>
+                <p className="text-[10px] text-on-surface-variant mt-1">{t('addCredential.tagsHint', 'Select all security features stored with this credential.')}</p>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {([
@@ -2113,7 +2156,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
               <div className="w-full p-5 flex flex-col">
                 <div className="mb-2">
                   <h2 className="font-headline font-black text-2xl md:text-3xl tracking-tight text-white mb-1">{t('addCredential.proGenerator', 'Pro Generator')}</h2>
-                  <p className="text-white/40 text-xs font-medium">{t('addCredential.generatorDesc', 'Create enterprise-grade credentials with high entropy.')}</p>
+                  <p className="text-white/70 text-xs font-medium">{t('addCredential.generatorDesc', 'Create enterprise-grade credentials with high entropy.')}</p>
                 </div>
 
                 <div className="flex p-1 bg-white/5 rounded-2xl mb-2 w-fit" role="tablist" aria-label={t('addCredential.generator', 'Generator Mode')}>
@@ -2122,7 +2165,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     role="tab"
                     aria-selected={!isPassphrase}
                     aria-label={t('addCredential.random', 'Random password mode')}
-                    className={`px-6 py-2 ${!isPassphrase ? 'bg-white text-black shadow-xl' : 'text-white/40'} text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2`}
+                    className={`px-6 py-2 ${!isPassphrase ? 'bg-white text-black shadow-xl' : 'text-white/70'} text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2`}
                   >
                     <Type size={14} aria-hidden="true" />
                     {t('addCredential.random', 'Random')}
@@ -2132,7 +2175,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     role="tab"
                     aria-selected={isPassphrase}
                     aria-label={t('addCredential.passphrase', 'Passphrase mode')}
-                    className={`px-6 py-2 ${isPassphrase ? 'bg-white text-black shadow-xl' : 'text-white/40'} text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2`}
+                    className={`px-6 py-2 ${isPassphrase ? 'bg-white text-black shadow-xl' : 'text-white/70'} text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2`}
                   >
                     <Hash size={16} aria-hidden="true" />
                     {t('addCredential.passphrase', 'Passphrase')}
@@ -2168,7 +2211,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   </div>
                   <div className="space-y-4 mt-3">
                     <div className="flex items-center justify-between pr-14">
-                      <span className="text-[10px] font-black uppercase text-white/40 tracking-[0.3em]">{t('addCredential.entropyAnalysis', 'Entropy Analysis')}</span>
+                      <span className="text-[10px] font-black uppercase text-white/70 tracking-[0.3em]">{t('addCredential.entropyAnalysis', 'Entropy Analysis')}</span>
                       <span className={`text-xs font-black uppercase ${strength.barText} tracking-widest`}>{strength.label}</span>
                     </div>
                     <div className="h-3 bg-white/5 rounded-full overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-label={t('vault.securityHealth', 'Password strength')}>
@@ -2182,7 +2225,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   {!isPassphrase ? (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <label htmlFor="char-length" className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">{t('addCredential.charLength', 'Character Length')}</label>
+                        <label htmlFor="char-length" className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">{t('addCredential.charLength', 'Character Length')}</label>
                         <span className="text-sm font-black text-white bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">{length}</span>
                       </div>
                       <input 
@@ -2199,7 +2242,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   ) : (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <label htmlFor="word-count" className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">{t('addCredential.wordCount', 'Word Count')}</label>
+                        <label htmlFor="word-count" className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">{t('addCredential.wordCount', 'Word Count')}</label>
                         <span className="text-sm font-black text-white bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">{wordCount}</span>
                       </div>
                       <input 
@@ -2216,7 +2259,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   )}
 
                   <div className="space-y-5">
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">{t('addCredential.securityParameters', 'Security Parameters')}</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">{t('addCredential.securityParameters', 'Security Parameters')}</span>
                     <div className="grid grid-cols-2 gap-3">
                       {!isPassphrase && (
                         <>
@@ -2270,7 +2313,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     </div>
                     <div>
                       <h4 className="text-white font-bold text-sm">{t('addCredential.securityAdvisory', 'Security Advisory')}</h4>
-                      <p className="text-[11px] text-white/40 font-medium">
+                      <p className="text-[11px] text-white/70 font-medium">
                         {t('addCredential.entropyHeadline', '{{bits}} bits of entropy · {{label}}', { bits: bitsRounded, label: strength.label })}
                       </p>
                     </div>
@@ -2311,7 +2354,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
 
                   {/* Threat-model selector — recomputes crack time live */}
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">{t('addCredential.attacker.label', 'Threat Model')}</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/70">{t('addCredential.attacker.label', 'Threat Model')}</span>
                     <div className="flex p-1 bg-white/5 rounded-xl gap-1 mt-2" role="tablist" aria-label={t('addCredential.attacker.label', 'Threat Model')}>
                       {(['online', 'gpu', 'nationState'] as AttackerProfileId[]).map((id) => (
                         <button
@@ -2320,7 +2363,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                           role="tab"
                           aria-selected={attackerProfile === id}
                           onClick={() => setAttackerProfile(id)}
-                          className={`flex-1 px-2 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all ${attackerProfile === id ? 'bg-white text-black shadow' : 'text-white/40 hover:text-white/70'}`}
+                          className={`flex-1 px-2 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all ${attackerProfile === id ? 'bg-white text-black shadow' : 'text-white/70 hover:text-white/90'}`}
                         >
                           {id === 'online' ? t('addCredential.attacker.online', 'Online')
                             : id === 'gpu' ? t('addCredential.attacker.gpu', 'GPU Rig')
@@ -2334,20 +2377,20 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <Clock size={12} className="text-white/40" aria-hidden="true" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{t('addCredential.crack.classical', 'Classical')}</span>
+                        <Clock size={12} className="text-white/70" aria-hidden="true" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{t('addCredential.crack.classical', 'Classical')}</span>
                       </div>
                       <p className="text-sm font-bold text-white break-words leading-tight">{formatCrack(classicalCrack)}</p>
                     </div>
                     <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <Atom size={12} className="text-white/40" aria-hidden="true" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{t('addCredential.crack.quantum', 'Quantum')}</span>
+                        <Atom size={12} className="text-white/70" aria-hidden="true" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/70">{t('addCredential.crack.quantum', 'Quantum')}</span>
                       </div>
                       <p className="text-sm font-bold text-white break-words leading-tight">{formatCrack(quantumCrack)}</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-white/30 leading-snug -mt-1">
+                  <p className="text-[10px] text-white/60 leading-snug -mt-1">
                     {t('addCredential.crack.note', "Average time to exhaust the keyspace at {{rate}} guesses/sec. Quantum figures assume Grover's algorithm.", { rate: numberFmt.format(guessesPerSecond) })}
                   </p>
 
@@ -2364,7 +2407,7 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                     {breachStatus === 'checking' ? <Loader2 size={15} className="text-white/50 animate-spin mt-[1px] shrink-0" aria-hidden="true" />
                       : breachStatus === 'pwned' ? <ShieldAlert size={15} className="text-red-300 mt-[1px] shrink-0" aria-hidden="true" />
                       : breachStatus === 'clean' ? <ShieldCheck size={15} className="text-green-300 mt-[1px] shrink-0" aria-hidden="true" />
-                      : <Info size={15} className="text-white/40 mt-[1px] shrink-0" aria-hidden="true" />}
+                      : <Info size={15} className="text-white/70 mt-[1px] shrink-0" aria-hidden="true" />}
                     <div>
                       <p className={`text-xs font-bold ${
                         breachStatus === 'pwned' ? 'text-red-300'
@@ -2418,7 +2461,9 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
                   <div className="text-xl font-mono font-bold break-all mb-4 pr-10 relative">
                     {password}
                     <div className="absolute top-0 right-0 flex flex-col gap-2">
-                      <button onClick={generatePassword} className="p-1.5 text-on-surface-variant"><RefreshCw size={16} /></button>
+                      <button aria-label="Refresh" onClick={generatePassword} className="p-1.5 text-on-surface-variant">
+  <RefreshCw aria-hidden="true" size={16} />
+</button>
                       <button onClick={handleCopy} className="p-1.5 text-on-surface-variant">{copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}</button>
                     </div>
                   </div>
@@ -2442,7 +2487,13 @@ export default function AddCredential({ folders, activeTab, initialData, onCreat
       </div>
 
       {/* Footer Security Notice */}
-      <div className="mt-12 flex items-center justify-center gap-8 opacity-30">
+      {/* WCAG 2 AAA fix: this previously relied on `opacity-30` for visual
+          de-emphasis, which diluted inherited black/white text down to
+          ~2.3:1 contrast in light mode (icons inherit via currentColor) —
+          far below the 7:1 AAA floor for normal-size text. `text-on-surface-variant`
+          is #000 in light / #d4d4d4 in dark, giving ~21:1 and ~11:1 respectively;
+          de-emphasis now comes from size/tracking, not reduced contrast. */}
+      <div className="mt-12 flex items-center justify-center gap-8 text-on-surface-variant">
         <div className="flex items-center gap-3">
           <ShieldCheck size={16} />
           <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('addCredential.aesEncryption', 'AES-256 Bit Encryption')}</span>

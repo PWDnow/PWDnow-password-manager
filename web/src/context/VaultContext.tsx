@@ -9,6 +9,7 @@ import { writeEncryptedLocal, readDecryptedLocal, encryptForServer, decryptFromS
 import { keyStore } from '../crypto/keystore';
 import { getTravelModeConfig, getTravelModeConfigAsync } from '../utils/securityModes';
 import { getCsrfToken, apiFetch, hasServerSession as _hasServerSession, ApiError } from '../utils/api';
+import { queueWrite, QueuedOfflineError, getQueueSize, flushOutbox, OUTBOX_CHANGED_EVENT, type QueueResource } from '../utils/offlineQueue';
 
 interface VaultContextType {
   folders: Folder[];
@@ -18,6 +19,9 @@ interface VaultContextType {
   credentialsLoading: boolean;
   daemonConnected: boolean;
   vaultLocked: boolean;
+  /** Number of vault resources (folders/credentials/asset-holder) with a
+   *  write queued because it couldn't reach the server - not yet synced. */
+  pendingSyncCount: number;
   /** Adds a folder. Returns the *resolved* id (which may differ from `folder.id`
    *  when the daemon assigns its own UUID or a slug collides). */
   addFolder: (folder: Folder) => Promise<string>;
@@ -48,6 +52,24 @@ const VAULT_LOCAL_KEYS = [
 
 function wipeDemoLocalStorage(): void {
   for (const k of VAULT_LOCAL_KEYS) localStorage.removeItem(k);
+}
+
+// ── Offline queue notification helper ─────────────────────────────────────
+// A write that failed only because the network is unreachable is not an
+// error from the user's point of view - their edit is safe (queued,
+// encrypted, on disk) and will sync automatically. This is deliberately a
+// distinct, calmer notification from the red "couldn't save" one used for
+// real failures (auth/validation/server errors), which do need the user's
+// attention because they won't resolve on their own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function notifyQueuedOffline(t: any, addNotification: any, label?: string): void {
+  addNotification({
+    type: 'info',
+    title: t('notifications.offlineQueuedTitle', 'Saved offline'),
+    message: label
+      ? t('notifications.offlineQueuedMessageNamed', { name: label, defaultValue: `"${label}" is saved on this device and will sync once you're back online.` })
+      : t('notifications.offlineQueuedMessage', 'Your change is saved on this device and will sync once you\'re back online.'),
+  });
 }
 
 // ── Per-key write mutex ──────────────────────────────────────────────
@@ -141,7 +163,17 @@ const _localWrite = (key: string, value: string): Promise<void> => serializedWri
         window.dispatchEvent(new CustomEvent('sessionInvalid'));
         throw new Error('session expired');
       }
-      throw new Error(`vault PUT ${endpoint} failed: ${e instanceof ApiError ? e.status : 'unknown'}`);
+      if (!(e instanceof ApiError)) {
+        // fetch() itself threw (TypeError: Failed to fetch, etc.) rather than
+        // the server responding with an error status - the network is down,
+        // not the write. Queue the already-encrypted payload so it isn't
+        // lost, instead of surfacing a generic failure the caller would roll
+        // back on.
+        const resource = endpoint as QueueResource;
+        await queueWrite(resource, encryptedValue);
+        throw new QueuedOfflineError(resource);
+      }
+      throw new Error(`vault PUT ${endpoint} failed: ${e.status}`);
     }
     localStorage.removeItem(key);
     return;
@@ -300,6 +332,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     const token = keyStore.get();
     if (token && token.length === 64) return;
 
+    // Re-entry (e.g. the `demoKeyAvailable` reload fired right after login)
+    // must flip this back to true - it only ever resolves to false in the
+    // `finally` below, so without this the skeleton gate stays stuck on
+    // whatever the very first pre-login mount left it as.
+    setIsLoading(true);
+
     try {
       if (hasServerSession()) {
         await keyStore.restoreAsync();
@@ -314,9 +352,20 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       let a: AssetHolder | null = null;
       let pendingError = false;
 
-      try { f = await loadLocalFolders(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else logger.error(e); }
-      try { c = await loadLocalCredentials(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else logger.error(e); }
-      try { a = await loadLocalAssetHolder(); } catch(e: any) { if (e?.name === 'DecryptionPendingError') pendingError = true; else logger.error(e); }
+      // These four reads are independent network/decryption calls - run them
+      // concurrently instead of serially to cut the critical-path latency on
+      // initial vault load roughly 4x (each was a separate /api/vault/* round trip).
+      const settle = <T,>(v: T | undefined, e: any): { v?: T; e?: any } => ({ v, e });
+      const [fRes, cRes, aRes, travel] = await Promise.all([
+        loadLocalFolders().then(v => settle(v, undefined), e => settle<Folder[]>(undefined, e)),
+        loadLocalCredentials().then(v => settle(v, undefined), e => settle<Credential[]>(undefined, e)),
+        loadLocalAssetHolder().then(v => settle(v, undefined), e => settle<AssetHolder>(undefined, e)),
+        getTravelModeConfigAsync(),
+      ]);
+
+      if (fRes.v !== undefined) f = fRes.v; else if (fRes.e?.name === 'DecryptionPendingError') pendingError = true; else if (fRes.e) logger.error(fRes.e);
+      if (cRes.v !== undefined) c = cRes.v; else if (cRes.e?.name === 'DecryptionPendingError') pendingError = true; else if (cRes.e) logger.error(cRes.e);
+      if (aRes.v !== undefined) a = aRes.v; else if (aRes.e?.name === 'DecryptionPendingError') pendingError = true; else if (aRes.e) logger.error(aRes.e);
 
       if (hasServerSession() && !keyStore.hasToken) {
         // Still no keys after restore attempt? User needs to log in to derive them.
@@ -332,8 +381,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Filter for Travel Mode
-      const travel = await getTravelModeConfigAsync();
+      // Filter for Travel Mode (config already fetched concurrently above)
       if (travel.active) {
         if (f !== null) {
           f = f.filter(folder => !travel.hiddenFolderIds.includes(folder.id));
@@ -412,6 +460,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     try {
       await persistFolders(updated);
     } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification, stored.label);
+        return stored.id;
+      }
       logger.error('[VaultContext] addFolder persist failed:', err);
       setFolders(prevFolders);
       addNotification({
@@ -442,11 +494,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     try {
       await persistFolders(updated);
     } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification, updatedFolder.label);
+        return;
+      }
       logger.error('[VaultContext] updateFolder persist failed:', err);
       setFolders(prevFolders);
       throw err;
     }
-  }, [folders, persistFolders, daemonConnected]);
+  }, [folders, persistFolders, daemonConnected, t, addNotification]);
 
   const deleteFolder = useCallback(async (folderId: string) => {
     const folderToDelete = folders.find(f => f.id === folderId);
@@ -468,6 +524,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
           newCreds.length !== prevCreds.length ? persistCredentials(newCreds) : Promise.resolve(),
         ]);
       } catch (err) {
+        if (err instanceof QueuedOfflineError) {
+          notifyQueuedOffline(t, addNotification, folderToDelete?.label);
+          return;
+        }
         logger.error('[VaultContext] deleteFolder persist failed:', err);
         setFolders(prevFolders);
         setCredentials(prevCreds);
@@ -495,11 +555,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     try {
       await persistFolders(newFolders);
     } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification);
+        return;
+      }
       logger.error('[VaultContext] reorderFolders persist failed:', err);
       setFolders(prev);
       throw err;
     }
-  }, [folders, persistFolders, daemonConnected]);
+  }, [folders, persistFolders, daemonConnected, t, addNotification]);
 
   // ── Credential operations ─────────────────────────────────────────────────
 
@@ -508,12 +572,35 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const { id: _id, folderId, ...rest } = newCredential;
       const id = await daemon.addCredential(folderId ?? null, rest);
       setCredentials(prev => [...prev, { ...newCredential, id }]);
-    } else {
-      setCredentials(prev => {
-        const updated = [...prev, newCredential];
-        persistCredentials(updated);
-        return updated;
+      addNotification({
+        type: 'credential_added',
+        title: t('notifications.credentialAddedTitle', 'Credential Added'),
+        message: t('notifications.credentialAddedMessage', { service: newCredential.service, defaultValue: `New credential for "${newCredential.service}" has been added.` }),
+        data: { credentialId: newCredential.id },
       });
+      return;
+    }
+    // Server / demo mode: optimistic state + awaited persist + rollback on failure
+    // (same pattern as addFolder - previously this fired persistCredentials()
+    // without awaiting or catching it, so a failed write was invisible).
+    const prevCreds = credentials;
+    const updated = [...prevCreds, newCredential];
+    setCredentials(updated);
+    try {
+      await persistCredentials(updated);
+    } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification, newCredential.service);
+        return;
+      }
+      logger.error('[VaultContext] addCredential persist failed:', err);
+      setCredentials(prevCreds);
+      addNotification({
+        type: 'persistence_failed',
+        title: t('notifications.credentialSaveFailedTitle', 'Could not save credential'),
+        message: t('notifications.credentialSaveFailedMessage', { service: newCredential.service, defaultValue: `Credential for "${newCredential.service}" could not be saved. Please try again.` }),
+      });
+      throw err;
     }
     addNotification({
       type: 'credential_added',
@@ -521,30 +608,62 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       message: t('notifications.credentialAddedMessage', { service: newCredential.service, defaultValue: `New credential for "${newCredential.service}" has been added.` }),
       data: { credentialId: newCredential.id },
     });
-  }, [t, addNotification, persistCredentials, daemonConnected]);
+  }, [t, addNotification, persistCredentials, credentials, daemonConnected]);
 
   const updateCredential = useCallback(async (updatedCredential: Credential) => {
     if (daemonConnected) {
       const { id, folderId, ...rest } = updatedCredential;
       await daemon.updateCredential(String(id), folderId ?? null, rest);
+      setCredentials(prev => prev.map(c => c.id === updatedCredential.id ? updatedCredential : c));
+      return;
     }
-    setCredentials(prev => {
-      const updated = prev.map(c => c.id === updatedCredential.id ? updatedCredential : c);
-      if (!daemonConnected) persistCredentials(updated);
-      return updated;
-    });
-  }, [persistCredentials, daemonConnected]);
+    const prevCreds = credentials;
+    const updated = prevCreds.map(c => c.id === updatedCredential.id ? updatedCredential : c);
+    setCredentials(updated);
+    try {
+      await persistCredentials(updated);
+    } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification, updatedCredential.service);
+        return;
+      }
+      logger.error('[VaultContext] updateCredential persist failed:', err);
+      setCredentials(prevCreds);
+      addNotification({
+        type: 'persistence_failed',
+        title: t('notifications.credentialSaveFailedTitle', 'Could not save credential'),
+        message: t('notifications.credentialSaveFailedMessage', { service: updatedCredential.service, defaultValue: `Credential for "${updatedCredential.service}" could not be saved. Please try again.` }),
+      });
+      throw err;
+    }
+  }, [credentials, persistCredentials, daemonConnected, t, addNotification]);
 
   const deleteCredential = useCallback(async (id: string | number) => {
     const credToDelete = credentials.find(c => c.id === id);
     if (daemonConnected) {
       await daemon.deleteCredential(String(id));
+      setCredentials(prev => prev.filter(c => c.id !== id));
+    } else {
+      const prevCreds = credentials;
+      const updated = prevCreds.filter(c => c.id !== id);
+      setCredentials(updated);
+      try {
+        await persistCredentials(updated);
+      } catch (err) {
+        if (err instanceof QueuedOfflineError) {
+          notifyQueuedOffline(t, addNotification, credToDelete?.service);
+          return;
+        }
+        logger.error('[VaultContext] deleteCredential persist failed:', err);
+        setCredentials(prevCreds);
+        addNotification({
+          type: 'persistence_failed',
+          title: t('notifications.credentialDeleteFailedTitle', 'Could not delete credential'),
+          message: t('notifications.credentialDeleteFailedMessage', { service: credToDelete?.service ?? '', defaultValue: `Credential for "${credToDelete?.service ?? ''}" could not be deleted. Please try again.` }),
+        });
+        throw err;
+      }
     }
-    setCredentials(prev => {
-      const updated = prev.filter(c => c.id !== id);
-      if (!daemonConnected) persistCredentials(updated);
-      return updated;
-    });
     if (credToDelete) {
       addNotification({
         type: 'credential_deleted',
@@ -568,26 +687,55 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         const { id, folderId: _f, ...rest } = cred;
         await daemon.updateCredential(String(id), targetFolderId, rest);
       }
-    }
-    setCredentials(prev => {
-      const updated = prev.map(c => {
+      setCredentials(prev => prev.map(c => {
         if (credentialIds) {
           return credentialIds.includes(c.id) ? { ...c, folderId: targetFolderId } : c;
         }
         return c.folderId === sourceFolderId ? { ...c, folderId: targetFolderId } : c;
-      });
-      if (!daemonConnected) persistCredentials(updated);
-      return updated;
+      }));
+      return;
+    }
+    const prevCreds = credentials;
+    const updated = prevCreds.map(c => {
+      if (credentialIds) {
+        return credentialIds.includes(c.id) ? { ...c, folderId: targetFolderId } : c;
+      }
+      return c.folderId === sourceFolderId ? { ...c, folderId: targetFolderId } : c;
     });
-  }, [credentials, persistCredentials, daemonConnected]);
+    setCredentials(updated);
+    try {
+      await persistCredentials(updated);
+    } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification);
+        return;
+      }
+      logger.error('[VaultContext] moveCredentials persist failed:', err);
+      setCredentials(prevCreds);
+      throw err;
+    }
+  }, [credentials, persistCredentials, daemonConnected, t, addNotification]);
 
   const updateAssetHolder = useCallback(async (newAssetHolder: AssetHolder) => {
     if (daemonConnected) {
       await daemon.updateAssetHolder(newAssetHolder);
+      setAssetHolder(newAssetHolder);
+      return;
     }
+    const prevAssetHolder = assetHolder;
     setAssetHolder(newAssetHolder);
-    if (!daemonConnected) persistAssetHolder(newAssetHolder);
-  }, [persistAssetHolder, daemonConnected]);
+    try {
+      await persistAssetHolder(newAssetHolder);
+    } catch (err) {
+      if (err instanceof QueuedOfflineError) {
+        notifyQueuedOffline(t, addNotification);
+        return;
+      }
+      logger.error('[VaultContext] updateAssetHolder persist failed:', err);
+      setAssetHolder(prevAssetHolder);
+      throw err;
+    }
+  }, [persistAssetHolder, daemonConnected, assetHolder, t, addNotification]);
 
   // ── Connect to daemon and load vault data ─────────────────────────────────
 
@@ -602,7 +750,18 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       }
       const status = await daemon.getStatus();
       if (status.locked) {
-        setDaemonConnected(true);
+        // A daemon reporting itself locked does NOT mean *this* session is
+        // authenticated via the daemon — the daemon process can be reachable
+        // (and its own vault locked) while the current user is authenticated
+        // purely via server mode, holding a 36-char UUID token rather than a
+        // real 64-char daemon session token. Blindly marking daemonConnected
+        // true here routes every mutation (addFolder, addCredential, ...)
+        // through the daemon RPC path with no valid session_token, which
+        // fails with "session invalid" on every call. Only keep it true when
+        // we already hold a genuine daemon token (matches the same check
+        // used for the initial state above).
+        const hasDaemonToken = keyStore.hasToken && keyStore.get()?.length === 64;
+        setDaemonConnected(hasDaemonToken);
         setIsLoading(false);
         return;
       }
@@ -687,10 +846,63 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('demoKeyAvailable', handler);
   }, [reloadLocal]);
 
+  // ── Offline outbox: pending-count tracking + auto-flush on reconnect ─────────
+
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => { getQueueSize().then(n => { if (!cancelled) setPendingSyncCount(n); }); };
+    refresh();
+    window.addEventListener(OUTBOX_CHANGED_EVENT, refresh);
+    return () => { cancelled = true; window.removeEventListener(OUTBOX_CHANGED_EVENT, refresh); };
+  }, []);
+
+  useEffect(() => {
+    // Only server-mode writes are ever queued (see `_localWrite`), so only
+    // server-mode needs to attempt flushing.
+    if (daemonConnected) return;
+
+    const attemptFlush = async () => {
+      const size = await getQueueSize();
+      if (size === 0) return;
+      const { flushed, authExpired } = await flushOutbox();
+      if (authExpired) {
+        // The session died while offline (expired token, revoked cookie).
+        // Leave the queue intact - AppLayout's sessionInvalid handler routes
+        // to /login; the queue will flush again once re-authenticated.
+        window.dispatchEvent(new CustomEvent('sessionInvalid'));
+        return;
+      }
+      if (flushed.length > 0) {
+        addNotification({
+          type: 'info',
+          title: t('notifications.syncCompleteTitle', 'Synced'),
+          message: t('notifications.syncCompleteMessage', 'Your offline changes have been saved to the server.'),
+        });
+        // Pick up the authoritative server copy now that queued writes landed.
+        reloadLocal().catch(() => {});
+      }
+    };
+
+    window.addEventListener('online', attemptFlush);
+    // `online`/`navigator.onLine` can be wrong (e.g. Wi-Fi with no real
+    // internet access, a captive portal) - a low-frequency background check
+    // catches reconnection in those cases without hammering the server.
+    const interval = setInterval(attemptFlush, 60_000);
+    attemptFlush();
+
+    return () => {
+      window.removeEventListener('online', attemptFlush);
+      clearInterval(interval);
+    };
+  }, [daemonConnected, addNotification, t, reloadLocal]);
+
   return (
     <VaultContext.Provider value={{
       folders, credentials, assetHolder,
       isLoading, credentialsLoading, daemonConnected, vaultLocked,
+      pendingSyncCount,
       addFolder, updateFolder, deleteFolder, reorderFolders,
       addCredential, updateCredential, deleteCredential, moveCredentials,
       updateAssetHolder,

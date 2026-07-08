@@ -1,4 +1,4 @@
-import { getCsrfToken, apiFetch } from '../utils/api';
+import { getCsrfToken, apiFetch, hasServerSession } from '../utils/api';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { daemon } from '../utils/daemonClient';
 import { keyStore } from '../crypto/keystore';
@@ -56,7 +56,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return { ...prev, firstName, lastName, email, photoUrl, passwordChangedAt };
       });
     } catch (err: any) {
-      if (err?.message?.includes('Session expired')) {
+      // A daemon "session expired" error only means the whole app session is
+      // dead when the daemon was our ONLY auth path. Server-mode users have
+      // a valid `_pwd_sess` session while the local daemon is simply never
+      // unlocked (session_token unset) — daemon.getProfile() fails the same
+      // way whether the daemon session truly expired or never existed, so
+      // treating it as globally fatal here logged every server-mode user out
+      // on load. Fall through to the server-session fallback below instead.
+      if (err?.message?.includes('Session expired') && !hasServerSession()) {
         keyStore.clear();
         window.dispatchEvent(new CustomEvent('sessionInvalid'));
         return;
