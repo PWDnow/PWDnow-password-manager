@@ -811,7 +811,7 @@ export default function Login() {
           <h2 className="text-4xl xl:text-5xl font-headline font-bold mb-6 leading-[1.1] tracking-tight text-white">
             {t('login.heroTitle', 'Open Source Password Management')}
           </h2>
-          <p className="text-slate-400 text-lg leading-relaxed mb-12">
+          <p className="text-slate-300 text-lg leading-relaxed mb-12">
             {t('login.heroSubtitle', 'A high-security, zero-knowledge vault for your credentials, fully open source and self-hostable.')}
           </p>
 
@@ -830,7 +830,7 @@ export default function Login() {
         </div>
 
         <div className="relative z-10 mt-12">
-          <p className="text-slate-400 text-sm font-medium">
+          <p className="text-slate-300 text-sm font-medium">
             © {new Date().getFullYear()} PWDnow. {t('login.allRightsReserved', 'All rights reserved.')}
           </p>
         </div>
@@ -1050,7 +1050,7 @@ export default function Login() {
                             
                             <div className="flex items-center gap-4">
                               <div className="h-px bg-slate-200 dark:bg-white/10 flex-1"></div>
-                              <span className="text-xs font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">{t('common.or', 'or')}</span>
+                              <span className="text-xs font-semibold text-slate-600 dark:text-white/70 uppercase tracking-wider">{t('common.or', 'or')}</span>
                               <div className="h-px bg-slate-200 dark:bg-white/10 flex-1"></div>
                             </div>
                           </div>

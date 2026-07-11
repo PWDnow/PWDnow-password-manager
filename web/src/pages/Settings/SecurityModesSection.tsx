@@ -174,7 +174,11 @@ export default function SecurityModesSection({
             </p>
           </div>
           <div className="relative shrink-0">
+            <label htmlFor="session-lock-timeout" className="sr-only">
+              {t('settings.autoLock', 'Auto-Lock After Inactivity')}
+            </label>
             <select
+              id="session-lock-timeout"
               value={sessionLockTimeout}
               onChange={(e) => handleSessionLockChange(e.target.value)}
               className="appearance-none bg-surface-container-high text-sm font-bold px-6 py-3 pr-10 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"
@@ -205,7 +209,7 @@ export default function SecurityModesSection({
             </p>
             {emailServerConfig && (
               <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-400 text-xs font-bold uppercase tracking-wider">
                   <CheckCircle size={12} /> {t('settings.emailServerConnected', 'Configured')}
                 </span>
                 <span className="text-xs text-on-surface-variant font-mono">{emailServerConfig.host}:{emailServerConfig.port}</span>
@@ -289,7 +293,7 @@ export default function SecurityModesSection({
                   {duressConfig.armed ? t('settings.duressModeArmed', 'Duress Mode Armed') : t('settings.duressModeDisarmed', 'Duress Mode')}
                 </h3>
                 {duressConfig.armed
-                  ? <span className="text-[9px] px-2.5 py-1 bg-red-600 text-white rounded-full font-black uppercase tracking-widest animate-pulse">{t('settings.duressArmed', 'Armed')}</span>
+                  ? <span className="text-[9px] px-2.5 py-1 bg-red-900 text-white rounded-full font-black uppercase tracking-widest">{t('settings.duressArmed', 'Armed')}</span>
                   : <span className="text-[9px] px-2.5 py-1 bg-surface-container-high text-on-surface-variant rounded-full font-black uppercase tracking-widest">{t('settings.duressDisarmed', 'Disarmed')}</span>
                 }
               </div>
@@ -299,11 +303,12 @@ export default function SecurityModesSection({
                   : t('settings.duressDisarmedDesc', 'A separate duress password entered at login silently wipes all vault data (3-pass CSPRNG overwrite). Also auto-triggers after a configurable number of failed login attempts.')}
               </p>
               <div className="flex items-center gap-4">
-                <label className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${duressConfig.armed ? 'text-red-300' : 'text-on-surface-variant'}`}>
+                <label htmlFor="duress-max-attempts" className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${duressConfig.armed ? 'text-red-300' : 'text-on-surface-variant'}`}>
                   {t('settings.duressAutoWipeAfter', 'Auto-wipe after')}
                 </label>
                 <div className="relative">
                   <select
+                    id="duress-max-attempts"
                     value={duressMaxAttempts}
                     onChange={e => setDuressMaxAttempts(Number(e.target.value))}
                     disabled={duressConfig.armed}
@@ -322,7 +327,7 @@ export default function SecurityModesSection({
                 <>
                   <button
                     onClick={() => setIsDuressWipeOpen(true)}
-                    className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-3 shadow-lg shadow-red-900/50"
+                    className="px-8 py-4 bg-red-900 hover:bg-red-800 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-3 shadow-lg shadow-red-900/50"
                   >
                     <Flame size={18} />
                     {t('settings.duressTriggerWipe', 'Trigger Wipe Now')}
@@ -467,7 +472,7 @@ export default function SecurityModesSection({
                     </div>
                     <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelPasswordConfirm', 'Confirm Password')}</label>
-                      <input type="password" value={confirmTravelPassword}
+<input id="input-9j7w4zl1i" type="password" value={confirmTravelPassword}
                         onChange={e => { setConfirmTravelPassword(e.target.value); setTravelError(''); }}
                         placeholder={t('settings.travelRepeatPassword', 'Repeat password')}
                         autoComplete="new-password"
@@ -636,9 +641,9 @@ export default function SecurityModesSection({
                     <div className="space-y-5">
                       {duressStep === 1 && (
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.duressPasswordLabel', 'Duress Password')}</label>
+                          <label htmlFor="duress-password-input" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.duressPasswordLabel', 'Duress Password')}</label>
                           <div className="relative">
-                            <input type={showDuressPassword ? 'text' : 'password'} value={duressPassword}
+                            <input id="duress-password-input" type={showDuressPassword ? 'text' : 'password'} value={duressPassword}
                               onChange={e => { setDuressPassword(e.target.value); setDuressError(''); }}
                               placeholder={t('settings.duressPasswordMin', 'Minimum 8 characters')}
                               className="w-full px-5 py-4 pr-12 bg-surface-container-low rounded-xl border border-outline-variant/20 text-black dark:text-white font-bold focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none transition-all"
@@ -653,8 +658,8 @@ export default function SecurityModesSection({
                       )}
                       {duressStep === 2 && (
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.duressConfirmLabel', 'Confirm Duress Password')}</label>
-                          <input type="password" value={confirmDuressPassword}
+                          <label htmlFor="duress-confirm-input" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.duressConfirmLabel', 'Confirm Duress Password')}</label>
+                          <input id="duress-confirm-input" type="password" value={confirmDuressPassword}
                             onChange={e => { setConfirmDuressPassword(e.target.value); setDuressError(''); }}
                             placeholder={t('settings.duressRepeat', 'Repeat duress password')}
                             autoComplete="new-password"

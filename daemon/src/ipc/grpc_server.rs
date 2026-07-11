@@ -105,14 +105,23 @@ impl VaultService for GrpcServer {
                 });
                 match totp_ok {
                     Err(e) => {
-                        self.state.lock();
+                        // D1 fix: record a TOTP-specific failure (independent
+                        // exponential lockout, not cleared by lock()) and
+                        // re-lock the vault state without wiping either
+                        // lockout tracker.
+                        self.state.record_totp_failure(uid, conn_id);
+                        self.state.lock_keep_lockout();
                         Err(err(tonic::Code::Unauthenticated, e))
                     }
                     Ok(false) => {
-                        self.state.lock();
+                        self.state.record_totp_failure(uid, conn_id);
+                        self.state.lock_keep_lockout();
                         Err(err(tonic::Code::Unauthenticated, "invalid TOTP code"))
                     }
                     Ok(true) => {
+                        // D3 fix: only now — once both factors have verified —
+                        // clear the unlock-failure and TOTP-failure counters.
+                        self.state.complete_unlock(uid, conn_id);
                         let _ = self.state.audit_log("UNLOCK", Some(&sess.user_id));
                         let ticket = self.state.wipe_ticket_bytes().unwrap_or_default();
                         let vmk_guard = self.state.vmk_read_guard();

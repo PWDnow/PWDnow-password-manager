@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync } from 'fs';
+import fs, { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync } from 'fs';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { lock } from 'proper-lockfile';
 import path from 'path';
@@ -23,6 +23,7 @@ import {
   generateUUID,
 } from '../lib/session.js';
 import { requireCsrf } from '../lib/csrf.js';
+import { resolvesToPublicHost } from '../lib/ssrfGuard.js';
 import {
   appendAuditEvent,
   compactIpInfo,
@@ -44,17 +45,16 @@ import {
   verifyPassword,
   secureOverwriteDir,
   performServerWipe,
-} from './authRoutes.js';
+} from './auth/utils.js';
 
 // ── withEmergencyRequestsLock ─────────────────────────────────────────────────
-// Same pattern as withUsersLock / withMfaPendingLock.
-// H-10 fix: serialise the read-push-write on the per-user emergency_requests file.
+// Serializes concurrent read-push-write on the per-user emergency_requests file.
+// Uses proper-lockfile for the file backend; the Postgres backend relies on the
+// repository UPSERT as the atomic unit of work.
 async function withEmergencyRequestsLock(uid, fn) {
   const dir = userVaultDir(uid);
   const filePath = userVaultFile(uid, 'emergency_requests');
   const info = userInfo(uid, 'emergency_requests');
-  // File backend: serialize read-push-write with proper-lockfile when the user dir
-  // exists. Postgres backend: no local dir — the repo UPSERT is the unit of work.
   let release = null;
   try {
     if (existsSync(dir)) {
@@ -68,7 +68,7 @@ async function withEmergencyRequestsLock(uid, fn) {
     }
     return result;
   } finally {
-    if (release) { try { await release(); } catch (_) {} }
+    if (release) { try { await release(); } catch (err) { logger.error({ err: err.message }, 'Failed to release user dir lock'); } }
   }
 }
 
@@ -82,7 +82,7 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'credentials', []));
   });
   app.put('/api/vault/credentials', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
     await writeUserBlobAsync(req.user.id, 'credentials', req.body);
     res.json({ ok: true });
   });
@@ -91,7 +91,7 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'folders', []));
   });
   app.put('/api/vault/folders', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
     await writeUserBlobAsync(req.user.id, 'folders', req.body);
     res.json({ ok: true });
   });
@@ -100,7 +100,7 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'asset_holder', { emails: [], phoneNumbers: [], u2fKeys: [] }));
   });
   app.put('/api/vault/asset-holder', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
     await writeUserBlobAsync(req.user.id, 'asset_holder', req.body);
     res.json({ ok: true });
   });
@@ -113,8 +113,8 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'travel_vault', { data: null }));
   });
   app.put('/api/vault/travel-vault', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
-    if (req.body.data.length > 5 * 1024 * 1024) return res.status(413).json({ error: 'payload_too_large' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
+    if (req.body.data.length > 5 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'payload_too_large' });
     await writeUserBlobAsync(req.user.id, 'travel_vault', req.body);
     res.json({ ok: true });
   });
@@ -130,8 +130,8 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'travel_config', { data: null }));
   });
   app.put('/api/vault/travel-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
-    if (req.body.data.length > 64 * 1024) return res.status(413).json({ error: 'payload_too_large' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
+    if (req.body.data.length > 64 * 1024) return res.status(413).json({ ok: false, error: 'payload_too_large' });
     await writeUserBlobAsync(req.user.id, 'travel_config', req.body);
     res.json({ ok: true });
   });
@@ -147,8 +147,8 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'duress_config', { data: null }));
   });
   app.put('/api/vault/duress-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
-    if (req.body.data.length > 64 * 1024) return res.status(413).json({ error: 'payload_too_large' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
+    if (req.body.data.length > 64 * 1024) return res.status(413).json({ ok: false, error: 'payload_too_large' });
     await writeUserBlobAsync(req.user.id, 'duress_config', req.body);
     res.json({ ok: true });
   });
@@ -163,7 +163,7 @@ export function mountVaultRoutes(app) {
   // during /api/auth/login (before authentication). Mirrors how `mfaEnforce` works.
   app.put('/api/vault/duress-enforce', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const { armed, maxAttempts } = req.body || {};
-    if (typeof armed !== 'boolean') return res.status(400).json({ error: 'invalid_input' });
+    if (typeof armed !== 'boolean') return res.status(400).json({ ok: false, error: 'invalid_input' });
     const max = Math.max(1, Math.min(20, Number(maxAttempts) || 3));
     let emailHash = null;
     const found = await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
@@ -171,7 +171,7 @@ export function mountVaultRoutes(app) {
       u.duressFailureCount = 0;
       emailHash = u.emailHash;
     });
-    if (found === null) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ ok: false, error: 'user_not_found' });
     // Clear the in-memory account-lockout counter for this account so any
     // failures accumulated before arming don't strand the wipe path behind an
     // 'account_locked' response.
@@ -183,7 +183,7 @@ export function mountVaultRoutes(app) {
       u.duressEnforce = null;
       u.duressFailureCount = 0;
     });
-    if (found === null) return res.status(401).json({ error: 'user_not_found' });
+    if (found === null) return res.status(401).json({ ok: false, error: 'user_not_found' });
     res.json({ ok: true });
   });
 
@@ -191,7 +191,7 @@ export function mountVaultRoutes(app) {
     res.json(await readUserBlobAsync(req.user.id, 'profile', { firstName: '', lastName: '', email: '' }));
   });
   app.put('/api/vault/profile', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ error: 'invalid_input' });
+    if (!req.body || typeof req.body.data !== 'string') return res.status(400).json({ ok: false, error: 'invalid_input' });
     await writeUserBlobAsync(req.user.id, 'profile', req.body);
     res.json({ ok: true });
   });
@@ -208,12 +208,11 @@ export function mountVaultRoutes(app) {
   });
   app.put('/api/vault/mfa', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     if (!req.body || typeof req.body.data !== 'string') {
-      return res.status(400).json({ error: 'invalid_input' });
+      return res.status(400).json({ ok: false, error: 'invalid_input' });
     }
     await writeUserBlob(req.user.id, 'mfa_config', req.body);
 
-    // H-3 fix: serialize concurrent PUT /api/vault/mfa — would otherwise clobber
-    // the TOTP secret or enforce flags.
+    // Serialize concurrent PUT requests to prevent clobbering the TOTP secret or enforce flags.
     const { enforce, serverSecret } = req.body;
     await ctx.vaultRepository.updateUserById(req.user.id, (u) => {
       if (enforce && typeof enforce === 'object') {
@@ -247,11 +246,10 @@ export function mountVaultRoutes(app) {
   app.put('/api/vault/smtp-config', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const { host, port, protocol, username, password, fromName, fromAddress, mxVerified } = req.body ?? {};
     if (!host || typeof host !== 'string' || !port || !username || typeof username !== 'string') {
-      return res.status(400).json({ error: 'invalid_input' });
+      return res.status(400).json({ ok: false, error: 'invalid_input' });
     }
-    const BLOCKED_HOST_RE = /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1|169\.254\.|fd[0-9a-f]{2}:|fc00:)/i;
-    if (BLOCKED_HOST_RE.test(String(host).trim())) {
-      return res.status(400).json({ error: 'invalid_smtp_host' });
+    if (!await resolvesToPublicHost(String(host).trim())) {
+      return res.status(400).json({ ok: false, error: 'invalid_smtp_host' });
     }
     await writeUserBlob(req.user.id, 'smtp_config', { host, port, protocol, username, password: password || '', fromName, fromAddress, mxVerified });
     res.json({ ok: true });
@@ -268,14 +266,35 @@ export function mountVaultRoutes(app) {
 
   const SHARE_TTL_MS = {
     '1h':  1 * 3600_000,
-    '24h': 24 * 3600_000,
+    '24h': process.env.SHARE_TTL_MS ? parseInt(process.env.SHARE_TTL_MS, 10) : 24 * 3600_000,
     '7d':  7 * 24 * 3600_000,
   };
 
-  app.post('/api/vault/shares', authMiddleware, requireAuth, requireCsrf, (req, res) => {
+  const SHARE_INDEX_PATH = path.join(ctx.DATA_DIR, 'share_index.json');
+  async function updateShareIndex(shareId, uid) {
+    if (!existsSync(ctx.DATA_DIR)) await fs.promises.mkdir(ctx.DATA_DIR, { recursive: true, mode: 0o700 });
+    let release = null;
+    try {
+      if (!existsSync(SHARE_INDEX_PATH)) await fs.promises.writeFile(SHARE_INDEX_PATH, '{}', { mode: 0o600 });
+      release = await lock(SHARE_INDEX_PATH, { retries: { retries: 10, minTimeout: 50 } });
+      let index = {};
+      try { index = JSON.parse(await fs.promises.readFile(SHARE_INDEX_PATH, 'utf8')); } catch { /* ignore */ }
+      if (uid) index[shareId] = uid;
+      else delete index[shareId];
+      await fs.promises.writeFile(SHARE_INDEX_PATH, JSON.stringify(index), { mode: 0o600 });
+    } finally {
+      if (release) await release().catch(() => {});
+    }
+  }
+  async function getShareOwner(shareId) {
+    if (!existsSync(SHARE_INDEX_PATH)) return null;
+    try { return JSON.parse(await fs.promises.readFile(SHARE_INDEX_PATH, 'utf8'))[shareId] || null; } catch { return null; }
+  }
+
+  app.post('/api/vault/shares', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const { encryptedBlob, iv, ttl, singleView, label } = req.body ?? {};
-    if (!encryptedBlob || typeof encryptedBlob !== 'string') return res.status(400).json({ error: 'missing_blob' });
-    if (!iv || typeof iv !== 'string') return res.status(400).json({ error: 'missing_iv' });
+    if (!encryptedBlob || typeof encryptedBlob !== 'string') return res.status(400).json({ ok: false, error: 'missing_blob' });
+    if (!iv || typeof iv !== 'string') return res.status(400).json({ ok: false, error: 'missing_iv' });
     const ttlMs = SHARE_TTL_MS[ttl] ?? SHARE_TTL_MS['24h'];
     const uid = req.user.id;
     const sharesDir = userSharesDir(uid);
@@ -294,6 +313,7 @@ export function mountVaultRoutes(app) {
     };
     const sharePath = path.join(sharesDir, `${shareId}.json`);
     writeFileSync(sharePath, JSON.stringify(record), { mode: 0o600 });
+    await updateShareIndex(shareId, uid);
     appendAuditEvent(uid, { action: 'share_created', ip: getClientIp(req), ipInfo: compactIpInfo(req.ipRecord), userAgent: req.headers['user-agent'] || '', success: true, resourceLabel: record.label, riskFlags: req.ipRecord?.riskFlags ?? [] });
     res.json({ ok: true, shareId });
   });
@@ -311,14 +331,15 @@ export function mountVaultRoutes(app) {
     res.json({ ok: true, shares });
   });
 
-  app.delete('/api/vault/shares/:shareId', authMiddleware, requireAuth, requireCsrf, (req, res) => {
+  app.delete('/api/vault/shares/:shareId', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const shareId = req.params.shareId;
-    if (!/^[0-9a-f]{32}$/.test(shareId)) return res.status(400).json({ error: 'invalid_id' });
+    if (!/^[0-9a-f]{32}$/.test(shareId)) return res.status(400).json({ ok: false, error: 'invalid_id' });
     const sharePath = path.join(userSharesDir(req.user.id), `${shareId}.json`);
     let label = '';
     if (existsSync(sharePath)) {
       try { label = JSON.parse(readFileSync(sharePath, 'utf8')).label || ''; } catch { /* ignore */ }
       rmSync(sharePath);
+      await updateShareIndex(shareId, null);
     }
     appendAuditEvent(req.user.id, { action: 'share_revoked', ip: getClientIp(req), ipInfo: compactIpInfo(req.ipRecord), userAgent: req.headers['user-agent'] || '', success: true, resourceLabel: label, riskFlags: req.ipRecord?.riskFlags ?? [] });
     res.json({ ok: true });
@@ -327,41 +348,35 @@ export function mountVaultRoutes(app) {
   // Public endpoint — no auth. Rate limited to prevent filesystem enumeration.
   app.get('/api/share/:shareId', async (req, res) => {
     if (!await checkEmergencyRate(getClientIp(req))) {
-      return res.status(429).json({ error: 'too_many_requests' });
+      return res.status(429).json({ ok: false, error: 'too_many_requests' });
     }
     const { shareId } = req.params;
-    if (!/^[0-9a-f]{32}$/.test(shareId)) return res.status(400).json({ error: 'invalid_id' });
+    if (!/^[0-9a-f]{32}$/.test(shareId)) return res.status(400).json({ ok: false, error: 'invalid_id' });
 
-    // O(users) scan — acceptable for self-hosted scale.
+    // O(1) index lookup
+    const ownerId = await getShareOwner(shareId);
+    if (!ownerId) return res.status(404).json({ ok: false, error: 'not_found' });
+    
     const vaultDir = path.join(ctx.DATA_DIR, 'vault');
-    if (!existsSync(vaultDir)) return res.status(404).json({ error: 'not_found' });
-
-    let recordPath = null;
-    for (const uid of readdirSync(vaultDir)) {
-      const p = path.join(vaultDir, uid, 'shares', `${shareId}.json`);
-      if (existsSync(p)) {
-        recordPath = p;
-        break;
-      }
-    }
-    if (!recordPath) return res.status(404).json({ error: 'not_found' });
+    const recordPath = path.join(vaultDir, ownerId, 'shares', `${shareId}.json`);
+    if (!existsSync(recordPath)) return res.status(404).json({ ok: false, error: 'not_found' });
 
     let release = null;
     let record = null;
     try {
       // Lock enforced to prevent race condition in single-view claim.
       release = await lock(recordPath, { retries: { retries: 10, minTimeout: 100 } });
-      if (!existsSync(recordPath)) return res.status(404).json({ error: 'not_found' });
-      try { record = JSON.parse(readFileSync(recordPath, 'utf8')); } catch { return res.status(500).json({ error: 'corrupt' }); }
+      if (!existsSync(recordPath)) return res.status(404).json({ ok: false, error: 'not_found' });
+      try { record = JSON.parse(readFileSync(recordPath, 'utf8')); } catch { return res.status(500).json({ ok: false, error: 'corrupt' }); }
 
       if (Date.now() > record.expiresAt) {
-        try { rmSync(recordPath); } catch { /* ignore */ }
-        return res.status(410).json({ error: 'expired' });
+        try { rmSync(recordPath); await updateShareIndex(shareId, null); } catch { /* ignore */ }
+        return res.status(410).json({ ok: false, error: 'expired' });
       }
 
       if (record.singleView) {
         if (record.viewed) {
-          return res.status(410).json({ error: 'already_viewed' });
+          return res.status(410).json({ ok: false, error: 'already_viewed' });
         }
         record.viewed = true;
         const tmp = recordPath + '.tmp';
@@ -369,12 +384,12 @@ export function mountVaultRoutes(app) {
           writeFileSync(tmp, JSON.stringify(record), { mode: 0o600 });
           renameSync(tmp, recordPath); // atomic rename
         } catch (e) {
-          console.error('[share] Atomic update failed:', e.message);
-          return res.status(500).json({ error: 'server_error' });
+          logger.error({ err: e.message }, '[share] Atomic update failed');
+          return res.status(500).json({ ok: false, error: 'server_error' });
         }
       }
     } finally {
-      if (release) await release().catch(() => {});
+      if (release) await release().catch((err) => { logger.error({ err: err.message }, 'Failed to release share lock'); });
     }
 
     res.json({ ok: true, encryptedBlob: record.encryptedBlob, iv: record.iv, expiresAt: record.expiresAt, singleView: record.singleView });
@@ -396,21 +411,20 @@ export function mountVaultRoutes(app) {
 
   app.post('/api/vault/emergency', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const { contactEmail, waitPeriodHours, password } = req.body || {};
-    // #5-FIX: require password re-verification before writing a recovery backdoor (CWE-620).
-    if (typeof password !== 'string') return res.status(400).json({ error: 'password_required' });
-    if (!contactEmail || typeof contactEmail !== 'string') return res.status(400).json({ error: 'invalid_email' });
+    if (typeof password !== 'string') return res.status(400).json({ ok: false, error: 'password_required' });
+    if (!contactEmail || typeof contactEmail !== 'string') return res.status(400).json({ ok: false, error: 'invalid_email' });
     const hours = Number(waitPeriodHours);
-    if (![24, 48, 72, 168].includes(hours)) return res.status(400).json({ error: 'invalid_wait_period' });
+    if (![24, 48, 72, 168].includes(hours)) return res.status(400).json({ ok: false, error: 'invalid_wait_period' });
 
     const u = await ctx.vaultRepository.findUserById(req.user.id);
-    if (!u) return res.status(401).json({ error: 'user_not_found' });
-    if (isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
+    if (!u) return res.status(401).json({ ok: false, error: 'user_not_found' });
+    if (await isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
     const verified = await verifyPassword(u.passwordHash, password, u.salt);
     if (!verified) {
-      recordMfaFailure(u.id);
-      return res.status(401).json({ error: 'invalid_credentials' });
+      await recordMfaFailure(u.id);
+      return res.status(401).json({ ok: false, error: 'invalid_credentials' });
     }
-    clearMfaFailure(u.id);
+    await clearMfaFailure(u.id);
 
     const uid = req.user.id;
     const cfg = {
@@ -436,15 +450,15 @@ export function mountVaultRoutes(app) {
   // emergency files, so without limiting this enables cross-tenant DoS.
   app.post('/api/emergency/request/:token', async (req, res) => {
     if (!await checkEmergencyRate(getClientIp(req))) {
-      return res.status(429).json({ error: 'too_many_requests' });
+      return res.status(429).json({ ok: false, error: 'too_many_requests' });
     }
     const { token } = req.params;
     const { requesterName, requesterEmail } = req.body ?? {};
-    if (!token || !/^[0-9a-f]{64}$/.test(token)) return res.status(400).json({ error: 'invalid_token' });
-    if (!requesterName || typeof requesterName !== 'string') return res.status(400).json({ error: 'invalid_name' });
+    if (!token || !/^[0-9a-f]{64}$/.test(token)) return res.status(400).json({ ok: false, error: 'invalid_token' });
+    if (!requesterName || typeof requesterName !== 'string') return res.status(400).json({ ok: false, error: 'invalid_name' });
     if (requesterEmail !== undefined && requesterEmail !== null && requesterEmail !== '') {
       if (typeof requesterEmail !== 'string' || requesterEmail.length > 320 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(requesterEmail)) {
-        return res.status(400).json({ error: 'invalid_email' });
+        return res.status(400).json({ ok: false, error: 'invalid_email' });
       }
     }
 
@@ -463,7 +477,7 @@ export function mountVaultRoutes(app) {
         break;
       }
     }
-    if (!owner) return res.status(404).json({ error: 'not_found' });
+    if (!owner) return res.status(404).json({ ok: false, error: 'not_found' });
 
     // H-10 fix: serialise the read-push-write on the per-user emergency_requests file.
     await withEmergencyRequestsLock(owner.id, async (requests) => {
@@ -486,11 +500,10 @@ export function mountVaultRoutes(app) {
 
   app.post('/api/vault/emergency/respond', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
     const { requestId, action } = req.body ?? {};
-    if (!requestId || !['grant', 'deny'].includes(action)) return res.status(400).json({ error: 'invalid_params' });
+    if (!requestId || !['grant', 'deny'].includes(action)) return res.status(400).json({ ok: false, error: 'invalid_params' });
     const uid = req.user.id;
-    // H-10 fix: same lock as the request-append path so grant/deny don't race
-    // a concurrent append (which would otherwise resurrect a denied request
-    // by clobbering the writer that flipped the status).
+    // Same lock as the request-append path so grant/deny don't race a concurrent
+    // append, which would otherwise clobber a denial by resurrecting the request.
     let notFound = false;
     await withEmergencyRequestsLock(uid, async (requests) => {
       const idx = requests.findIndex(r => r.id === requestId);
@@ -498,24 +511,24 @@ export function mountVaultRoutes(app) {
       requests[idx].status = action === 'grant' ? 'granted' : 'denied';
       requests[idx].respondedAt = Date.now();
     });
-    if (notFound) return res.status(404).json({ error: 'not_found' });
+    if (notFound) return res.status(404).json({ ok: false, error: 'not_found' });
     res.json({ ok: true });
   });
 
   // ── Account wipe ──────────────────────────────────────────────────────────────
   app.post('/api/vault/wipe', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
-    // #1-FIX: require password re-verification before destructive wipe (CWE-306).
+    // Require password re-verification before destructive wipe.
     const { password } = req.body ?? {};
-    if (typeof password !== 'string') return res.status(400).json({ error: 'password_required' });
+    if (typeof password !== 'string') return res.status(400).json({ ok: false, error: 'password_required' });
     const u = await ctx.vaultRepository.findUserById(req.user.id);
-    if (!u) return res.status(401).json({ error: 'user_not_found' });
-    if (isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
+    if (!u) return res.status(401).json({ ok: false, error: 'user_not_found' });
+    if (await isMfaLocked(u.id)) return res.status(429).json({ ok: false, error: 'too_many_attempts' });
     const verified = await verifyPassword(u.passwordHash, password, u.salt);
     if (!verified) {
-      recordMfaFailure(u.id);
-      return res.status(401).json({ error: 'invalid_credentials' });
+      await recordMfaFailure(u.id);
+      return res.status(401).json({ ok: false, error: 'invalid_credentials' });
     }
-    clearMfaFailure(u.id);
+    await clearMfaFailure(u.id);
 
     await performServerWipe(req.user.id);
     clearSessionCookies(req, res);
@@ -539,22 +552,22 @@ export function mountVaultRoutes(app) {
     // Require password re-verification with brute-force lockout before clearing logs.
     const { password } = req.body ?? {};
     if (typeof password !== 'string') {
-      return res.status(400).json({ error: 'password_required' });
+      return res.status(400).json({ ok: false, error: 'password_required' });
     }
     const u = await ctx.vaultRepository.findUserById(req.user.id);
-    if (!u) return res.status(401).json({ error: 'user_not_found' });
+    if (!u) return res.status(401).json({ ok: false, error: 'user_not_found' });
 
-    if (isMfaLocked(u.id)) {
+    if (await isMfaLocked(u.id)) {
       return res.status(429).json({ ok: false, error: 'too_many_attempts' });
     }
 
     const verified = await verifyPassword(u.passwordHash, password, u.salt);
     if (!verified) {
-      recordMfaFailure(u.id);
+      await recordMfaFailure(u.id);
       appendAuditEvent(req.user.id, { action: 'audit_clear_rejected', ip: getClientIp(req), success: false });
-      return res.status(401).json({ error: 'invalid_credentials' });
+      return res.status(401).json({ ok: false, error: 'invalid_credentials' });
     }
-    clearMfaFailure(u.id);
+    await clearMfaFailure(u.id);
 
     let release = null;
     try {
@@ -579,17 +592,16 @@ export function mountVaultRoutes(app) {
     if (
       !smtp?.host || !smtp?.port || !smtp?.username || !smtp?.password ||
       !Array.isArray(expiredCreds) || !toEmail || typeof toEmail !== 'string' ||
-      toEmail.length > 320
+      toEmail.length > 320 || /[\r\n]/.test(toEmail) || /[\r\n]/.test(String(smtp.username))
     ) {
-      return res.status(400).json({ error: 'invalid_input' });
+      return res.status(400).json({ ok: false, error: 'invalid_input' });
     }
     if (expiredCreds.length === 0) return res.json({ ok: true, sent: 0 });
 
     // Block SSRF to RFC-1918, loopback, and metadata endpoints.
     const smtpHost = String(smtp.host).trim().toLowerCase();
-    const BLOCKED_HOST_RE = /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1|169\.254\.|fd[0-9a-f]{2}:|fc00:)/i;
-    if (BLOCKED_HOST_RE.test(smtpHost)) {
-      return res.status(400).json({ error: 'invalid_smtp_host' });
+    if (!await resolvesToPublicHost(smtpHost)) {
+      return res.status(400).json({ ok: false, error: 'invalid_smtp_host' });
     }
 
     const { default: nodemailer } = await import('nodemailer');
@@ -617,7 +629,7 @@ export function mountVaultRoutes(app) {
       res.json({ ok: true, sent: expiredCreds.length });
     } catch (err) {
       console.error('[expiry-notify]', err.message);
-      res.status(502).json({ error: 'smtp_error' });
+      res.status(502).json({ ok: false, error: 'smtp_error' });
     }
   });
 }

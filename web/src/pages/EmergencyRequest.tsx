@@ -39,7 +39,7 @@ export default function EmergencyRequest() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+    <main className="min-h-screen bg-surface flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -64,7 +64,7 @@ export default function EmergencyRequest() {
               <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50">
                 <div className="flex items-start gap-3">
                   <Clock size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                  <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
                     Your request will be sent to the vault owner. They'll have a waiting period to deny it.
                     If they don't respond, access may be granted after that period.
                   </p>
@@ -164,6 +164,6 @@ export default function EmergencyRequest() {
           )}
         </div>
       </motion.div>
-    </div>
+    </main>
   );
 }

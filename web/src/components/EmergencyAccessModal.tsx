@@ -149,12 +149,12 @@ export default function EmergencyAccessModal({ onClose }: Props) {
               </p>
             </div>
           </div>
-          <button 
+          <button aria-label="Close" 
             onClick={onClose} 
             className="w-10 h-10 flex items-center justify-center hover:bg-surface-container-low rounded-full transition-colors text-on-surface-variant hover:text-black dark:hover:text-white"
           >
-            <X size={20} />
-          </button>
+  <X aria-hidden="true" size={20} />
+</button>
         </div>
 
         {/* Content Area */}
@@ -193,10 +193,10 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                 <div className="space-y-8">
                   {/* Email Input */}
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+                    <label htmlFor="input-0bz6u6yj6" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
                       <Mail size={12} /> {t('emergency.trustedContactEmail', 'Trusted Contact Email')}
                     </label>
-                    <input
+<input id="input-0bz6u6yj6"
                       type="email"
                       value={email}
                       onChange={e => { setEmail(e.target.value); setError(''); }}

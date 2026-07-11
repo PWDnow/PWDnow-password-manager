@@ -83,12 +83,12 @@ export default function SharesModal({ isOpen, onClose }: Props) {
             </div>
             <div>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{t('settings.shareLinks', 'Shared Links')}</h3>
-              <p className="text-sm text-slate-500">{t('settings.shareLinksDesc', 'Manage and revoke your active credential shares.')}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t('settings.shareLinksDesc', 'Manage and revoke your active credential shares.')}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <X size={20} className="text-slate-500" />
-          </button>
+          <button aria-label="Close" onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+  <X aria-hidden="true" size={20} className="text-slate-500" />
+</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -99,12 +99,12 @@ export default function SharesModal({ isOpen, onClose }: Props) {
               <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center mx-auto mb-4">
                 <Link size={24} className="text-slate-300" />
               </div>
-              <p className="text-slate-500 font-bold">{t('settings.noActiveShares', 'No active share links')}</p>
+              <p className="text-slate-600 dark:text-slate-300 font-bold">{t('settings.noActiveShares', 'No active share links')}</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('shares.activeLinkCount', '{{count}} active link(s)', { count: shares.length })}</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{t('shares.activeLinkCount', '{{count}} active link(s)', { count: shares.length })}</h4>
                 <button
                   onClick={handleRevokeAll}
                   className={`text-xs font-bold transition-colors ${confirmingRevokeAll ? 'text-red-700 underline' : 'text-red-600 hover:underline'}`}
@@ -124,10 +124,10 @@ export default function SharesModal({ isOpen, onClose }: Props) {
                       <div>
                         <p className="font-bold text-sm text-slate-900 dark:text-white">{s.label || t('shares.sharedCredential', 'Shared Credential')}</p>
                         <div className="flex items-center gap-3 mt-0.5">
-                           <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                           <span className="flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-300">
                              <Clock size={12} /> {formatExpiry(s.expiresAt)}
                            </span>
-                           <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                           <span className="flex items-center gap-1 text-[10px] text-slate-600 dark:text-slate-300">
                              <Globe size={12} /> {s.viewCount} {t('shares.views', 'views')}
                            </span>
                            {s.viewed && <span className="text-[10px] px-2 py-0.5 bg-green-500/15 text-green-600 rounded font-bold">{t('shares.viewed', 'Viewed')}</span>}

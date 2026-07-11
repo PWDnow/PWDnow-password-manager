@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const BASE_URL    = 'http://localhost:1234';
-const EMAIL       = 'wee.wa@gmail.com';
-const PASSWORD    = 'wee.wa@gmail.comAwee.wa@gmail.com';
+const EMAIL       = 'e2e-test@pwdnow.local';
+const PASSWORD    = 'E2eTestPassw0rd!1';
 const DURESS_PASSWORD = 'duress_password_123!';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,12 +109,12 @@ test.describe('Comprehensive Platform Test', () => {
     // ── Phase 4: Language toggle ──────────────────────────────────────────────
     console.log('\n[Phase 4] Testing language toggle...');
     await page.goto(`${BASE_URL}/vault`);
-    await page.locator('button[aria-label="Select Language"]').click();
+    await page.locator('button[aria-label^="Select Language"]').click();
     await page.locator('button:has-text("Français")').click();
     await expect(page.locator('text=Bastion Numérique Actif')).toBeVisible({ timeout: 5_000 });
     console.log('[Phase 4] ✓ Switched to French.');
 
-    await page.locator('button[aria-label="Select Language"]').click();
+    await page.locator('button[aria-label^="Select Language"]').click();
     await page.locator('button:has-text("English")').click();
     await expect(page.locator('text=Digital Bastion Active')).toBeVisible({ timeout: 5_000 });
     console.log('[Phase 4] ✓ Switched back to English.');
@@ -144,6 +144,10 @@ test.describe('Comprehensive Platform Test', () => {
       'input[placeholder*="folder" i], input[placeholder*="Personal" i]'
     ).first();
     await folderInput.waitFor({ state: 'visible', timeout: 5_000 });
+    // The folder-name field is rendered readOnly until focused (autofill
+    // suppression, see useAutofillGuard) — click() is allowed on readOnly
+    // elements and triggers the onFocus handler that unlocks it for fill().
+    await folderInput.click();
     await folderInput.fill(folderName);
 
     // Click the "Create Folder" inside the modal (not the page-level button)
@@ -186,7 +190,9 @@ test.describe('Comprehensive Platform Test', () => {
     await page.locator('button:has-text("Arm Duress Mode")').last().click();
 
     // Step 3 — done
-    await page.locator('button:has-text("Done")').waitFor({ state: 'visible', timeout: 5_000 });
+    // armDuressMode() runs Argon2id at m=256MiB,t=3 client-side (#29-FIX),
+    // which can take well over 5s in a browser, so allow a generous timeout.
+    await page.locator('button:has-text("Done")').waitFor({ state: 'visible', timeout: 60_000 });
     await page.locator('button:has-text("Done")').click();
     console.log('[Phase 7] Duress mode armed.');
 
@@ -236,8 +242,8 @@ test.describe('Comprehensive Platform Test', () => {
     const firstNameInput = page.locator('input[name="firstName"]');
     await firstNameInput.waitFor({ state: 'visible', timeout: 10_000 });
 
-    await firstNameInput.fill('Wee');
-    await page.locator('input[name="lastName"]').fill('Wa');
+    await firstNameInput.fill('E2E');
+    await page.locator('input[name="lastName"]').fill('Test');
     await page.locator('input[name="email"]').fill(EMAIL);
     await page.locator('input[name="password"]').fill(PASSWORD);
     await page.locator('input#confirmPassword').fill(PASSWORD);

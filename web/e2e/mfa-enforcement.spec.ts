@@ -1,5 +1,5 @@
 /**
- * MFA enforcement tests for wang@gmail.com
+ * MFA enforcement tests for mfa-test@pwdnow.local
  * Verifies that when TOTP is enabled, "Password only" bypass is gone
  * and login always requires the second factor.
  */
@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 import { encode, decode } from '@msgpack/msgpack';
 
 const BASE  = 'http://localhost:1234';
-const EMAIL = 'wang@gmail.com';
+const EMAIL = 'mfa-test@pwdnow.local';
 const PASS  = 'name';
 
 function mockDaemon(page: import('@playwright/test').Page, opts: {
@@ -40,7 +40,7 @@ function mockDaemon(page: import('@playwright/test').Page, opts: {
         case 'Unlock':
           resp = { status: 'Unlocked', data: { session_token: 'mock-token', wipe_ticket: [] } }; break;
         case 'GetProfile':
-          resp = { status: 'Profile', data: { first_name: 'Wang', last_name: 'Test', email: EMAIL } }; break;
+          resp = { status: 'Profile', data: { first_name: 'MFA', last_name: 'Test', email: EMAIL } }; break;
         case 'ListFolders':
           resp = { status: 'Folders', data: Buffer.from(JSON.stringify([])) }; break;
         case 'ListCredentials':
@@ -57,7 +57,7 @@ function mockDaemon(page: import('@playwright/test').Page, opts: {
   });
 }
 
-test.describe('MFA enforcement — wang@gmail.com', () => {
+test.describe('MFA enforcement — mfa-test@pwdnow.local', () => {
 
   test('no MFA configured: password form shown directly, no method cards', async ({ page }) => {
     await mockDaemon(page, { totp_enabled: false });

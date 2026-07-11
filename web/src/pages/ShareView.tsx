@@ -110,7 +110,7 @@ export default function ShareView() {
   }, [shareId]);
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+    <main className="min-h-screen bg-surface flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center mx-auto mb-4">
@@ -198,6 +198,6 @@ export default function ShareView() {
           )}
         </div>
       </motion.div>
-    </div>
+    </main>
   );
 }

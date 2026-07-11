@@ -211,7 +211,7 @@ for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
   curl -sk -o /dev/null -w "%{http_code}\n" \
     -X POST https://localhost:51234/api/auth/login-hints \
     -H "Content-Type: application/json" \
-    -d '{"email":"wee.wa@gmail.com"}'
+    -d '{"email":"e2e-test@pwdnow.local"}'
 done
 ```
 
@@ -247,8 +247,8 @@ Create `web/e2e/duress-wipe-trigger.spec.ts` with this content:
  */
 import { test, expect } from '@playwright/test';
 
-const EMAIL = 'wee.wa@gmail.com';
-const REAL_PASSWORD = 'wee.wa@gmail.comAwee.wa@gmail.com';
+const EMAIL = 'e2e-test@pwdnow.local';
+const REAL_PASSWORD = 'E2eTestPassw0rd!1';
 const WRONG_PASSWORD = 'definitely-not-the-password-xyz';
 const DURESS_PASSWORD = 'DuressWipe123!';
 const BASE_URL = 'https://localhost:51234';
@@ -392,7 +392,7 @@ for i in $(seq 1 12); do
   curl -sk -o /dev/null -w "%{http_code}\n" \
     -X POST https://localhost:51234/api/auth/login-hints \
     -H "Content-Type: application/json" \
-    -d '{"email":"wee.wa@gmail.com"}'
+    -d '{"email":"e2e-test@pwdnow.local"}'
 done
 ```
 

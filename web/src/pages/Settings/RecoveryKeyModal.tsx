@@ -50,9 +50,9 @@ export default function RecoveryKeyModal({ isOpen, onClose, recoveryKey }: Props
               <p className="text-sm text-on-surface-variant mt-0.5">{t('settings.recoveryKeySubtitle', 'Generated and encrypted successfully')}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-surface-container-high rounded-full transition-colors">
-            <X size={24} />
-          </button>
+          <button aria-label="Close" onClick={onClose} className="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+  <X aria-hidden="true" size={24} />
+</button>
         </div>
 
         <div className="p-8 space-y-8">

@@ -70,7 +70,7 @@ export default function ForgotPassword() {
           <h2 className="text-4xl xl:text-5xl font-headline font-bold mb-6 leading-[1.1] tracking-tight text-white">
             {t('forgotPassword.heroTitle', 'Regain access to your vault securely.')}
           </h2>
-          <p className="text-slate-400 text-lg leading-relaxed mb-12">
+          <p className="text-slate-300 text-lg leading-relaxed mb-12">
             {t('forgotPassword.heroSub', 'Enter your registered email and we\'ll send secure reset instructions.')}
           </p>
 
@@ -89,7 +89,7 @@ export default function ForgotPassword() {
         </div>
 
         <div className="relative z-10 mt-12">
-          <p className="text-slate-400 text-sm font-medium">
+          <p className="text-slate-300 text-sm font-medium">
             © {new Date().getFullYear()} PWDnow. {t('forgotPassword.allRightsReserved', 'All rights reserved.')}
           </p>
         </div>
@@ -144,7 +144,7 @@ export default function ForgotPassword() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                  className="w-full mt-4 bg-blue-900 hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 active:scale-[0.98]"
                 >
                   {loading
                     ? <><Loader2 size={18} className="animate-spin" />{t('forgotPassword.submitting', 'Sending…')}</>
@@ -179,7 +179,7 @@ export default function ForgotPassword() {
                 </p>
                 <Link
                   to="/login"
-                  className="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                  className="w-full max-w-xs bg-blue-900 hover:opacity-90 text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 active:scale-[0.98]"
                 >
                   {t('forgotPassword.backToLogin', 'Back to Login')}
                 </Link>

@@ -46,15 +46,23 @@ export async function verifyJwt(token) {
   }
 }
 
+// In production the deployment is HTTPS-only (Nginx terminates TLS and the app
+// refuses to start without NODE_ENV set), so Secure is forced unconditionally
+// rather than relying on req.secure / X-Forwarded-Proto being set on every
+// proxied location block.
+function cookieIsSecure(req) {
+  return process.env.NODE_ENV === 'production' || req.secure;
+}
+
 export function setSessionCookies(req, res, token, csrf) {
-  const isSecure = req.secure;
+  const isSecure = cookieIsSecure(req);
   const common = { httpOnly: true, secure: isSecure, sameSite: 'Strict', path: '/' };
   res.cookie(COOKIE_SESSION, token, common);
   res.cookie(COOKIE_CSRF, csrf, { ...common, httpOnly: false });
 }
 
 export function clearSessionCookies(req, res) {
-  const isSecure = req.secure;
+  const isSecure = cookieIsSecure(req);
   const common = { httpOnly: true, secure: isSecure, sameSite: 'Strict', path: '/' };
   res.clearCookie(COOKIE_SESSION, common);
   res.clearCookie(COOKIE_CSRF, { ...common, httpOnly: false });

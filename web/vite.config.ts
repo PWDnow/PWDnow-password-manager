@@ -39,6 +39,12 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    // esbuild ships per-module `@license` banner comments (e.g. one per
+    // lucide-react icon) into the minified output by default; drop them
+    // entirely since none of our bundled deps require attribution at runtime.
+    esbuild: {
+      legalComments: 'none',
+    },
     build: {
       // Never ship sourcemaps in production — they expose original source to anyone
       // who can reach the server.

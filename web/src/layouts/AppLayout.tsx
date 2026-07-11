@@ -18,7 +18,7 @@ export default function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isRestoringKeys, setIsRestoringKeys] = useState(true);
-  const { folders, addFolder } = useVault();
+  const { folders, isLoading, addFolder, pendingSyncCount } = useVault();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -129,6 +129,21 @@ export default function AppLayout() {
     };
   }, [navigate]);
 
+  // Warn before closing/refreshing the tab while offline writes are still
+  // queued - the Sidebar logout button already warns on an explicit logout,
+  // but a closed tab (or crash) never gets a chance to. The queue itself
+  // survives this either way (it's on disk, encrypted); this is purely so
+  // the user isn't surprised their edit isn't visible on other devices yet.
+  useEffect(() => {
+    if (pendingSyncCount === 0) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [pendingSyncCount]);
+
   // Determine active tab based on path
   let activeTab = 'vault';
   if (location.pathname.startsWith('/vault/')) {
@@ -145,6 +160,8 @@ export default function AppLayout() {
     activeTab = 'assetHolder';
   } else if (location.pathname === '/health') {
     activeTab = 'health';
+  } else if (location.pathname === '/generator') {
+    activeTab = 'generator';
   }
 
   const handleAddFolder = async (newFolder: Folder) => {
@@ -167,6 +184,7 @@ export default function AppLayout() {
     else if (tab === 'dashboard') navigate('/dashboard');
     else if (tab === 'assetHolder') navigate('/asset-holder');
     else if (tab === 'health') navigate('/health');
+    else if (tab === 'generator') navigate('/generator');
     else if (tab === 'vault') navigate('/vault');
     else navigate(`/vault/${tab}`);
     
@@ -175,6 +193,12 @@ export default function AppLayout() {
 
   return (
     <UserProvider>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-black focus:text-white focus:rounded-lg focus:font-bold focus:text-sm focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <div className="min-h-screen bg-surface overflow-x-hidden">
         <CreateFolderModal 
           isOpen={isCreateModalOpen} 
@@ -188,12 +212,13 @@ export default function AppLayout() {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           folders={folders}
+          foldersLoading={isLoading}
           onCreateFolder={() => setIsCreateModalOpen(true)}
           onManageFolders={() => handleTabChange('manage-folders')}
         />
         <Header activeTab={activeTab} onMenuClick={() => setIsSidebarOpen(true)} />
         
-        <main className="ml-16 md:ml-64 pt-24 pb-20 px-6 md:px-12 min-h-screen transition-all duration-300">
+        <main id="main-content" className="ml-16 md:ml-64 pt-24 pb-20 px-6 md:px-12 min-h-screen transition-all duration-300">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

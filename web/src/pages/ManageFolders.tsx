@@ -29,6 +29,11 @@ import { useAutofillGuard } from '../utils/autofill';
 import { BROWSER_AUTOFILL } from '../utils/cardUtils';
 import SEO from '../components/SEO';
 
+const ICON_ARIA_LABELS: Record<string, string> = {
+  Gamepad2: 'Gamepad',
+  CreditCard: 'Credit Card',
+};
+
 const ICON_OPTIONS = [
   { name: 'Wallet', icon: Wallet },
   { name: 'Globe', icon: Globe },
@@ -183,6 +188,17 @@ export default function ManageFolders() {
     setHoveredTargetId(targetId);
   };
 
+  const handleKeyboardReorder = (folderId: string, direction: 'up' | 'down') => {
+    const index = folders.findIndex(f => f.id === folderId);
+    if (index === -1) return;
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= folders.length) return;
+    const newFolders = [...folders];
+    const [moved] = newFolders.splice(index, 1);
+    newFolders.splice(newIndex, 0, moved);
+    onReorderFolders(newFolders);
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-12">
@@ -191,7 +207,7 @@ export default function ManageFolders() {
             onClick={onBack}
             className="flex items-center gap-2 text-on-surface-variant hover:text-black dark:hover:text-white transition-colors mb-4 font-bold text-[10px] uppercase tracking-widest"
           >
-            <ArrowLeft size={14} />
+            <ArrowLeft size={14} aria-hidden="true" />
             {t('manageFolders.backToVault', 'Back to Vault')}
           </button>
           <h1 className="text-4xl md:text-5xl font-headline font-black tracking-tighter text-black dark:text-white leading-none">{t('manageFolders.title', 'Manage Folders')}</h1>
@@ -221,9 +237,22 @@ export default function ManageFolders() {
                 className="bg-white dark:bg-surface-container-low hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors group"
               >
                 <div className="p-6 px-8 flex items-center gap-6">
-                  <div className="cursor-grab active:cursor-grabbing text-on-surface-variant/30 hover:text-black dark:hover:text-white transition-colors">
+                  <button
+                    type="button"
+                    aria-label={`Reorder ${folder.label} folder. Use arrow keys to move up or down.`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        handleKeyboardReorder(folder.id, 'up');
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        handleKeyboardReorder(folder.id, 'down');
+                      }
+                    }}
+                    className="cursor-grab active:cursor-grabbing text-on-surface-variant/30 hover:text-black dark:hover:text-white transition-colors"
+                  >
                     <GripVertical size={20} />
-                  </div>
+                  </button>
 
                   {editingId === folder.id ? (
                     <div className="flex-1 flex items-center gap-4">
@@ -282,14 +311,16 @@ export default function ManageFolders() {
                         <div className="text-xs text-on-surface-variant font-medium mt-1 opacity-60 line-clamp-1">{folder.description}</div>
                       </div>
                       <div className="flex items-center gap-2 transition-opacity">
-                        <button 
+                        <button
                           onClick={() => handleStartEdit(folder)}
+                          aria-label={`Edit ${folder.label} folder`}
                           className="p-3 bg-surface-container-low hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all"
                         >
                           <Pencil size={18} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => setFolderToDelete(folder)}
+                          aria-label={`Delete ${folder.label} folder`}
                           className="p-3 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 rounded-xl transition-all"
                         >
                           <Trash2 size={18} />
@@ -314,21 +345,24 @@ export default function ManageFolders() {
               className="absolute inset-0 bg-[#000000]/40"
               onClick={() => setIsAdding(false)}
             />
-            <motion.div 
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-folder-title"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-2xl bg-white dark:bg-surface-container-low rounded-3xl shadow-2xl overflow-hidden border border-outline-variant/10"
             >
               <div className="p-8">
-                <h3 className="text-2xl font-black tracking-tighter text-black dark:text-white mb-2">{t('manageFolders.createNewFolder', 'Create New Folder')}</h3>
+                <h2 id="create-folder-title" className="text-2xl font-black tracking-tighter text-black dark:text-white mb-2">{t('manageFolders.createNewFolder', 'Create New Folder')}</h2>
                 <p className="text-on-surface-variant text-sm mb-8 font-medium">{t('manageFolders.createNewFolderDesc', 'Create a new category to organize your vault.')}</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.folderName', 'Folder Name')}</label>
-                      <input 
+                      <label htmlFor="input-ynr6df09k" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.folderName', 'Folder Name')}</label>
+<input id="input-ynr6df09k" 
                         type="text" 
                         value={newLabel}
                         onChange={(e) => setNewLabel(e.target.value)}
@@ -340,8 +374,9 @@ export default function ManageFolders() {
                     </div>
  
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.description', 'Description')}</label>
-                      <textarea 
+                      <label htmlFor="input-description" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.description', 'Description')}</label>
+                      <textarea
+                        id="input-description"
                         value={newDescription}
                         onChange={(e) => setNewDescription(e.target.value)}
                         {...guardNewDesc}
@@ -353,8 +388,8 @@ export default function ManageFolders() {
  
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.customSvg', 'Custom SVG Icon (Optional)')}</label>
-                      <textarea 
+                      <label htmlFor="input-rt7xis3ng" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.customSvg', 'Custom SVG Icon (Optional)')}</label>
+<textarea id="input-rt7xis3ng" 
                         value={newCustomSvg}
                         onChange={(e) => setNewCustomSvg(e.target.value)}
                         placeholder={t('manageFolders.customSvgPlaceholder', 'Paste SVG code here...')}
@@ -363,16 +398,19 @@ export default function ManageFolders() {
                     </div>
  
                     {!newCustomSvg && (
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.selectPresetIcon', 'Or Select Preset Icon')}</label>
+                      <fieldset className="space-y-2">
+                        <legend className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.selectPresetIcon', 'Or Select Preset Icon')}</legend>
                         <div className="grid grid-cols-5 gap-2">
                           {ICON_OPTIONS.map((opt) => (
                             <button
                               key={opt.name}
+                              type="button"
                               onClick={() => setNewIcon(opt.name)}
+                              aria-label={`Select ${ICON_ARIA_LABELS[opt.name] || opt.name} icon`}
+                              aria-pressed={newIcon === opt.name}
                               className={`p-3 rounded-xl border transition-all flex items-center justify-center ${
-                                newIcon === opt.name 
-                                  ? 'bg-black text-white border-black shadow-lg' 
+                                newIcon === opt.name
+                                  ? 'bg-black text-white border-black shadow-lg'
                                   : 'bg-surface-container-low text-on-surface-variant border-outline-variant/10 hover:border-black/20'
                               }`}
                             >
@@ -380,7 +418,7 @@ export default function ManageFolders() {
                             </button>
                           ))}
                         </div>
-                      </div>
+                      </fieldset>
                     )}
  
                     {newCustomSvg && (

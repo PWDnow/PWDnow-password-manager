@@ -44,12 +44,12 @@ export default function LanguageModal({ isOpen, onClose }: LanguageModalProps) {
                   </div>
                   <h2 className="text-xl font-headline font-black tracking-tight">{t('language.title', 'Select Language')}</h2>
                 </div>
-                <button
+                <button aria-label="Close"
                   onClick={onClose}
                   className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
                 >
-                  <X size={20} />
-                </button>
+  <X aria-hidden="true" size={20} />
+</button>
               </div>
 
               <div className="p-6 space-y-2 max-h-[60vh] overflow-y-auto">

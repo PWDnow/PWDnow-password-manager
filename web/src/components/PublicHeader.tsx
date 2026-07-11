@@ -29,7 +29,7 @@ export default function PublicHeader() {
           className="flex items-center gap-2 px-4 py-2.5 bg-white/80 dark:bg-black/80 hover:bg-white dark:hover:bg-black backdrop-blur-md border border-black/10 dark:border-white/10 rounded-full transition-all text-xs font-bold uppercase tracking-wider text-black dark:text-white shadow-sm"
         >
           <Globe size={16} />
-          <span>{i18n.language === 'fr' ? 'FR' : 'EN'}</span>
+          <span>{(i18n.resolvedLanguage ?? i18n.language).slice(0, 2).toUpperCase()}</span>
         </button>
       </div>
 

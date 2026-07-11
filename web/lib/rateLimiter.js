@@ -30,8 +30,13 @@ export const PBKDF2_HASH_PREFIX  = '$pbkdf2sha512$';
 export const LOGIN_MAX_PER_WINDOW = 10;
 export const LOGIN_WINDOW_MS      = 5 * 60 * 1000;
 
-export async function checkLoginRate(ip) {
+export async function checkLoginRate(ip, res = null) {
   const count = await ctx.stateStore.incrExpire(`rl:login:${ip}`, LOGIN_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', LOGIN_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, LOGIN_MAX_PER_WINDOW - count));
+    if (count > LOGIN_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(LOGIN_WINDOW_MS / 1000));
+  }
   return count <= LOGIN_MAX_PER_WINDOW;
 }
 
@@ -40,8 +45,13 @@ export async function checkLoginRate(ip) {
 export const HINTS_MAX_PER_WINDOW = 60;
 export const HINTS_WINDOW_MS      = 5 * 60 * 1000;
 
-export async function checkHintsRate(ip) {
+export async function checkHintsRate(ip, res = null) {
   const count = await ctx.stateStore.incrExpire(`rl:hints:${ip}`, HINTS_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', HINTS_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, HINTS_MAX_PER_WINDOW - count));
+    if (count > HINTS_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(HINTS_WINDOW_MS / 1000));
+  }
   return count <= HINTS_MAX_PER_WINDOW;
 }
 
@@ -112,6 +122,31 @@ export function deriveClientIdentity(req, fp) {
   return createHash('sha256').update(`${ip}|${ua}|${screen}|${visitor}`, 'utf8').digest('hex');
 }
 
+// WEB-06: a *separate*, narrower identity used only for the fingerprint
+// brute-force lockout bucket. `deriveClientIdentity` above intentionally
+// includes client-supplied `screen`/`visitorId` so distinct devices behind
+// the same NAT/IP get distinct entries in the Settings "Recent Devices" log
+// — but that same client-controlled input means an attacker can rotate
+// `visitorId` on every login attempt to mint a fresh lockout bucket each
+// time, defeating the fingerprint throttle entirely. The lockout bucket is
+// therefore keyed on IP+UA only, neither of which the caller can cheaply
+// vary per request the way a body field can be.
+export function deriveLockoutIdentity(req) {
+  const ip = getClientIp(req);
+  const ua = req.headers['user-agent'] || '';
+  return createHash('sha256').update(`${ip}|${ua}`, 'utf8').digest('hex');
+}
+
+// Recompute the same IP+UA lockout identity from a stored fingerprint-log
+// entry (which records the raw ip/ua at the time it was seen) — used so
+// DELETE /api/auth/fingerprints/:id can clear the matching lockout bucket
+// for the fingerprint being removed.
+export function lockoutIdentityFromLogEntry(entry) {
+  const ip = entry && typeof entry.ip === 'string' ? entry.ip : '';
+  const ua = entry && typeof entry.ua === 'string' ? entry.ua : '';
+  return createHash('sha256').update(`${ip}|${ua}`, 'utf8').digest('hex');
+}
+
 export function makeFingerprintLogEntry(clientIdentity, fp, req, success) {
   const now = Date.now();
   return {
@@ -154,9 +189,45 @@ export function mergeFingerprintLog(log, newEntry) {
 export const REGISTER_MAX_PER_WINDOW = 5;
 export const REGISTER_WINDOW_MS      = 60 * 60 * 1000;
 
-export async function checkRegisterRate(ip) {
+// ── /api/rpc daemon-proxy rate limiter (L1) ───────────────────────────────────
+
+export const RPC_MAX_PER_WINDOW = 60;
+export const RPC_WINDOW_MS      = 60 * 1000;
+
+export async function checkRpcRate(ip, res = null) {
+  const count = await ctx.stateStore.incrExpire(`rl:rpc:${ip}`, RPC_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', RPC_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, RPC_MAX_PER_WINDOW - count));
+    if (count > RPC_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(RPC_WINDOW_MS / 1000));
+  }
+  return count <= RPC_MAX_PER_WINDOW;
+}
+
+export async function checkRegisterRate(ip, res = null) {
   const count = await ctx.stateStore.incrExpire(`rl:register:${ip}`, REGISTER_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', REGISTER_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, REGISTER_MAX_PER_WINDOW - count));
+    if (count > REGISTER_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(REGISTER_WINDOW_MS / 1000));
+  }
   return count <= REGISTER_MAX_PER_WINDOW;
+}
+
+// Per-email-hash registration limiter (M5): caps how many registration
+// attempts a single target email can be probed with, independent of the
+// caller's IP, slowing down user-enumeration via repeated /register calls.
+export const REGISTER_EMAIL_MAX_PER_WINDOW = 3;
+export const REGISTER_EMAIL_WINDOW_MS      = 24 * 60 * 60 * 1000;
+
+export async function checkRegisterEmailRate(emailHash, res = null) {
+  const count = await ctx.stateStore.incrExpire(`rl:register:email:${emailHash}`, REGISTER_EMAIL_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', REGISTER_EMAIL_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, REGISTER_EMAIL_MAX_PER_WINDOW - count));
+    if (count > REGISTER_EMAIL_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(REGISTER_EMAIL_WINDOW_MS / 1000));
+  }
+  return count <= REGISTER_EMAIL_MAX_PER_WINDOW;
 }
 
 // ── Per-IP emergency rate limiter ─────────────────────────────────────────────
@@ -164,9 +235,34 @@ export async function checkRegisterRate(ip) {
 export const EMERGENCY_MAX_PER_WINDOW = 5;
 export const EMERGENCY_WINDOW_MS      = 60 * 1000;
 
-export async function checkEmergencyRate(ip) {
+export async function checkEmergencyRate(ip, res = null) {
   const count = await ctx.stateStore.incrExpire(`rl:emergency:${ip}`, EMERGENCY_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', EMERGENCY_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, EMERGENCY_MAX_PER_WINDOW - count));
+    if (count > EMERGENCY_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(EMERGENCY_WINDOW_MS / 1000));
+  }
   return count <= EMERGENCY_MAX_PER_WINDOW;
+}
+
+// ── Per-IP DNS-check rate limiter (WEB-02) ────────────────────────────────────
+// /api/system/dns-check and /api/auth/smtp-check each fan out ~35 DNS lookups
+// (MX/TXT/DMARC/BIMI + DKIM selector probes) per call. Without a cap here, an
+// unauthenticated caller can turn the server into a DNS amplifier/reflector
+// against an arbitrary target domain. Capped well below the general nginx
+// limit so this specific endpoint is bounded even without the reverse proxy.
+
+export const DNS_CHECK_MAX_PER_WINDOW = 10;
+export const DNS_CHECK_WINDOW_MS      = 60 * 1000;
+
+export async function checkDnsRate(ip, res = null) {
+  const count = await ctx.stateStore.incrExpire(`rl:dnscheck:${ip}`, DNS_CHECK_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', DNS_CHECK_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, DNS_CHECK_MAX_PER_WINDOW - count));
+    if (count > DNS_CHECK_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(DNS_CHECK_WINDOW_MS / 1000));
+  }
+  return count <= DNS_CHECK_MAX_PER_WINDOW;
 }
 
 // ── Dummy Argon2id hash for timing equalisation ────────────────────────────────

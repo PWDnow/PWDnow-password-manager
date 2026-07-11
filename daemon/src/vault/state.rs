@@ -122,6 +122,11 @@ pub struct DaemonState {
     pending_audit: Mutex<Vec<(String, Option<String>)>>,
     // Key is uid only — lockout persists across WebSocket reconnections
     pub lockout: LockoutTracker,
+    // D1 fix: independent lockout tracker for TOTP failures *after* a correct
+    // password. Survives `lock()` (unlike `lockout`, which `lock()` clears) so
+    // an attacker who knows the password cannot reset their TOTP-attempt
+    // budget by deliberately triggering a re-lock.
+    pub totp_lockout: LockoutTracker,
     // SLA P4: dispatch-driven watchdog. The free-running watchdog ticker
     // checks these atomics before sending WATCHDOG=1 — if requests are in
     // flight but none has completed in `WATCHDOG_STALL_SECS`, the daemon is
@@ -145,6 +150,7 @@ impl DaemonState {
             pre_auth_count: Arc::new(std::sync::atomic::AtomicU32::new(0)),
             pending_audit: Mutex::new(Vec::new()),
             lockout: LockoutTracker::new(),
+            totp_lockout: LockoutTracker::new(),
             // Initialise to "we just completed something" so an idle daemon
             // at boot doesn't immediately appear wedged.
             in_flight_requests: Arc::new(AtomicU64::new(0)),
@@ -219,6 +225,36 @@ impl DaemonState {
         self.lockout.check_unlock_lockout(uid)
     }
 
+    /// D1 fix: independent exponential lockout for TOTP failures that follow a
+    /// *correct* password. Checked up-front (alongside the password lockout)
+    /// so a TOTP-locked-out caller cannot even spend an Argon2id derivation.
+    pub fn check_totp_lockout(&self, uid: u32, _conn_id: u64) -> Result<(), VaultError> {
+        self.totp_lockout.check_unlock_lockout(uid)
+    }
+
+    /// D1 fix: record a post-password TOTP failure. Counts toward both the
+    /// TOTP-specific schedule (which `lock()` does not clear) and the
+    /// password-unlock schedule, since the overall authentication attempt
+    /// failed.
+    pub fn record_totp_failure(&self, uid: u32, conn_id: u64) {
+        let count = self.totp_lockout.record_failed_unlock(uid);
+        self.record_failed_unlock(uid, conn_id);
+
+        // NIST SP 800-88 Rev. 2 — trigger wipe if TOTP failure threshold reached.
+        if let Ok(header) = self.read_header() {
+            if header.duress_max_attempts > 0 && count >= header.duress_max_attempts {
+                let _ = self.forensic_wipe_internal();
+            }
+        }
+    }
+
+    /// D1/D3 fix: called only once *both* the password and (if required) TOTP
+    /// have been verified. Resets both lockout trackers for this uid.
+    pub fn complete_unlock(&self, uid: u32, conn_id: u64) {
+        self.reset_unlock_counter(uid, conn_id);
+        self.totp_lockout.reset_lockout(uid);
+    }
+
     pub fn record_failed_unlock(&self, uid: u32, _conn_id: u64) {
         {
             let mut pending = self.pending_audit.lock().unwrap();
@@ -241,6 +277,7 @@ impl DaemonState {
     /// forever (check_unlock_lockout only prunes for accounts that retry).
     pub fn prune_lockout_map(&self) {
         self.lockout.prune();
+        self.totp_lockout.prune();
     }
 
     pub fn reset_unlock_counter(&self, uid: u32, _conn_id: u64) {
@@ -715,9 +752,19 @@ impl DaemonState {
             return Err(VaultError::Auth("password must be at least 12 characters".into()));
         }
         self.check_unlock_lockout(uid, conn_id)?;
+        // D1 fix: also reject up-front if this uid is in TOTP-failure lockout,
+        // so a locked-out caller can't spend an Argon2id derivation just to
+        // get to the TOTP check.
+        self.check_totp_lockout(uid, conn_id)?;
         let res = if self.vault_path.exists() { self.unlock_existing(pw, yk, uid) } else { self.create_and_unlock(pw, yk, uid) };
         if res.is_ok() {
-            self.reset_unlock_counter(uid, conn_id);
+            // D3 fix: do NOT reset the unlock-failure counter here. If TOTP is
+            // enabled, the overall authentication is not yet complete — the
+            // caller must call `complete_unlock()` only after TOTP also
+            // verifies. Otherwise an attacker who knows the password could
+            // keep the password-lockout counter pinned at zero indefinitely
+            // while brute-forcing the TOTP code.
+            //
             // Start the 15-min idle clock from unlock completion — the Argon2id KDF
             // can take 60s+, leaving last_activity stale from the prior session and
             // causing the idle auto-lock task to fire seconds after unlock returns,
@@ -894,6 +941,18 @@ impl DaemonState {
     }
 
     pub fn lock(&self) {
+        self.lock_internal(true);
+    }
+
+    /// D1 fix: re-lock the vault state (db/vmk/sessions) WITHOUT clearing the
+    /// unlock-failure lockout trackers. Used on the TOTP-failure path so that
+    /// an attacker who knows the password cannot reset their attempt budget by
+    /// deliberately failing TOTP and letting the daemon re-lock.
+    pub fn lock_keep_lockout(&self) {
+        self.lock_internal(false);
+    }
+
+    fn lock_internal(&self, clear_lockout: bool) {
         // D-2 fix: canonical lock order across the codebase is
         //   db → vmk → vault_uuid → wipe_ticket → lockout → sessions.
         // Every sidecar writer (change_password_inner, add_passkey_to_sidecar,
@@ -906,7 +965,10 @@ impl DaemonState {
         drop(self.vmk.write().unwrap().take());
         drop(self.vault_uuid.lock().unwrap().take());
         drop(self.wipe_ticket.lock().unwrap().take());
-        self.lockout.clear();
+        if clear_lockout {
+            self.lockout.clear();
+            self.totp_lockout.clear();
+        }
         self.sessions.revoke_all();
     }
 

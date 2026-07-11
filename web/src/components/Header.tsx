@@ -87,14 +87,18 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
         <div className="flex items-center gap-1 sm:gap-4 flex-1">
           <button
             onClick={onMenuClick}
+            aria-label={t('header.menu', 'Menu')}
             className="md:hidden p-1 sm:p-2 hover:bg-surface-container-high rounded-lg transition-colors shrink-0 text-black dark:text-white"
           >
-            <Menu size={20} />
+            <Menu size={20} aria-hidden="true" />
           </button>
           <div className="relative group flex-1">
             <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
             <input
               type="text"
+              id="global-search"
+              name="global-search"
+              autoComplete="off"
               value={globalSearch}
               onChange={e => setGlobalSearch(e.target.value)}
               onKeyDown={handleGlobalSearch}
@@ -110,7 +114,7 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
             <button 
               onClick={() => setIsLanguageModalOpen(true)} 
               className="font-bold text-[10px] sm:text-xs uppercase tracking-widest text-on-surface-variant hover:text-black dark:hover:text-white transition-colors px-1 sm:px-2"
-              aria-label="Select Language"
+              aria-label={`${t('header.selectLanguage', 'Select Language')}: ${displayLang}`}
             >
               {displayLang}
             </button>
@@ -120,11 +124,12 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
               }`} 
               ref={notificationRef}
             >
-              <button 
+              <button
                 onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                aria-label={t('header.notifications', 'Notifications')}
                 className={`relative p-1.5 sm:p-2 rounded-xl transition-all duration-300 ${
-                  isNotificationOpen 
-                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg scale-110' 
+                  isNotificationOpen
+                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg scale-110'
                     : 'text-on-surface-variant hover:text-black dark:hover:text-white hover:bg-surface-container-high'
                 }`}
               >
@@ -187,7 +192,7 @@ export default function Header({ activeTab, onMenuClick }: HeaderProps) {
                   <div className="h-px bg-outline-variant/10 my-1"></div>
                   <button
                     onClick={handleLogout}
-                    className="w-full px-4 py-2.5 text-sm font-medium text-left text-error hover:bg-error/5 transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-2.5 text-sm font-medium text-left text-red-900 hover:bg-red-900/5 transition-colors flex items-center gap-3"
                   >
                     <LogOut size={16} />
                     {t('common.logout', 'Logout')}

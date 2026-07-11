@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://localhost:1234';
-const EMAIL    = 'wee.wa@gmail.com';
-const PASSWORD = 'wee.wa@gmail.comAwee.wa@gmail.com';
+const EMAIL    = 'e2e-test@pwdnow.local';
+const PASSWORD = 'E2eTestPassw0rd!1';
 
 test('Folder survives clear-site-data + re-login', async ({ page, context }) => {
   // ── Login

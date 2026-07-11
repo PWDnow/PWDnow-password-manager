@@ -1,20 +1,22 @@
-import React, { useEffect } from 'react';
-import { 
-  X, 
-  History, 
-  Monitor, 
-  LogOut, 
-  ShieldAlert, 
-  RefreshCw, 
-  CheckCircle, 
-  Trash2, 
+import React, { useEffect, useState } from 'react';
+import {
+  X,
+  History,
+  Monitor,
+  LogOut,
+  ShieldAlert,
+  RefreshCw,
+  CheckCircle,
+  Trash2,
   Globe,
-  Loader2
+  Loader2,
+  ShieldCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from './hooks/useAuditLog';
 import { formatSessionTime } from '../../utils/sessionTracker';
+import { daemon } from '../../utils/daemonClient';
 
 interface Props {
   isOpen: boolean;
@@ -37,6 +39,26 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
     refreshAuditEvents,
     handleRevokeAll
   } = useAuditLog();
+
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<'ok' | 'fail' | null>(null);
+
+  const handleVerifyChain = async () => {
+    if (!daemon.isConnected) {
+      setVerifyResult('fail');
+      return;
+    }
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      await daemon.verifyAuditChain();
+      setVerifyResult('ok');
+    } catch {
+      setVerifyResult('fail');
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -79,24 +101,24 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
             </div>
             <div>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{t('settings.auditLog', 'Security Audit Log')}</h3>
-              <p className="text-sm text-slate-500">{t('settings.auditLogDesc', 'Review recent account activity and active sessions.')}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t('settings.auditLogDesc', 'Review recent account activity and active sessions.')}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <X size={20} className="text-slate-500" />
-          </button>
+          <button aria-label="Close" onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+  <X aria-hidden="true" size={20} className="text-slate-500" />
+</button>
         </div>
 
         <div className="flex border-b border-slate-100 dark:border-white/5 px-8">
           <button
             onClick={() => setAuditTab('sessions')}
-            className={`px-6 py-4 text-sm font-bold transition-all border-b-2 ${auditTab === 'sessions' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`px-6 py-4 text-sm font-bold transition-all border-b-2 ${auditTab === 'sessions' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100'}`}
           >
             {t('audit.activeSessions', 'Active Sessions')}
           </button>
           <button
             onClick={() => setAuditTab('events')}
-            className={`px-6 py-4 text-sm font-bold transition-all border-b-2 ${auditTab === 'events' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`px-6 py-4 text-sm font-bold transition-all border-b-2 ${auditTab === 'events' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100'}`}
           >
             {t('audit.auditEvents', 'Audit Events')}
           </button>
@@ -106,7 +128,7 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
           {auditTab === 'sessions' ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('audit.currentActiveSessions', 'Current active sessions')}</h4>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{t('audit.currentActiveSessions', 'Current active sessions')}</h4>
                 <button
                   onClick={handleRevokeAll}
                   disabled={isRevoking || sessions.length <= 1}
@@ -131,7 +153,7 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
                             {s.deviceName}
                             {s.id === 'current' && <span className="px-2 py-0.5 bg-blue-600 text-[8px] font-black uppercase text-white rounded-full">{t('audit.thisDevice', 'This Device')}</span>}
                           </p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{s.ip} · {formatSessionTime(s.timestamp)}</p>
+                          <p className="text-[10px] text-slate-600 dark:text-slate-300 mt-0.5">{s.ip} · {formatSessionTime(s.timestamp)}</p>
                         </div>
                       </div>
                       {s.id !== 'current' && (
@@ -147,8 +169,8 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('audit.recentActivity', 'Recent activity')}</h4>
-                <p className="text-[10px] font-bold text-slate-500">{t('audit.showingLastEvents', 'Showing last {{count}} events', { count: auditEvents.length })}</p>
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{t('audit.recentActivity', 'Recent activity')}</h4>
+                <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{t('audit.showingLastEvents', 'Showing last {{count}} events', { count: auditEvents.length })}</p>
               </div>
 
               {auditEventsLoading ? (
@@ -156,7 +178,7 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
               ) : auditEvents.length === 0 ? (
                 <div className="py-20 text-center">
                   <History size={48} className="mx-auto text-slate-200 dark:text-white/5 mb-4" />
-                  <p className="text-sm font-medium text-slate-400">{t('audit.noEvents', 'No security events recorded yet.')}</p>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t('audit.noEvents', 'No security events recorded yet.')}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-white/5 border border-slate-100 dark:border-white/5 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-white/[0.01]">
@@ -174,11 +196,11 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
                               {!e.success && <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[8px] font-black uppercase rounded">{t('audit.failed', 'Failed')}</span>}
                             </div>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                              <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                              <p className="text-[10px] text-slate-600 dark:text-slate-300 flex items-center gap-1">
                                 <Globe size={10} />
                                 {e.ip} {e.ipInfo?.countryFlag} {e.ipInfo?.city && `(${e.ipInfo.city}, ${e.ipInfo.countryCode})`}
                               </p>
-                              <p className="text-[10px] text-slate-500 font-medium">
+                              <p className="text-[10px] text-slate-600 dark:text-slate-300 font-medium">
                                 {new Date(e.ts).toLocaleString()}
                               </p>
                               {e.resourceLabel && (
@@ -205,14 +227,39 @@ export default function AuditLogModal({ isOpen, onClose }: Props) {
           )}
         </div>
 
-        <div className="p-8 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01] flex items-center justify-between">
-           <div className="flex items-center gap-3 text-slate-400">
-             <ShieldAlert size={14} />
-             <p className="text-[10px] font-black uppercase tracking-widest">{t('audit.e2eEncrypted', 'End-to-end encrypted audit logs')}</p>
-           </div>
-           <button onClick={onClose} className="px-8 py-3 bg-black dark:bg-white dark:text-black text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all">
-             {t('common.close', 'Close')}
-           </button>
+        <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+              <ShieldAlert size={14} />
+              <p className="text-[10px] font-black uppercase tracking-widest">{t('audit.e2eEncrypted', 'End-to-end encrypted audit logs')}</p>
+            </div>
+            {/* Verify Chain Integrity — calls daemon VerifyAuditChain */}
+            {daemon.isConnected && (
+              <button
+                onClick={handleVerifyChain}
+                disabled={verifying}
+                className="flex items-center gap-2 ml-3 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-white/10 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                {verifying ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : verifyResult === 'ok' ? (
+                  <ShieldCheck size={11} className="text-green-500" />
+                ) : verifyResult === 'fail' ? (
+                  <ShieldAlert size={11} className="text-red-500" />
+                ) : (
+                  <ShieldCheck size={11} />
+                )}
+                {verifyResult === 'ok'
+                  ? t('audit.chainOk', 'Chain Valid')
+                  : verifyResult === 'fail'
+                  ? t('audit.chainFail', 'Integrity Fail')
+                  : t('audit.verifyChain', 'Verify Chain')}
+              </button>
+            )}
+          </div>
+          <button onClick={onClose} className="px-8 py-3 bg-black dark:bg-white dark:text-black text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all">
+            {t('common.close', 'Close')}
+          </button>
         </div>
       </motion.div>
     </div>

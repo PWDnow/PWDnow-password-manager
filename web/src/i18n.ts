@@ -1,18 +1,6 @@
 import i18n from 'i18next';
+import HttpBackend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
-import enTranslations from './locales/en.json';
-import frTranslations from './locales/fr.json';
-import esTranslations from './locales/es.json';
-import deTranslations from './locales/de.json';
-import itTranslations from './locales/it.json';
-import ptTranslations from './locales/pt.json';
-import ruTranslations from './locales/ru.json';
-import arTranslations from './locales/ar.json';
-import hiTranslations from './locales/hi.json';
-import zhTranslations from './locales/zh.json';
-import jaTranslations from './locales/ja.json';
-import koTranslations from './locales/ko.json';
-import idTranslations from './locales/id.json';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', name: 'English',    nativeName: 'English'           },
@@ -32,26 +20,19 @@ export const SUPPORTED_LANGUAGES = [
 
 const RTL_LANGS = new Set(['ar']);
 
-i18n
+// Translation JSON (~70-130 KB per language) is fetched on demand from
+// /locales/{{lng}}.json instead of being statically imported, so the main
+// bundle no longer ships all 13 languages (~1.1 MB) up front. The PWA
+// workbox config already CacheFirst-caches /locales/* responses.
+export const i18nReady = i18n
+  .use(HttpBackend)
   .use(initReactI18next)
   .init({
     lng: localStorage.getItem('i18nextLng') || 'en',
     fallbackLng: 'en',
     supportedLngs: SUPPORTED_LANGUAGES.map(l => l.code),
-    resources: {
-      en: { translation: enTranslations },
-      fr: { translation: frTranslations },
-      es: { translation: esTranslations },
-      de: { translation: deTranslations },
-      it: { translation: itTranslations },
-      pt: { translation: ptTranslations },
-      ru: { translation: ruTranslations },
-      ar: { translation: arTranslations },
-      hi: { translation: hiTranslations },
-      zh: { translation: zhTranslations },
-      ja: { translation: jaTranslations },
-      ko: { translation: koTranslations },
-      id: { translation: idTranslations },
+    backend: {
+      loadPath: '/locales/{{lng}}.json',
     },
     interpolation: {
       escapeValue: false,
@@ -63,6 +44,7 @@ i18n
 
 i18n.on('languageChanged', (lng) => {
   document.documentElement.dir = RTL_LANGS.has(lng) ? 'rtl' : 'ltr';
+  document.documentElement.lang = lng;
   localStorage.setItem('i18nextLng', lng);
 });
 

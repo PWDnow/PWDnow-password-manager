@@ -47,7 +47,7 @@ import { useSecurityModes } from './Settings/hooks/useSecurityModes';
 type SvgP = { size?: number; className?: string };
 
 const FbUserCircle = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10"/>
     <circle cx="12" cy="8.5" r="2.5"/>
@@ -56,7 +56,7 @@ const FbUserCircle = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbPalette = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2C6.48 2 2 6.48 2 12c0 5.52 4.48 10 10 10 1.1 0 2-.9 2-2 0-.51-.2-.97-.52-1.32-.31-.33-.5-.77-.5-1.18 0-1.1.9-2 2-2h2.35C19.47 15.5 22 13.14 22 10 22 5.59 17.52 2 12 2z"/>
     <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor" stroke="none"/>
@@ -67,7 +67,7 @@ const FbPalette = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbShieldLock = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
     <rect x="9" y="11" width="6" height="5" rx="1"/>
@@ -76,7 +76,7 @@ const FbShieldLock = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbGearCog = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -84,7 +84,7 @@ const FbGearCog = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbKey = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="7.5" cy="15.5" r="5.5"/>
     <path d="m21 2-9.6 9.6"/>
@@ -93,7 +93,7 @@ const FbKey = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbLifeRing = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10"/>
     <circle cx="12" cy="12" r="4"/>
@@ -105,7 +105,7 @@ const FbLifeRing = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbClockRotate = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
     <path d="M3 3v5h5"/>
@@ -114,7 +114,7 @@ const FbClockRotate = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbShare = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="18" cy="5" r="3"/>
     <circle cx="6" cy="12" r="3"/>
@@ -125,7 +125,7 @@ const FbShare = ({ size = 20, className = '' }: SvgP) => (
 );
 
 const FbImportExport = ({ size = 20, className = '' }: SvgP) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M8 17L4 21M4 21L0 17M4 21V3"/>
     <path d="M16 7L20 3M20 3L24 7M20 3V21"/>
@@ -173,7 +173,7 @@ function SectionHeading({ title, description }: { title: string; description?: s
     <div className="mb-6">
       <h2 className="text-[15px] font-semibold text-neutral-900 dark:text-white leading-snug">{title}</h2>
       {description && (
-        <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-400 leading-relaxed">{description}</p>
+        <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-300 leading-relaxed">{description}</p>
       )}
       <div className="mt-4 h-px bg-neutral-200 dark:bg-white/8" />
     </div>
@@ -194,7 +194,7 @@ function ThemeButton({ current, value, setTheme, icon, label }: {
       className={`flex items-center gap-2 px-4 py-2 rounded-md text-[13px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-1 ${
         active
           ? 'bg-white dark:bg-white/15 text-neutral-900 dark:text-white shadow-sm border border-neutral-200 dark:border-white/20'
-          : 'text-neutral-700 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+          : 'text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-200'
       }`}
     >
       {icon}
@@ -210,12 +210,12 @@ function ActionRow({ icon, title, desc, btnLabel, onClick }: {
   return (
     <div className="flex items-center justify-between py-4 border-b border-neutral-100 dark:border-white/5 last:border-0">
       <div className="flex items-center gap-3 min-w-0 mr-6">
-        <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 flex items-center justify-center shrink-0 text-neutral-500 dark:text-neutral-400">
+        <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 flex items-center justify-center shrink-0 text-neutral-600 dark:text-neutral-300">
           {icon}
         </div>
         <div className="min-w-0">
           <p className="text-[13px] font-medium text-neutral-900 dark:text-white">{title}</p>
-          <p className="text-[12px] text-neutral-600 dark:text-neutral-400 mt-0.5 leading-relaxed">{desc}</p>
+          <p className="text-[12px] text-neutral-600 dark:text-neutral-300 mt-0.5 leading-relaxed">{desc}</p>
         </div>
       </div>
       <button
@@ -240,14 +240,14 @@ function DnsRow({ label, ok, detail, required, optional }: {
         : <X size={12} className={optional ? 'text-neutral-400 shrink-0' : 'text-red-500 shrink-0'} />
       }
       <span className={`font-medium ${!ok && required ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-300'}`}>{label}</span>
-      {optional && !ok && <span className="text-neutral-600 dark:text-neutral-400 text-[10px]">{t('common.optional', '(optional)')}</span>}
-      {detail && <span className="text-neutral-600 dark:text-neutral-400 truncate">{detail}</span>}
+      {optional && !ok && <span className="text-neutral-600 dark:text-neutral-300 text-[10px]">{t('common.optional', '(optional)')}</span>}
+      {detail && <span className="text-neutral-600 dark:text-neutral-300 truncate">{detail}</span>}
     </div>
   );
 }
 
 // ── Shared input class ─────────────────────────────────────────────────────────
-const inputCls = 'w-full px-3 py-2.5 bg-neutral-50 dark:bg-white/5 rounded-lg border border-neutral-200 dark:border-white/10 text-[13px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-neutral-400 dark:focus:border-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-1 transition-colors';
+const inputCls = 'w-full px-3 py-2.5 bg-neutral-50 dark:bg-white/5 rounded-lg border border-neutral-200 dark:border-white/10 text-[13px] text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 dark:focus:border-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-1 transition-colors';
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Settings() {
@@ -535,20 +535,20 @@ export default function Settings() {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) setActiveSection(entry.target.id.replace('s-', ''));
+          if (entry.isIntersecting) setActiveSection(entry.target.id.replace('settings-panel-', ''));
         }
       },
       { threshold: 0.15, rootMargin: '-80px 0px -55% 0px' },
     );
     NAV.forEach(({ id }) => {
-      const el = document.getElementById(`s-${id}`);
+      const el = document.getElementById(`settings-panel-${id}`);
       if (el) observer.observe(el);
     });
     return () => observer.disconnect();
   }, []);
 
   const scrollTo = (id: string) => {
-    document.getElementById(`s-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById(`settings-panel-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setActiveSection(id);
   };
 
@@ -563,38 +563,55 @@ export default function Settings() {
           <h1 className="text-xl font-semibold text-neutral-900 dark:text-white">
             {t('settings.title', 'Settings')}
           </h1>
-          <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-400">
+          <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-300">
             {t('settings.subtitle', 'Manage your account, security, and preferences.')}
           </p>
         </div>
 
-        {/* Mobile horizontal nav */}
-        <nav aria-label={t('settings.settingsNav', 'Settings navigation')} className="lg:hidden flex gap-1.5 overflow-x-auto no-scrollbar pb-4 mb-8">
+        {/* Mobile horizontal nav — ARIA tablist */}
+        <div role="tablist" aria-label={t('settings.settingsNavMobile', 'Settings sections')} className="lg:hidden flex gap-1.5 overflow-x-auto no-scrollbar pb-4 mb-8">
           {NAV.map(({ id, label, Icon }) => (
             <button
               key={id}
-              onClick={() => scrollTo(id)}
-              aria-current={activeSection === id ? 'true' : undefined}
+              role="tab"
+              id={`settings-tab-${id}`}
+              aria-selected={activeSection === id}
+              aria-controls={`settings-panel-${id}`}
+              tabIndex={activeSection === id ? 0 : -1}
+              onClick={() => setActiveSection(id)}
+              onKeyDown={(e) => {
+                const ids = NAV.map(n => n.id);
+                const cur = ids.indexOf(id);
+                let next = cur;
+                if (e.key === 'ArrowRight') next = (cur + 1) % ids.length;
+                else if (e.key === 'ArrowLeft') next = (cur - 1 + ids.length) % ids.length;
+                else if (e.key === 'Home') next = 0;
+                else if (e.key === 'End') next = ids.length - 1;
+                else return;
+                e.preventDefault();
+                setActiveSection(ids[next]);
+                document.getElementById(`settings-tab-${ids[next]}`)?.focus();
+              }}
               className={`flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-1 ${
                 activeSection === id
                   ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-transparent'
                   : 'bg-white dark:bg-white/5 border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-white/20 hover:text-neutral-900 dark:hover:text-white'
               }`}
             >
-              <Icon size={12} />
+              <Icon size={12} aria-hidden="true" />
               {label}
             </button>
           ))}
-        </nav>
+        </div>
 
         <div className="lg:flex gap-10 items-start">
 
           {/* ── Sidebar ───────────────────────────────────────────────────────── */}
           <aside className="hidden lg:block w-48 shrink-0">
-            <nav aria-label={t('settings.settingsNav', 'Settings navigation')} className="sticky top-6 space-y-5">
+            <nav aria-label={t('settings.settingsNavDesktop', 'Settings sidebar')} className="sticky top-6 space-y-5">
               {NAV_GROUPS.map(group => (
                 <div key={group.label}>
-                  <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-neutral-600 dark:text-neutral-400 px-2.5 mb-1.5">
+                  <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-neutral-600 dark:text-neutral-300 px-2.5 mb-1.5">
                     {group.label}
                   </p>
                   <div className="space-y-0.5">
@@ -604,14 +621,14 @@ export default function Settings() {
                         <button
                           key={id}
                           onClick={() => scrollTo(id)}
-                          aria-current={active ? 'location' : undefined}
+                          aria-current={active ? 'true' : undefined}
                           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-1 ${
                             active
                               ? 'bg-neutral-100 dark:bg-white/8 text-neutral-900 dark:text-white font-medium'
                               : 'text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-50 dark:hover:bg-white/5'
                           }`}
                         >
-                          <Icon size={14} className="shrink-0 opacity-75" />
+                          <Icon size={14} className="shrink-0 opacity-75" aria-hidden="true" />
                           <span>{label}</span>
                         </button>
                       );
@@ -626,14 +643,14 @@ export default function Settings() {
           <div className="flex-1 min-w-0 space-y-12">
 
             {/* ── Profile ─────────────────────────────────────────────────────── */}
-            <section id="s-profile" className="scroll-mt-24">
+            <section id="settings-panel-profile" role="tabpanel" aria-labelledby="settings-tab-profile" className={`scroll-mt-24${activeSection !== 'profile' ? ' hidden lg:block' : ''}`}>
               <ProfileSection profile={profile} updateProfile={updateProfile} reloadProfile={reloadProfile} />
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Appearance ──────────────────────────────────────────────────── */}
-            <section id="s-appearance" className="scroll-mt-24">
+            <section id="settings-panel-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance" className={`scroll-mt-24${activeSection !== 'appearance' ? ' hidden lg:block' : ''}`}>
               <SectionHeading
                 title={t('settings.appearance', 'Appearance')}
                 description={t('settings.appearanceDesc', 'Choose your preferred interface color scheme.')}
@@ -648,10 +665,10 @@ export default function Settings() {
               </div>
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Import & Export ──────────────────────────────────────────────── */}
-            <section id="s-import" className="scroll-mt-24">
+            <section id="settings-panel-import" role="tabpanel" aria-labelledby="settings-tab-import" className={`scroll-mt-24${activeSection !== 'import' ? ' hidden lg:block' : ''}`}>
               <SectionHeading
                 title={t('settings.importExport', 'Import & Export')}
                 description={t('settings.importExportDesc', 'Move your credentials between password managers.')}
@@ -661,18 +678,18 @@ export default function Settings() {
                 {/* Import card */}
                 <div className="border border-neutral-200 dark:border-white/10 rounded-xl overflow-hidden">
                   <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-white/5 flex items-center gap-3 bg-neutral-50/50 dark:bg-white/2">
-                    <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-white/10 flex items-center justify-center shrink-0 text-neutral-600 dark:text-neutral-400">
+                    <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-white/10 flex items-center justify-center shrink-0 text-neutral-600 dark:text-neutral-300">
                       <Upload size={13} />
                     </div>
                     <div>
                       <h3 className="text-[13px] font-semibold text-neutral-900 dark:text-white">{t('settings.importVaultTitle', 'Import')}</h3>
-                      <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-tight">{t('settings.importVaultDesc', 'Bring in credentials from any password manager')}</p>
+                      <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-tight">{t('settings.importVaultDesc', 'Bring in credentials from any password manager')}</p>
                     </div>
                   </div>
 
                   <div className="p-5 flex flex-col gap-4">
                     {!pendingEncryptedFile && (
-                      <label
+                      <label htmlFor="import-vault-file"
                         className={`relative flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 cursor-pointer transition-all ${
                           isDragOver
                             ? 'border-neutral-400 dark:border-white/30 bg-neutral-50 dark:bg-white/5'
@@ -683,15 +700,15 @@ export default function Settings() {
                         onDragLeave={() => setIsDragOver(false)}
                         onDrop={handleFileDrop}
                       >
-                        <input type="file" accept=".json,.csv,.xml,.1pux,.p2w" className="sr-only" onChange={handleFileSelect} />
+                        <input id="import-vault-file" type="file" accept=".json,.csv,.xml,.1pux,.p2w" className="sr-only" onChange={handleFileSelect} />
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isDragOver ? 'bg-neutral-200 dark:bg-white/20' : 'bg-neutral-100 dark:bg-white/5'}`}>
-                          <FileUp size={18} className="text-neutral-500 dark:text-neutral-400" />
+                          <FileUp size={18} className="text-neutral-600 dark:text-neutral-300" />
                         </div>
                         <div className="text-center">
                           <p className="text-[13px] font-medium text-neutral-900 dark:text-white">
                             {isDragOver ? t('settings.dropHere', 'Drop to import') : t('settings.importDropzone', 'Drop file or click to browse')}
                           </p>
-                          <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-1">JSON · CSV · XML · 1PUX · P2W</p>
+                          <p className="text-[11px] text-neutral-600 dark:text-neutral-300 mt-1">JSON · CSV · XML · 1PUX · P2W</p>
                         </div>
                       </label>
                     )}
@@ -699,10 +716,10 @@ export default function Settings() {
                     {pendingEncryptedFile && (
                       <div className="space-y-3 border border-neutral-200 dark:border-white/10 rounded-lg p-4">
                         <div className="flex items-center gap-2">
-                          <Lock size={12} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
+                          <Lock size={12} className="text-neutral-600 dark:text-neutral-300 shrink-0" />
                           <p className="text-[12px] font-medium text-neutral-900 dark:text-white">{t('settings.importEncryptedDetected', 'Encrypted — enter passphrase to unlock')}</p>
                         </div>
-                        <p className="text-[11px] text-neutral-600 dark:text-neutral-400 truncate">{pendingEncryptedFile.name}</p>
+                        <p className="text-[11px] text-neutral-600 dark:text-neutral-300 truncate">{pendingEncryptedFile.name}</p>
                         <input
                           type="password"
                           value={importPassphrase}
@@ -719,7 +736,7 @@ export default function Settings() {
                             {t('settings.importDecryptButton', 'Decrypt & Import')}
                           </button>
                           <button onClick={() => { setPendingEncryptedFile(null); setImportPassphrase(''); }}
-                            className="px-3 py-2 rounded-lg text-[12px] font-medium text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors border border-neutral-200 dark:border-white/10">
+                            className="px-3 py-2 rounded-lg text-[12px] font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors border border-neutral-200 dark:border-white/10">
                             {t('common.cancel', 'Cancel')}
                           </button>
                         </div>
@@ -732,7 +749,7 @@ export default function Settings() {
                       </p>
                     )}
 
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
                       {t('settings.importAutoDetect', 'Format detected automatically. Supports 20+ password managers.')}
                     </p>
                   </div>
@@ -746,7 +763,7 @@ export default function Settings() {
                     </div>
                     <div>
                       <h3 className="text-[13px] font-semibold text-neutral-900 dark:text-white">{t('settings.exportVaultTitle', 'Export')}</h3>
-                      <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-tight">{t('settings.exportVaultDesc', 'Download credentials for backup or migration')}</p>
+                      <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-tight">{t('settings.exportVaultDesc', 'Download credentials for backup or migration')}</p>
                     </div>
                   </div>
 
@@ -768,7 +785,7 @@ export default function Settings() {
                             className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all ${
                               active
                                 ? 'bg-white dark:bg-white/15 text-neutral-900 dark:text-white shadow-sm'
-                                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
+                                : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white'
                             }`}
                           >
                             {t(`settings.formatGroup_${gId}`, gLabel.split(' ')[0])}
@@ -788,7 +805,7 @@ export default function Settings() {
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[12px] font-medium transition-all text-left ${
                               active
                                 ? 'border-neutral-900 dark:border-white/30 bg-neutral-900 dark:bg-white/12 text-white dark:text-white'
-                                : 'border-neutral-200 dark:border-white/8 bg-white dark:bg-transparent text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-white/18 hover:text-neutral-900 dark:hover:text-white'
+                                : 'border-neutral-200 dark:border-white/8 bg-white dark:bg-transparent text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-white/18 hover:text-neutral-900 dark:hover:text-white'
                             }`}
                           >
                             {fmt.exportExt === 'json' || fmt.exportExt === '1pux' ? <FileJson size={11} className="shrink-0" /> : <FileText size={11} className="shrink-0" />}
@@ -800,16 +817,19 @@ export default function Settings() {
 
                     {selectedFmt?.needsPassphrase && (
                       <div className="space-y-2">
-                        <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5">
+                        <label htmlFor="export-passphrase" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
                           <Lock size={10} /> {t('settings.exportPassphraseLabel', 'Encryption passphrase')}
                         </label>
-                        <input type="password" value={exportPassphrase}
+                        <input id="export-passphrase" aria-label={t('settings.exportPassphraseLabel', 'Encryption passphrase')} type="password" value={exportPassphrase}
                           onChange={e => { setExportPassphrase(e.target.value); setExportPassphraseError(''); }}
                           placeholder={t('settings.exportPassphrasePlaceholder', 'Enter a strong passphrase…')}
                           className={inputCls}
                           autoComplete="new-password"
                         />
-                        <input type="password" value={exportPassphraseConfirm}
+                        <label htmlFor="confirm-passphrase" className="sr-only">
+                          {t('settings.exportPassphraseConfirmLabel', 'Confirm passphrase')}
+                        </label>
+                        <input id="confirm-passphrase" aria-label={t('settings.exportPassphraseConfirmLabel', 'Confirm passphrase')} type="password" value={exportPassphraseConfirm}
                           onChange={e => { setExportPassphraseConfirm(e.target.value); setExportPassphraseError(''); }}
                           placeholder={t('settings.exportPassphraseConfirmPlaceholder', 'Confirm passphrase…')}
                           className={inputCls}
@@ -826,10 +846,10 @@ export default function Settings() {
                     >
                       <Download size={14} />
                       {t('settings.exportButton', 'Export')}
-                      {credentials.length > 0 && <span className="opacity-50 text-[12px]">({credentials.length})</span>}
+                      {credentials.length > 0 && <span className="text-[12px] text-neutral-300 dark:text-neutral-700">({credentials.length})</span>}
                     </button>
 
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
                       {selectedFmt?.needsPassphrase
                         ? t('settings.exportWarningEncrypted', 'AES-256-GCM · PBKDF2-SHA-256 · 600 000 iterations. Keep the passphrase — required to re-import.')
                         : t('settings.exportWarningCleartext', 'Credentials exported in cleartext for compatibility. Delete the file after migration.')}
@@ -839,17 +859,17 @@ export default function Settings() {
               </div>
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Authentication ───────────────────────────────────────────────── */}
-            <section id="s-auth" className="scroll-mt-24">
+            <section id="settings-panel-auth" role="tabpanel" aria-labelledby="settings-tab-auth" className={`scroll-mt-24${activeSection !== 'auth' ? ' hidden lg:block' : ''}`}>
               <MfaSection profile={profile} emailServerConfig={emailServerConfig} />
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Security Modes ───────────────────────────────────────────────── */}
-            <section id="s-security" className="scroll-mt-24">
+            <section id="settings-panel-security" role="tabpanel" aria-labelledby="settings-tab-security" className={`scroll-mt-24${activeSection !== 'security' ? ' hidden lg:block' : ''}`}>
               <SecurityModesSection
                 sessionLockTimeout={sessionLockTimeout}
                 handleSessionLockChange={handleSessionLockChange}
@@ -864,10 +884,10 @@ export default function Settings() {
               />
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Recovery Key ─────────────────────────────────────────────────── */}
-            <section id="s-recovery" className="scroll-mt-24">
+            <section id="settings-panel-recovery" role="tabpanel" aria-labelledby="settings-tab-recovery" className={`scroll-mt-24${activeSection !== 'recovery' ? ' hidden lg:block' : ''}`}>
               <RecoveryKeySection
                 profile={profile}
                 setIsRecoveryModalOpen={setIsRecoveryModalOpen}
@@ -879,10 +899,10 @@ export default function Settings() {
               />
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Emergency Access ─────────────────────────────────────────────── */}
-            <section id="s-emergency" className="scroll-mt-24">
+            <section id="settings-panel-emergency" role="tabpanel" aria-labelledby="settings-tab-emergency" className={`scroll-mt-24${activeSection !== 'emergency' ? ' hidden lg:block' : ''}`}>
               <SectionHeading
                 title={t('settings.emergencyAccess', 'Emergency Access')}
                 description={t('settings.emergencyAccessDesc', 'Designate trusted contacts who can request emergency vault access.')}
@@ -899,19 +919,19 @@ export default function Settings() {
                     <p className="text-[13px] font-medium text-neutral-900 dark:text-white">
                       {t('settings.configureEmergency', 'Configure Trusted Contacts')}
                     </p>
-                    <p className="text-[12px] text-neutral-600 dark:text-neutral-400 mt-0.5">
+                    <p className="text-[12px] text-neutral-600 dark:text-neutral-300 mt-0.5">
                       {t('settings.emergencyAccessClickDesc', 'Set up emergency vault access for trusted people')}
                     </p>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-400 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                <ChevronRight size={16} className="text-neutral-600 dark:text-neutral-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
               </button>
             </section>
 
-            <div className="h-px bg-neutral-200 dark:bg-white/8" />
+            <div className="h-px bg-neutral-200 dark:bg-white/8 hidden lg:block" />
 
             {/* ── Sessions & Log ───────────────────────────────────────────────── */}
-            <section id="s-log" className="scroll-mt-24">
+            <section id="settings-panel-log" role="tabpanel" aria-labelledby="settings-tab-log" className={`scroll-mt-24${activeSection !== 'log' ? ' hidden lg:block' : ''}`}>
               <SectionHeading
                 title={t('settings.sessionsAndLog', 'Sessions & Security Log')}
                 description={t('settings.sessionsAndLogDesc', 'Monitor account activity and manage credential shares.')}
@@ -967,15 +987,16 @@ export default function Settings() {
                 <div>
                   <h3 className="text-[15px] font-semibold text-neutral-900 dark:text-white">{t('settings.importPreviewTitle', 'Import Preview')}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] px-2 py-0.5 bg-neutral-100 dark:bg-white/8 rounded-full font-medium uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
+                    <span className="text-[10px] px-2 py-0.5 bg-neutral-100 dark:bg-white/8 rounded-full font-medium uppercase tracking-wide text-neutral-600 dark:text-neutral-300">
                       {getFormat(importResult.detectedFormat)?.label ?? importResult.detectedFormat}
                     </span>
-                    <span className="text-[12px] text-neutral-600 dark:text-neutral-400">{importFileName}</span>
+                    <span className="text-[12px] text-neutral-600 dark:text-neutral-300">{importFileName}</span>
                   </div>
                 </div>
                 <button onClick={() => !isImporting && setIsImportModalOpen(false)}
+                  aria-label={t('common.close', 'Close')}
                   className="p-1.5 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white">
-                  <X size={18} className="text-neutral-600 dark:text-neutral-400" />
+                  <X size={18} aria-hidden="true" className="text-neutral-600 dark:text-neutral-300" />
                 </button>
               </div>
 
@@ -988,7 +1009,7 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-600 dark:text-neutral-400 mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-600 dark:text-neutral-300 mb-2">
                     {t('settings.importPreviewLabel', 'Preview (first 8)')}
                   </p>
                   <div className="rounded-lg border border-neutral-200 dark:border-white/10 overflow-hidden">
@@ -1004,13 +1025,13 @@ export default function Settings() {
                         {importResult.credentials.slice(0, 8).map((c, i) => (
                           <tr key={i} className="border-t border-neutral-100 dark:border-white/5 hover:bg-neutral-50 dark:hover:bg-white/3">
                             <td className="px-3 py-2 font-medium text-neutral-900 dark:text-white truncate max-w-[120px]">{c.service}</td>
-                            <td className="px-3 py-2 text-neutral-500 dark:text-neutral-400 truncate max-w-[120px]">{c.username}</td>
-                            <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400 truncate max-w-[140px] hidden sm:table-cell">{c.url}</td>
+                            <td className="px-3 py-2 text-neutral-600 dark:text-neutral-300 truncate max-w-[120px]">{c.username}</td>
+                            <td className="px-3 py-2 text-neutral-600 dark:text-neutral-300 truncate max-w-[140px] hidden sm:table-cell">{c.url}</td>
                           </tr>
                         ))}
                         {importResult.credentials.length > 8 && (
                           <tr className="border-t border-neutral-100 dark:border-white/5">
-                            <td colSpan={3} className="px-3 py-2 text-center text-neutral-600 dark:text-neutral-400 text-[11px]">
+                            <td colSpan={3} className="px-3 py-2 text-center text-neutral-600 dark:text-neutral-300 text-[11px]">
                               {t('settings.importMoreItems', '+{{count}} more', { count: importResult.credentials.length - 8 })}
                             </td>
                           </tr>
@@ -1021,7 +1042,7 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-600 dark:text-neutral-400 mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-600 dark:text-neutral-300 mb-2">
                     {t('settings.importModeLabel', 'Import mode')}
                   </p>
                   <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('settings.importModeLabel', 'Import mode')}>
@@ -1035,7 +1056,7 @@ export default function Settings() {
                       <p className={`text-[13px] font-medium ${importMode === 'merge' ? '' : 'text-neutral-900 dark:text-white'}`}>
                         {t('settings.importMergeName', 'Merge')}
                       </p>
-                      <p className={`text-[11px] mt-0.5 ${importMode === 'merge' ? 'opacity-60' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                      <p className={`text-[11px] mt-0.5 ${importMode === 'merge' ? 'opacity-60' : 'text-neutral-600 dark:text-neutral-300'}`}>
                         {t('settings.importMergeDesc', 'Add alongside existing')}
                       </p>
                     </button>
@@ -1049,7 +1070,7 @@ export default function Settings() {
                       <p className={`text-[13px] font-medium ${importMode === 'replace' ? '' : 'text-neutral-900 dark:text-white'}`}>
                         {t('settings.importReplaceName', 'Replace All')}
                       </p>
-                      <p className={`text-[11px] mt-0.5 ${importMode === 'replace' ? 'opacity-60' : 'text-neutral-600 dark:text-neutral-400'}`}>
+                      <p className={`text-[11px] mt-0.5 ${importMode === 'replace' ? 'opacity-60' : 'text-neutral-600 dark:text-neutral-300'}`}>
                         {t('settings.importReplaceDesc', 'Delete existing first')}
                       </p>
                     </button>
@@ -1104,27 +1125,27 @@ export default function Settings() {
               <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 dark:border-white/8">
                 <div>
                   <h3 className="text-[15px] font-semibold text-neutral-900 dark:text-white">{t('settings.emailServerTitle', 'SMTP Configuration')}</h3>
-                  <p className="text-[12px] text-neutral-600 dark:text-neutral-400 mt-0.5">{t('settings.emailServerModalDesc', 'Configure outgoing mail server')}</p>
+                  <p className="text-[12px] text-neutral-600 dark:text-neutral-300 mt-0.5">{t('settings.emailServerModalDesc', 'Configure outgoing mail server')}</p>
                 </div>
                 <button onClick={() => setIsEmailServerModalOpen(false)} disabled={isSavingEmailServer}
                   className="p-1.5 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white">
-                  <X size={18} className="text-neutral-600 dark:text-neutral-400" />
+                  <X size={18} className="text-neutral-600 dark:text-neutral-300" />
                 </button>
               </div>
 
               <div className="px-6 py-5 space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-1.5">
-                    <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">{t('settings.emailServerHost', 'SMTP Host')}</label>
-                    <input type="text" value={emailServerForm.host}
+                    <label htmlFor="input-0r5lt0x14" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerHost', 'SMTP Host')}</label>
+<input id="input-0r5lt0x14" type="text" value={emailServerForm.host}
                       onChange={e => { setEmailServerForm({ ...emailServerForm, host: e.target.value }); setEmailServerError(''); setDnsCheckResult(null); }}
                       placeholder="smtp.example.com"
                       className={inputCls}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">{t('settings.emailServerPort', 'Port')}</label>
-                    <input type="number" value={emailServerForm.port}
+                    <label htmlFor="input-uyncl7xda" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerPort', 'Port')}</label>
+<input id="input-uyncl7xda" type="number" value={emailServerForm.port}
                       onChange={e => setEmailServerForm({ ...emailServerForm, port: Number(e.target.value) })}
                       min={1} max={65535}
                       className={inputCls}
@@ -1133,8 +1154,8 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">{t('settings.emailServerUser', 'Username / Email')}</label>
-                  <input type="text" value={emailServerForm.user}
+                  <label htmlFor="input-h0trif5l7" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerUser', 'Username / Email')}</label>
+<input id="input-h0trif5l7" type="text" value={emailServerForm.user}
                     onChange={e => { setEmailServerForm({ ...emailServerForm, user: e.target.value }); setEmailServerError(''); setDnsCheckResult(null); }}
                     placeholder="user@example.com" autoComplete="off"
                     className={inputCls}
@@ -1142,7 +1163,7 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">{t('settings.emailServerPass', 'Password / App Password')}</label>
+                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerPass', 'Password / App Password')}</label>
                   <div className="relative">
                     <input type={showEmailPass ? 'text' : 'password'} value={emailServerForm.pass}
                       onChange={e => setEmailServerForm({ ...emailServerForm, pass: e.target.value })}
@@ -1157,7 +1178,7 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">{t('settings.smtpProtocol', 'Security Protocol')}</label>
+                  <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.smtpProtocol', 'Security Protocol')}</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { id: 'none',     label: t('settings.smtpProtoSmtp', 'None (25)'),         port: 25 },
@@ -1171,7 +1192,7 @@ export default function Settings() {
                           className={`py-2 rounded-lg border text-[11px] font-medium transition-all ${
                             active
                               ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white/30 dark:bg-white/12 dark:text-white'
-                              : 'border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-white/20'
+                              : 'border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-white/20'
                           }`}
                         >
                           {m.label}
@@ -1179,7 +1200,7 @@ export default function Settings() {
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                  <p className="text-[11px] text-neutral-600 dark:text-neutral-300">
                     {emailServerForm.protocol === 'ssl_tls' || (emailServerForm.secure && !emailServerForm.protocol)
                       ? t('settings.smtpProtoSslTlsDesc', 'Port 465 — Implicit TLS')
                       : emailServerForm.protocol === 'starttls'
@@ -1198,7 +1219,7 @@ export default function Settings() {
                     {isDnsChecking ? t('settings.dnsChecking', 'Checking…') : t('settings.dnsTestBtn', 'Test DNS')}
                   </button>
                   {dnsCheckResult && (
-                    <span className="text-[11px] text-neutral-600 dark:text-neutral-400 font-mono">{dnsCheckResult.domain}</span>
+                    <span className="text-[11px] text-neutral-600 dark:text-neutral-300 font-mono">{dnsCheckResult.domain}</span>
                   )}
                 </div>
                 {dnsCheckResult && (
