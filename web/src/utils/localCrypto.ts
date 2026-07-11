@@ -150,32 +150,7 @@ export async function writeEncryptedLocal(key: string, value: string): Promise<v
     }
   }
 
-  // ── Fallback to v1 (PBKDF2) ─────────────────────────────────────────────
-  const ck1 = keyStore.getLocalKey(1);
-  if (!ck1) return; // No key - refuse to write plaintext. Wait for login.
-  try {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = new Uint8Array(
-      await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, ck1, new TextEncoder().encode(value)),
-    );
 
-    // Payload: IV (12 B) || ciphertext+tag (variable)
-    const payload = new Uint8Array(iv.length + ct.length);
-    payload.set(iv);
-    payload.set(ct, iv.length);
-    const b64payload = toB64u(payload);
-
-    const sk = keyStore.getSigningKey(1);
-    let token: string;
-    if (sk) {
-      const sigInput = new TextEncoder().encode(`${HDR_B64}.${b64payload}`);
-      const sig = new Uint8Array(await crypto.subtle.sign('HMAC', sk, sigInput));
-      token = `${HDR_B64}.${b64payload}.${toB64u(sig)}`;
-    } else {
-      token = `${HDR_B64}.${b64payload}`;
-    }
-    localStorage.setItem(key, token);
-  } catch { /* storage quota / private mode - non-fatal */ }
 }
 
 /**
@@ -218,39 +193,5 @@ export async function readDecryptedLocal(key: string): Promise<string | null> {
     } catch { return null; }
   }
 
-  // ── Legacy JSON format: {"enc":1,"iv":"...","ct":"..."} ───────────────────
-  if (raw.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      if (parsed['enc'] !== 1) return null; // Disallow plaintext legacy fallback
-      const ck = keyStore.getLocalKey(1);
-      if (!ck) return null;
-      const iv = Uint8Array.from(atob(parsed['iv'] as string), c => c.charCodeAt(0));
-      const ct = Uint8Array.from(atob(parsed['ct'] as string), c => c.charCodeAt(0));
-      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, ck, ct));
-    } catch { return null; }
-  }
-
-  // ── Compact JWT-like format: header.payload[.sig] ────────────────────────
-  try {
-    const parts = raw.split('.');
-    if (parts.length < 2) return null;
-
-    // Verify HMAC signature when signing key and signature are both present.
-    const sk = keyStore.getSigningKey(1);
-    if (sk && parts.length >= 3) {
-      const sigInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-      const sig = fromB64u(parts[2]);
-      const valid = await crypto.subtle.verify('HMAC', sk, sig, sigInput);
-      if (!valid) return null; // tampered token - hard reject
-    }
-
-    const ck = keyStore.getLocalKey(1);
-    if (!ck) return null;
-
-    const ivCt = fromB64u(parts[1]);
-    const iv = ivCt.slice(0, 12);
-    const ct = ivCt.slice(12);
-    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, ck, ct));
-  } catch { return null; }
+  return null;
 }

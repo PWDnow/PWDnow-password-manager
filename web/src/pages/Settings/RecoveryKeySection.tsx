@@ -36,7 +36,7 @@ export default function RecoveryKeySection({
     <section>
       <div className="mb-6">
         <h2 className="text-[15px] font-semibold text-neutral-900 dark:text-white leading-snug">{t('settings.recoveryKey', 'Emergency Recovery')}</h2>
-        <p className="mt-1 text-[13px] text-neutral-500 dark:text-neutral-400">{t('settings.recoveryKeySubtitle', 'Generate a recovery key for offline vault access.')}</p>
+        <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-300">{t('settings.recoveryKeySubtitle', 'Generate a recovery key for offline vault access.')}</p>
         <div className="mt-4 h-px bg-neutral-200 dark:bg-white/8" />
       </div>
       <div className="bg-surface-container-low p-10 rounded-xl">
@@ -66,8 +66,8 @@ export default function RecoveryKeySection({
                     <AlertTriangle className="text-white" size={20} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-amber-800 dark:text-amber-300">{t('settings.noKey', 'No Recovery Key')}</p>
-                    <p className="text-[10px] text-amber-700/70 dark:text-amber-400/70 font-bold uppercase tracking-widest mt-0.5">
+                    <p className="text-sm font-bold text-amber-900 dark:text-amber-200">{t('settings.noKey', 'No Recovery Key')}</p>
+                    <p className="text-[10px] text-amber-900 dark:text-amber-200 font-bold uppercase tracking-widest mt-0.5">
                       {t('settings.keyWarning', 'Highly recommended for account safety')}
                     </p>
                   </div>

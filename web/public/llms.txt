@@ -1,0 +1,15 @@
+# PWDnow
+
+> Zero-knowledge, local-first password manager. All credential encryption and
+> decryption happens client-side or in a local vault daemon — the server never
+> sees plaintext vault data.
+
+PWDnow stores credentials, secure notes, and asset-holder records in an
+encrypted vault. Most application routes require authentication and are not
+useful to crawlers; the links below are the public entry points.
+
+## Pages
+
+- [Login](/login): Sign in to an existing vault.
+- [Register](/register): Create a new account.
+- [Forgot password](/forgot-password): Account recovery flow.

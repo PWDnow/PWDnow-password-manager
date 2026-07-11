@@ -15,7 +15,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const EMAIL = 'wee.wa@gmail.com';
+const EMAIL = 'e2e-test@pwdnow.local';
 const WRONG_PASSWORD = 'definitely-not-the-password-xyz';
 const BASE_URL = 'https://localhost:51234';
 

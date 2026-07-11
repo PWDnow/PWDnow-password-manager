@@ -264,7 +264,7 @@ export default function Register() {
           <h2 className="text-4xl xl:text-5xl font-headline font-bold mb-6 leading-[1.1] tracking-tight text-white">
             {t('register.heroTitle', 'Secure your digital life with open source.')}
           </h2>
-          <p className="text-slate-400 text-lg leading-relaxed mb-12">
+          <p className="text-slate-300 text-lg leading-relaxed mb-12">
             {t('register.heroSubtitle', 'High-security vault with zero-knowledge architecture, designed for individuals and teams who value privacy.')}
           </p>
 
@@ -272,18 +272,18 @@ export default function Register() {
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
               <Building2 className="text-blue-400 mb-4" size={28} />
               <div className="text-2xl font-bold text-white mb-1">100%</div>
-              <div className="text-sm text-slate-400 font-medium">{t('register.openSourceLabel', 'Open Source')}</div>
+              <div className="text-sm text-slate-300 font-medium">{t('register.openSourceLabel', 'Open Source')}</div>
             </div>
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
               <Users className="text-indigo-400 mb-4" size={28} />
               <div className="text-2xl font-bold text-white mb-1">{t('register.communityValue', 'Community')}</div>
-              <div className="text-sm text-slate-400 font-medium">{t('register.communityLabel', 'Driven')}</div>
+              <div className="text-sm text-slate-300 font-medium">{t('register.communityLabel', 'Driven')}</div>
             </div>
           </div>
         </div>
 
         <div className="relative z-10 mt-12">
-          <p className="text-slate-400 text-sm font-medium">
+          <p className="text-slate-300 text-sm font-medium">
             © {new Date().getFullYear()} PWDnow. {t('register.allRightsReserved', 'All rights reserved.')}
           </p>
         </div>
@@ -357,7 +357,7 @@ export default function Register() {
             <div>
               <label htmlFor="company" className="block text-sm font-semibold text-black dark:text-white mb-2 flex items-center gap-2">
                 {t('register.company', 'Company Name')}
-                <span className="text-xs font-normal text-slate-400 dark:text-white/40 normal-case tracking-normal">
+                <span className="text-xs font-normal text-slate-600 dark:text-white/70 normal-case tracking-normal">
                   ({t('register.optional', 'optional')})
                 </span>
               </label>
@@ -419,7 +419,7 @@ export default function Register() {
                         <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center ${
                           status === 'met' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
                           status === 'unmet' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
-                          'bg-slate-100 dark:bg-white/10 text-slate-400 dark:text-white/30'
+                          'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/40'
                         }`}>
                           {status === 'met' ? <Check size={10} strokeWidth={3} /> :
                            status === 'unmet' ? <X size={10} strokeWidth={3} /> :
@@ -428,7 +428,7 @@ export default function Register() {
                         <span className={
                           status === 'met' ? 'text-green-700 dark:text-green-400' :
                           status === 'unmet' ? 'text-red-600 dark:text-red-400' :
-                          'text-slate-500 dark:text-white/40'
+                          'text-slate-600 dark:text-white/70'
                         }>
                           {rule.label}
                         </span>
@@ -458,7 +458,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+              className="w-full mt-6 bg-blue-900 hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 active:scale-[0.98]"
             >
               {loading
                 ? <><Loader2 size={18} className="animate-spin" />{t('register.submitting', 'Creating…')}</>

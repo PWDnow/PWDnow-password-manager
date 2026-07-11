@@ -34,7 +34,7 @@ These are absolute rules. Never violate them.
 |---|---|
 | **Zero-Knowledge** | Frontend NEVER handles KEK, VMK, or DEK in any form. |
 | **No Key Persistence** | NEVER store key material in React state, `localStorage`, `sessionStorage`, or IndexedDB. |
-| **SecureKeyStore only** | Session token lives in `src/crypto/keystore.ts` JS private field `#token`. Cleared on `pagehide`, `visibilitychange → hidden`, and logout. |
+| **SecureKeyStore only** | Session token lives in `src/crypto/keystore.ts` JS private field `#token`. Cleared on logout, session expiry, and after a 5-minute grace period of the tab being hidden (a bounded `visibilitychange` timer — not immediate, so a page refresh isn't mistaken for a backgrounded tab). |
 | **No plaintext vault writes** | `writeEncryptedLocal` silently no-ops if the session key is absent. Vault data is NEVER written in plaintext. |
 | **SVG sanitization** | Any `customSvg` injected into innerHTML MUST go through `sanitizeSvg()` from `src/utils/sanitize.ts` (DOMPurify + RETURN_TRUSTED_TYPE). |
 | **No unsafe-inline scripts** | CSP enforces `nonce-{per-request}` for scripts. Never add `'unsafe-inline'` to scriptSrc. |

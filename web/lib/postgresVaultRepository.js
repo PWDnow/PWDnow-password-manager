@@ -10,11 +10,18 @@ const PROMOTED = new Set([
   'wrapMode', 'pwWrapSalt', 'cryptoSalt', 'status', 'createdAt',
 ]);
 
-function rowToUser(r) {
+// Fields that grant access to the vault or to account recovery/duress paths.
+// These are envelope-encrypted under the user's DEK (meta._sealed) instead of
+// being stored as plaintext in the meta jsonb column.
+const SENSITIVE_META_KEYS = new Set([
+  'mfaTotpSecret', 'recoveryKeyHash', 'recoveryKeySalt', 'duressEnforce',
+]);
+
+async function rowToUser(env, r) {
   if (!r) return null;
   const meta = r.meta || {};
-  return {
-    ...meta,
+  const { _sealed, ...restMeta } = meta;
+  const base = {
     id: r.id,
     emailHash: r.email_hmac,
     passwordHash: r.password_hash,
@@ -26,11 +33,28 @@ function rowToUser(r) {
     status: r.status,
     createdAt: r.created_at ? new Date(r.created_at).getTime() : meta.createdAt,
   };
+  let sealed = {};
+  if (_sealed) {
+    sealed = await env.decryptResource(base, Buffer.from(_sealed, 'base64'));
+  }
+  return { ...restMeta, ...sealed, ...base };
 }
 
-function userToMeta(user) {
+async function userToMeta(env, user) {
   const meta = {};
-  for (const k of Object.keys(user)) if (!PROMOTED.has(k)) meta[k] = user[k];
+  const sealed = {};
+  let hasSealed = false;
+  for (const k of Object.keys(user)) {
+    if (PROMOTED.has(k)) continue;
+    if (SENSITIVE_META_KEYS.has(k)) {
+      if (user[k] !== undefined) { sealed[k] = user[k]; hasSealed = true; }
+    } else {
+      meta[k] = user[k];
+    }
+  }
+  if (hasSealed) {
+    meta._sealed = (await env.encryptResource(user, sealed)).toString('base64');
+  }
   return meta;
 }
 
@@ -50,23 +74,24 @@ export class PostgresVaultRepository {
 
   async findUserByEmailHash(emailHash) {
     const r = await query('SELECT * FROM users WHERE email_hmac = $1', [emailHash]);
-    return rowToUser(r.rows[0]);
+    return rowToUser(this._env, r.rows[0]);
   }
 
   async findUserById(id) {
     const r = await query('SELECT * FROM users WHERE id = $1', [id]);
-    return rowToUser(r.rows[0]);
+    return rowToUser(this._env, r.rows[0]);
   }
 
   // New users get a freshly KMS-wrapped DEK provisioned here.
   async insertUser(user) {
     const dek = await this._env.newUserDek();
+    const meta = await userToMeta(this._env, { ...user, wrappedDek: dek.wrappedDek, kmsKeyId: dek.kmsKeyId });
     try {
       await query(
         `INSERT INTO users (id, email_hmac, password_hash, wrapped_dek, kms_key_id, wrap_mode, pw_wrap_salt, crypto_salt, status, meta, created_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active',$9, now())`,
         [user.id, user.emailHash, user.passwordHash, dek.wrappedDek, dek.kmsKeyId,
-         dek.wrapMode, dek.pwWrapSalt, user.cryptoSalt ?? null, JSON.stringify(userToMeta(user))],
+         dek.wrapMode, dek.pwWrapSalt, user.cryptoSalt ?? null, JSON.stringify(meta)],
       );
       return user.id;
     } catch (e) {
@@ -81,13 +106,13 @@ export class PostgresVaultRepository {
     return withTx(async (client) => {
       const r = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [id]);
       if (r.rows.length === 0) return null;
-      const user = rowToUser(r.rows[0]);
+      const user = await rowToUser(this._env, r.rows[0]);
       const ret = fn(user);
       if (ret === false) return false;
       await client.query(
         `UPDATE users SET password_hash=$2, wrap_mode=$3, pw_wrap_salt=$4, crypto_salt=$5, status=$6, meta=$7 WHERE id=$1`,
         [id, user.passwordHash, user.wrapMode, user.pwWrapSalt, user.cryptoSalt ?? null,
-         user.status ?? 'active', JSON.stringify(userToMeta(user))],
+         user.status ?? 'active', JSON.stringify(await userToMeta(this._env, user))],
       );
       return ret === undefined ? id : ret;
     });
@@ -102,7 +127,7 @@ export class PostgresVaultRepository {
   async withUserTransaction(fn) {
     return withTx(async (client) => {
       const r = await client.query('SELECT * FROM users FOR UPDATE');
-      const users = r.rows.map(rowToUser);
+      const users = await Promise.all(r.rows.map(row => rowToUser(this._env, row)));
       const before = new Map(users.map(u => [u.id, JSON.stringify(u)]));
       const result = await fn(users);
       if (result === false) return result;
@@ -110,7 +135,7 @@ export class PostgresVaultRepository {
         if (before.get(u.id) !== JSON.stringify(u)) {
           await client.query(
             `UPDATE users SET password_hash=$2, wrap_mode=$3, pw_wrap_salt=$4, crypto_salt=$5, status=$6, meta=$7 WHERE id=$1`,
-            [u.id, u.passwordHash, u.wrapMode, u.pwWrapSalt, u.cryptoSalt ?? null, u.status ?? 'active', JSON.stringify(userToMeta(u))],
+            [u.id, u.passwordHash, u.wrapMode, u.pwWrapSalt, u.cryptoSalt ?? null, u.status ?? 'active', JSON.stringify(await userToMeta(this._env, u))],
           );
         }
       }

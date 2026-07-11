@@ -35,21 +35,21 @@ export default function PasswordPromptModal({ isOpen, onClose, onConfirm, title,
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{title}</h2>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                <X size={20} className="text-slate-500" />
-              </button>
+              <button aria-label="Close" onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
+  <X aria-hidden="true" size={20} className="text-slate-500" />
+</button>
             </div>
 
-            <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-300 text-sm mb-6 leading-relaxed">
               {message}
             </p>
 
             <form onSubmit={(e) => { e.preventDefault(); onConfirm(password); }} className="space-y-6">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-2">
+                <label htmlFor="input-jfy6bo31a" className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
                   {t('settings.masterPassword', 'Master Password')}
                 </label>
-                <input
+<input id="input-jfy6bo31a"
                   type="password"
                   autoFocus
                   value={password}

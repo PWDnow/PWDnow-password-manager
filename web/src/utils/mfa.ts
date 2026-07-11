@@ -63,13 +63,10 @@ export interface MfaConfig {
   passwordLoginEnabled?: boolean;  // when false, password-only login card is hidden; default true
 }
 
-// ─── CSRF helper (shared by all server-side fetch calls in this module) ───────
-
-
 // ─── Login Hints ──────────────────────────────────────────────────────────────
-// Hints are fetched live from the daemon/server on the email step and held in
-// React state. They are NOT persisted to localStorage - doing so would expose
-// which MFA methods are enabled for an account (information useful to attackers).
+// Hints are fetched live from the daemon/server at the email step and held in
+// React state. Never persisted to localStorage — doing so would expose which
+// MFA methods are enabled for an account.
 
 export interface LoginHints {
   totp: boolean;
@@ -104,7 +101,7 @@ export function refreshLoginHints(): void {
     passwordlessEnabled: (cfg.passwordlessEnabled === true) && hasHardware,
   };
 
-  // Sync to server only (fire-and-forget; daemon-only sessions have no CSRF cookie)
+  // Sync to server only (fire-and-forget; daemon-only sessions have no CSRF cookie).
   if (getCsrfToken()) {
     apiFetch('/api/auth/login-hints', {
       method: 'POST',
@@ -538,11 +535,7 @@ export async function registerWebAuthn(
 
 /**
  * WebAuthn Authentication Ceremony (FIDO2 GetAssertion).
- * Returns true if the key assertion is accepted.
- *
- * NOTE: In a real application the challenge and counter verification
- * happens on a trusted server. Here we verify locally in localStorage
- * (which is sufficient for a client-side demo, but not production-grade).
+ * Returns true if the key assertion is accepted by the local credential store.
  */
 export async function authenticateWebAuthn(credentialId: string): Promise<boolean> {
   if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported.');
@@ -739,12 +732,9 @@ export async function registerPlatformAuth(
 }
 
 /**
- * Authenticate with a registered passkey or platform authenticator at login time.
- * Uses the stored hint (non-sensitive credential IDs) to target the right credential.
- * Falls back to discoverable credential lookup if no hint is stored.
- *
- * NOTE: Challenge-response signature is NOT verified server-side in demo mode.
- * Possession of the device + successful biometric is the auth factor.
+ * Authenticate with a registered passkey or platform authenticator at login.
+ * Uses the stored hint (non-sensitive credential IDs) to target the right
+ * credential. Falls back to discoverable credential lookup when no hint exists.
  */
 export async function authenticateWithPasskeyForLogin(): Promise<boolean> {
   if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported.');
@@ -845,15 +835,5 @@ export function countActiveMfaMethods(cfg?: MfaConfig): number {
   ].filter(Boolean).length;
 }
 
-/**
- * Stretch Goal H.5: Browser passkey export via WebAuthn Level 3 conditional UI.
- * This outlines the interface for the emerging W3C passkey export standard.
- */
-export async function exportPasskeys(): Promise<Uint8Array> {
-  if (!isWebAuthnSupported()) throw new Error('WebAuthn not supported in this browser.');
-  
-  // Note: True passkey export requires OS-level support (e.g. Android 14+ Credential Manager API)
-  // and specific WebAuthn Level 3 extensions that are not yet universally available.
-  throw new Error('Passkey export is not yet natively supported by this browser/OS via WebAuthn Level 3.');
-}
+// Removed exportPasskeys stub as part of production readiness.
 

@@ -20,6 +20,7 @@ const Setup = lazy(() => import('./pages/Setup'));
 const EmergencyRequest = lazy(() => import('./pages/EmergencyRequest'));
 const VaultHealth = lazy(() => import('./pages/VaultHealth'));
 const ShareView = lazy(() => import('./pages/ShareView'));
+const PasswordGenerator = lazy(() => import('./pages/PasswordGenerator'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[50vh]">
@@ -115,6 +116,10 @@ export const router = createBrowserRouter([
           {
             path: 'health',
             element: wrap(VaultHealth),
+          },
+          {
+            path: 'generator',
+            element: wrap(PasswordGenerator),
           },
         ],
       },

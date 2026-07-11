@@ -82,7 +82,7 @@ const SERVICE_COLORS: Record<string, { bg: string, text: string, border: string,
   'LinkedIn': { bg: 'bg-indigo-50/50', text: 'text-indigo-600', border: 'border-indigo-100/50', glow: 'shadow-indigo-500/20' },
   'Spotify': { bg: 'bg-green-50/50', text: 'text-green-600', border: 'border-green-100/50', glow: 'shadow-green-500/20' },
   'Netflix': { bg: 'bg-red-50/50', text: 'text-red-600', border: 'border-red-100/50', glow: 'shadow-red-500/20' },
-  'Amazon': { bg: 'bg-orange-50/50', text: 'text-orange-600', border: 'border-orange-100/50', glow: 'shadow-orange-500/20' },
+  'Amazon': { bg: 'bg-orange-50/50', text: 'text-orange-700', border: 'border-orange-100/50', glow: 'shadow-orange-500/20' },
   'Apple': { bg: 'bg-neutral-50/50', text: 'text-neutral-800', border: 'border-neutral-200/50', glow: 'shadow-neutral-500/20' },
   'Microsoft': { bg: 'bg-blue-50/50', text: 'text-blue-600', border: 'border-blue-100/50', glow: 'shadow-blue-500/20' },
 };
@@ -134,7 +134,7 @@ export default function Vault() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const activeTab = folderId || 'vault';
-  const { folders, credentials, credentialsLoading, addCredential, updateCredential, deleteCredential } = useVault();
+  const { folders, credentials, credentialsLoading, isLoading, addCredential, updateCredential, deleteCredential } = useVault();
   const { profile } = useUser();
   const { notifications, addNotification } = useNotification();
   const location = useLocation();
@@ -166,6 +166,12 @@ export default function Vault() {
   const clipboardGuardRef = useRef<ClipboardGuardHandle | null>(null);
   const isMountedRef = useRef(true);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  // Skip the entrance fade/slide on first paint so the LCP heading isn't
+  // delayed by an opacity:0 -> 1 transition; folder switches still animate.
+  const isFirstRenderRef = useRef(true);
+  useEffect(() => {
+    isFirstRenderRef.current = false;
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -451,14 +457,14 @@ export default function Vault() {
               </span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{clipboardLabel}</span>
+              <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">{clipboardLabel}</span>
               <span className="text-sm font-semibold text-black dark:text-white whitespace-nowrap">
                 {t('vault.clipboardClears', 'Clears in {{s}}s', { s: clipboardCountdown })}
               </span>
             </div>
             <button
               onClick={() => clipboardGuardRef.current?.cancel()}
-              className="ml-1 text-xs font-semibold text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors whitespace-nowrap"
+              className="ml-1 text-xs font-semibold text-orange-500 hover:text-orange-700 dark:hover:text-orange-400 transition-colors whitespace-nowrap"
               aria-label={t('vault.clearNow', 'Clear clipboard now')}
             >
               {t('vault.clearNow', 'Clear now')}
@@ -501,9 +507,9 @@ export default function Vault() {
             />
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             key="vault-list"
-            initial={{ opacity: 0, x: -20 }}
+            initial={isFirstRenderRef.current ? false : { opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
@@ -529,7 +535,7 @@ export default function Vault() {
               <button
                 onClick={() => setIsAdding(true)}
                 aria-label={t('vault.addCredential', 'Add Credential')}
-                className="group inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 shrink-0"
+                className="group inline-flex items-center gap-2 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 shrink-0"
               >
                 <PlusCircle size={18} className="group-hover:rotate-90 transition-transform duration-300" />
                 {t('vault.addCredential', 'Add Credential')}
@@ -537,7 +543,7 @@ export default function Vault() {
             </div>
 
             {/* Stats bar */}
-            <div className="flex items-center gap-4 mb-5 px-4 py-3 bg-surface-container-low/60 rounded-2xl border border-outline-variant/10 flex-wrap">
+            <div className="flex items-center gap-4 mb-5 px-4 py-3 bg-surface-container-low rounded-2xl border border-outline-variant/10 flex-wrap">
               <div className="flex items-center gap-2">
                 <Wallet size={14} className="text-on-surface-variant" />
                 <span className="text-sm font-bold text-black dark:text-white">{totalItems}</span>
@@ -546,7 +552,7 @@ export default function Vault() {
               <div className="w-px h-4 bg-outline-variant/20 hidden sm:block" />
               <div className="flex items-center gap-2">
                 <ShieldCheck size={14} className={securityHealthScore >= 80 ? 'text-emerald-500' : 'text-orange-500'} />
-                <span className={`text-sm font-bold ${securityHealthScore >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600'}`}>{securityHealth}</span>
+                <span className={`text-sm font-bold ${securityHealthScore >= 80 ? 'text-emerald-900 dark:text-emerald-200' : 'text-orange-900 dark:text-orange-300'}`}>{securityHealth}</span>
                 <span className="text-xs text-on-surface-variant">{t('vault.securityHealth', 'health')}</span>
               </div>
               {weakCount > 0 && (
@@ -554,14 +560,14 @@ export default function Vault() {
                   <div className="w-px h-4 bg-outline-variant/20 hidden sm:block" />
                   <div className="flex items-center gap-2">
                     <AlertTriangle size={14} className="text-orange-500" />
-                    <span className="text-sm font-bold text-orange-600">{weakCount}</span>
+                    <span className="text-sm font-bold text-orange-900 dark:text-orange-300">{weakCount}</span>
                     <span className="text-xs text-on-surface-variant">{t('vault.weakPasswords', { count: weakCount, defaultValue: 'weak' })}</span>
                   </div>
                 </>
               )}
               <div className="ml-auto flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest hidden sm:block">AES-256</span>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest hidden sm:block">AES-256</span>
               </div>
             </div>
 
@@ -569,12 +575,15 @@ export default function Vault() {
             <div className="relative group w-full mb-6">
               <input
                 type="text"
+                id="vault-search"
+                name="vault-search"
+                autoComplete="off"
                 placeholder={t('vault.searchPlaceholder', { folder: getFolderTitle(), defaultValue: `Search in ${getFolderTitle()}...` })}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white dark:bg-surface-container-low border border-outline-variant/20 rounded-xl py-3 pl-10 pr-10 text-sm font-medium text-black dark:text-white placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/40 transition-all outline-none shadow-sm"
               />
-              <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-on-surface-variant/60 group-focus-within:text-emerald-600 transition-colors z-10">
+              <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-on-surface-variant group-focus-within:text-emerald-600 transition-colors z-10">
                 <Search size={16} strokeWidth={2} />
               </div>
               {searchTerm && (
@@ -589,7 +598,7 @@ export default function Vault() {
 
             {/* Credentials List */}
             <div className="space-y-4">
-              {credentialsLoading && credentials.length === 0 ? (
+              {(credentialsLoading || isLoading) && credentials.length === 0 ? (
                 <div className="space-y-4" aria-label="Loading credentials" aria-busy="true">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="bg-white/40 dark:bg-black/10 backdrop-blur-xl rounded-3xl p-6 flex items-center gap-4 border border-outline-variant/10 animate-pulse">
@@ -614,9 +623,9 @@ export default function Vault() {
                     </div>
                     <div className="absolute -inset-4 bg-primary-container/10 rounded-full blur-2xl animate-pulse" />
                   </div>
-                  <h3 className="text-2xl md:text-3xl font-black text-black dark:text-white mb-4 tracking-tighter">
+                  <h2 className="text-2xl md:text-3xl font-black text-black dark:text-white mb-4 tracking-tighter">
                     {isSearchEmpty ? t('vault.noResults', 'No results found') : t('vault.noItems', 'No items found')}
-                  </h3>
+                  </h2>
                   <p className="text-on-surface-variant text-lg font-medium max-w-md mb-10 leading-relaxed">
                     {isSearchEmpty 
                       ? t('vault.noResultsDesc', { term: searchTerm, folder: getFolderTitle(), defaultValue: `Nothing found for "${searchTerm}" in ${getFolderTitle()} folder.` })
@@ -626,7 +635,7 @@ export default function Vault() {
                   {!isSearchEmpty && (
                     <button
                       onClick={() => setIsAdding(true)}
-                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-emerald-600/25"
+                      className="inline-flex items-center gap-2 bg-emerald-800 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-emerald-600/25"
                     >
                       <PlusCircle size={18} />
                       {t('vault.addNew', 'Add a credential')}
@@ -677,18 +686,18 @@ export default function Vault() {
                             <div className="font-black text-base text-black dark:text-white leading-tight tracking-tight truncate">{item.service}</div>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               {item.credentialType === 'passkey' && (
-                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">{item.rpId || item.authenticatorName || 'Passkey'}</div>
+                                <div className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest truncate">{item.rpId || item.authenticatorName || 'Passkey'}</div>
                               )}
                               {item.credentialType === 'secure_note' && (
-                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">{t('vault.secureNote', 'Secure Note')}</div>
+                                <div className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest truncate">{t('vault.secureNote', 'Secure Note')}</div>
                               )}
                               {item.credentialType === 'payment_card' && (
-                                <div className="text-[10px] text-on-surface-variant font-black opacity-60 uppercase tracking-widest truncate">
+                                <div className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest truncate">
                                   {item.cardType ? item.cardType.toUpperCase() : t('vault.card', 'Card')}{item.cardNumber ? ` ···· ${item.cardNumber.slice(-4)}` : ''}
                                 </div>
                               )}
                               {(!item.credentialType || item.credentialType === 'login') && <>
-                                <div className="text-[10px] text-on-surface-variant font-black opacity-40 group-hover:opacity-100 group-hover:text-black transition-all uppercase tracking-widest truncate max-w-[120px] sm:max-w-none">{item.url.replace(/^https?:\/\//, '')}</div>
+                                <div className="text-[10px] text-on-surface-variant font-black transition-all uppercase tracking-widest truncate max-w-[120px] sm:max-w-none">{item.url.replace(/^https?:\/\//, '')}</div>
                                 {item.tags && item.tags.length > 0 && (
                                   <div className="flex gap-1 flex-wrap">
                                     {Array.from(new Set(item.tags)).map(tag => (
@@ -707,28 +716,28 @@ export default function Vault() {
                           <span className="md:hidden text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('vault.username', 'Username')}</span>
                           <div className="flex items-center gap-2 group/field">
                             {item.credentialType === 'passkey' ? (
-                              <span className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl truncate max-w-[150px] sm:max-w-none">
+                              <span className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low px-3 md:px-4 py-1.5 md:py-2 rounded-xl truncate max-w-[150px] sm:max-w-none">
                                 {item.authenticatorName || item.rpName || '-'}
                               </span>
                             ) : item.credentialType === 'payment_card' ? (
-                              <span className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl truncate max-w-[150px] sm:max-w-none">
+                              <span className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low px-3 md:px-4 py-1.5 md:py-2 rounded-xl truncate max-w-[150px] sm:max-w-none">
                                 {item.cardholderName || '-'}
                               </span>
                             ) : item.credentialType === 'secure_note' ? (
-                              <span className="text-[11px] font-black text-on-surface-variant/60 px-3 md:px-4 py-1.5 md:py-2 truncate max-w-[200px]">
+                              <span className="text-[11px] font-black text-on-surface-variant px-3 md:px-4 py-1.5 md:py-2 truncate max-w-[200px]">
                                 {item.noteContent ? item.noteContent.slice(0, 60) + (item.noteContent.length > 60 ? '…' : '') : '-'}
                               </span>
                             ) : formatUsername(item.username) ? (
                               <span
                                 onClick={(e) => { e.stopPropagation(); handleCopyUsername(item.username, item.id); }}
-                                className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all flex items-center gap-2 group-hover:shadow-md active:scale-95 truncate max-w-[150px] sm:max-w-[200px] md:max-w-none"
+                                className="text-[11px] font-mono font-black text-on-surface-variant tracking-wider bg-surface-container-low px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all flex items-center gap-2 group-hover:shadow-md active:scale-95 truncate max-w-[150px] sm:max-w-[200px] md:max-w-none"
                                 title={t('vault.copyUsername', 'Click to copy username')}
                               >
                                 <span className="truncate">{formatUsername(item.username)}</span>
                                 {copiedId === item.id && <Check size={12} className="text-green-400 shrink-0" />}
                               </span>
                             ) : (
-                              <span className="text-[10px] italic font-black text-on-surface-variant/30 px-3 md:px-4 py-1.5 md:py-2 uppercase tracking-widest">{t('vault.noUsername', 'No username')}</span>
+                              <span className="text-[10px] italic font-black text-on-surface-variant px-3 md:px-4 py-1.5 md:py-2 uppercase tracking-widest">{t('vault.noUsername', 'No username')}</span>
                             )}
                           </div>
                         </div>
@@ -739,7 +748,7 @@ export default function Vault() {
                             {(!item.credentialType || item.credentialType === 'login') && <>
                               <span
                                 onClick={(e) => { e.stopPropagation(); handleCopyPassword(item.password, item.id); }}
-                                className="text-[11px] font-mono font-black text-on-surface-variant tracking-[0.3em] bg-surface-container-low/50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all group-hover:shadow-md active:scale-95"
+                                className="text-[11px] font-mono font-black text-on-surface-variant tracking-[0.3em] bg-surface-container-low px-3 md:px-4 py-1.5 md:py-2 rounded-xl cursor-pointer hover:bg-black hover:text-white transition-all group-hover:shadow-md active:scale-95"
                                 title={t('vault.copyPassword', 'Click to copy password')}
                               >
                                 ••••••••
@@ -754,15 +763,15 @@ export default function Vault() {
                               </div>
                             </>}
                             {item.credentialType === 'passkey' && (
-                              <span className="text-[10px] px-3 py-1.5 bg-blue-500/10 text-blue-600 rounded-lg font-bold uppercase tracking-widest">
+                              <span className="text-[10px] px-3 py-1.5 bg-blue-500/10 text-blue-900 dark:text-blue-200 rounded-lg font-bold uppercase tracking-widest">
                                 {item.backedUp ? 'Synced' : 'Device-bound'}
                               </span>
                             )}
                             {item.credentialType === 'secure_note' && (
-                              <span className="text-[10px] px-3 py-1.5 bg-purple-500/10 text-purple-600 rounded-lg font-bold uppercase tracking-widest">{t('vault.noteBadge', 'Note')}</span>
+                              <span className="text-[10px] px-3 py-1.5 bg-purple-500/10 text-purple-900 dark:text-purple-200 rounded-lg font-bold uppercase tracking-widest">{t('vault.noteBadge', 'Note')}</span>
                             )}
                             {item.credentialType === 'payment_card' && (
-                              <span className="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg font-bold uppercase tracking-widest">{item.cardExpiry || t('vault.card', 'Card')}</span>
+                              <span className="text-[10px] px-3 py-1.5 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 rounded-lg font-bold uppercase tracking-widest">{item.cardExpiry || t('vault.card', 'Card')}</span>
                             )}
                           </div>
                         </div>
@@ -777,7 +786,7 @@ export default function Vault() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleCopyUsername(item.username, item.id); }}
                                   aria-label={`Copy username for ${item.service}`}
-                                  className="p-2 md:p-2.5 bg-surface-container-low/50 hover:bg-emerald-600 hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90"
+                                  className="p-2 md:p-2.5 bg-surface-container-low hover:bg-emerald-800 hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90"
                                   title={t('vault.copyUsername', 'Copy username')}
                                 >
                                   {copiedId === item.id ? <Check size={15} className="text-emerald-400" aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
@@ -786,7 +795,7 @@ export default function Vault() {
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCopyPassword(item.password, item.id); }}
                                 aria-label={`Copy password for ${item.service}`}
-                                className="p-2 md:p-2.5 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90"
+                                className="p-2 md:p-2.5 bg-surface-container-low hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-md active:scale-90"
                                 title={t('vault.copyPassword', 'Copy password')}
                               >
                                 {copiedPwdId === item.id ? <Check size={15} className="text-green-400" aria-hidden="true" /> : <Key size={15} aria-hidden="true" />}
@@ -797,7 +806,7 @@ export default function Vault() {
                               <button
                                 onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === item.id ? null : item.id); }}
                                 aria-label={`More options for ${item.service}`}
-                                className="p-2 md:p-3 bg-surface-container-low/50 hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-lg active:scale-90"
+                                className="p-2 md:p-3 bg-surface-container-low hover:bg-black hover:text-white text-on-surface-variant rounded-xl transition-all shadow-sm hover:shadow-lg active:scale-90"
                               >
                                 <MoreVertical size={16} aria-hidden="true" />
                               </button>
@@ -929,7 +938,7 @@ export default function Vault() {
               <button
                 onClick={() => setIsAdding(true)}
                 aria-label={t('vault.addCredential', 'Add Credential')}
-                className="fixed bottom-8 right-8 z-50 inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-xl shadow-emerald-600/30 hover:shadow-emerald-600/50"
+                className="fixed bottom-8 right-8 z-50 inline-flex items-center gap-2 bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-800 text-white px-5 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-xl shadow-emerald-600/30 hover:shadow-emerald-600/50"
               >
                 <PlusCircle size={18} />
                 <span className="hidden sm:inline">{t('vault.addCredential', 'Add Credential')}</span>

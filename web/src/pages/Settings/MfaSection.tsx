@@ -2,7 +2,7 @@ import React from 'react';
 import { Key, Mail, KeyRound, Fingerprint, ToggleRight, ToggleLeft, Loader2, Trash2, AlertTriangle, ShieldCheck, X, Check, Copy, RefreshCw, Smartphone, Smartphone as SmartphoneIcon, Mail as MailIcon, Key as KeyIcon, ShieldCheck as ShieldCheckIcon } from 'lucide-react';
 
 const FbShieldLock = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
     <rect x="9" y="11" width="6" height="5" rx="1"/>
@@ -92,7 +92,7 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
       <section>
         <div className="mb-6">
           <h2 className="text-[15px] font-semibold text-neutral-900 dark:text-white leading-snug">{t('settings.authProtocols', 'Authentication Protocols')}</h2>
-          <p className="mt-1 text-[13px] text-neutral-500 dark:text-neutral-400">{t('settings.authProtocolsDesc', 'Manage multi-factor authentication and login methods.')}</p>
+          <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-300">{t('settings.authProtocolsDesc', 'Manage multi-factor authentication and login methods.')}</p>
           <div className="mt-4 h-px bg-neutral-200 dark:bg-white/8" />
         </div>
         <div className="bg-surface-container-low rounded-xl p-10">
@@ -138,8 +138,9 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
                         onClick={e => { e.stopPropagation(); handleTotpRemove(); }}
                         className="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                         title={t('settings.removeAuthApp', 'Remove authenticator app')}
+                        aria-label={t('settings.removeAuthApp', 'Remove authenticator app')}
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={15} aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -210,8 +211,9 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
                         onClick={e => { e.stopPropagation(); handleEmailRemove(); }}
                         className="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                         title={t('settings.removeEmailOtp', 'Remove email OTP')}
+                        aria-label={t('settings.removeEmailOtp', 'Remove email OTP')}
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={15} aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -227,7 +229,7 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
               return (
                 <div
                   onClick={() => openMfaModal('passkey')}
-                  className={`p-8 rounded-xl border-2 transition-all cursor-pointer flex flex-col ${active ? 'border-black dark:border-on-primary-container bg-white dark:bg-surface-container-high shadow-lg' : unavailable ? 'border-amber-300/60 dark:border-amber-700/40 bg-surface-container-high opacity-75' : 'border-outline-variant/40 bg-surface-container-high hover:border-outline-variant hover:bg-surface-container-highest'}`}
+                  className={`p-8 rounded-xl border-2 transition-all cursor-pointer flex flex-col ${active ? 'border-black dark:border-on-primary-container bg-white dark:bg-surface-container-high shadow-lg' : unavailable ? 'border-amber-300/60 dark:border-amber-700/40 bg-surface-container-high' : 'border-outline-variant/40 bg-surface-container-high hover:border-outline-variant hover:bg-surface-container-highest'}`}
                 >
                   <div className="flex items-center justify-between mb-6">
                     <KeyRound size={32} className={active ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
@@ -248,7 +250,7 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
                       </span>
                     )}
                     {unavailable && (
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                      <p className="text-[10px] text-black dark:text-amber-200 font-semibold flex items-center gap-1">
                         <AlertTriangle size={10} />{t('mfa.noAuthenticatorVM', 'Not available — no platform authenticator detected (VM environment)')}
                       </p>
                     )}
@@ -265,7 +267,7 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
               return (
                 <div
                   onClick={() => openMfaModal('platform')}
-                  className={`p-8 rounded-xl border-2 transition-all cursor-pointer flex flex-col ${active ? 'border-black dark:border-on-primary-container bg-white dark:bg-surface-container-high shadow-lg' : unavailable ? 'border-amber-300/60 dark:border-amber-700/40 bg-surface-container-high opacity-75' : 'border-outline-variant/40 bg-surface-container-high hover:border-outline-variant hover:bg-surface-container-highest'}`}
+                  className={`p-8 rounded-xl border-2 transition-all cursor-pointer flex flex-col ${active ? 'border-black dark:border-on-primary-container bg-white dark:bg-surface-container-high shadow-lg' : unavailable ? 'border-amber-300/60 dark:border-amber-700/40 bg-surface-container-high' : 'border-outline-variant/40 bg-surface-container-high hover:border-outline-variant hover:bg-surface-container-highest'}`}
                 >
                   <div className="flex items-center justify-between mb-6">
                     <Fingerprint size={32} className={active ? 'text-black dark:text-white' : 'text-on-surface-variant'} />
@@ -286,7 +288,7 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
                       </span>
                     )}
                     {unavailable && (
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                      <p className="text-[10px] text-black dark:text-amber-200 font-semibold flex items-center gap-1">
                         <AlertTriangle size={10} />{t('mfa.noBiometricHardware', 'Not available — Touch ID / Windows Hello requires biometric hardware')}
                       </p>
                     )}
@@ -315,16 +317,20 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
               type="button"
               onClick={handleToggleQuickUnlock}
               disabled={quickUnlockLoading}
+              aria-label={quickUnlockEnabled
+                ? t('mfa.quickUnlockDisable', 'Disable Quick Unlock')
+                : t('mfa.quickUnlockEnable', 'Enable Quick Unlock')}
+              aria-pressed={quickUnlockEnabled}
               className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-sm active:scale-[0.98] ${
-                quickUnlockEnabled 
-                  ? 'bg-black text-white hover:opacity-90 dark:bg-white dark:text-black' 
+                quickUnlockEnabled
+                  ? 'bg-black text-white hover:opacity-90 dark:bg-white dark:text-black'
                   : 'bg-white text-black border-2 border-outline-variant hover:border-black dark:bg-[#1a1a1a] dark:text-white dark:border-white/20 dark:hover:border-white'
               }`}
             >
-              {quickUnlockLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+              {quickUnlockLoading ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : null}
               {quickUnlockEnabled
-                ? <><ToggleRight size={16} />{t('common.enabled', 'Enabled')}</>
-                : <><ToggleLeft size={16} />{t('common.disabled', 'Disabled')}</>}
+                ? <><ToggleRight size={16} aria-hidden="true" />{t('common.enabled', 'Enabled')}</>
+                : <><ToggleLeft size={16} aria-hidden="true" />{t('common.disabled', 'Disabled')}</>}
             </button>
           </div>
 
@@ -346,14 +352,18 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
               </div>
               <button
                 onClick={handlePasswordlessToggle}
+                aria-label={mfaConfig.passwordlessEnabled
+                  ? t('settings.passwordlessDisable', 'Disable passwordless login')
+                  : t('settings.passwordlessEnable', 'Enable passwordless login')}
+                aria-pressed={mfaConfig.passwordlessEnabled}
                 className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all"
                 style={mfaConfig.passwordlessEnabled
                   ? { background: 'black', color: 'white' }
                   : { background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface)' }}
               >
                 {mfaConfig.passwordlessEnabled
-                  ? <><ToggleRight size={16} />{t('settings.passwordlessOn', 'Enabled')}</>
-                  : <><ToggleLeft size={16} />{t('settings.passwordlessOff', 'Disabled')}</>}
+                  ? <><ToggleRight size={16} aria-hidden="true" />{t('settings.passwordlessOn', 'Enabled')}</>
+                  : <><ToggleLeft size={16} aria-hidden="true" />{t('settings.passwordlessOff', 'Disabled')}</>}
               </button>
             </div>
           )}
@@ -376,14 +386,18 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
               </div>
               <button
                 onClick={handlePasswordLoginToggle}
+                aria-label={mfaConfig.passwordLoginEnabled === false
+                  ? t('settings.twoFactorEnable', 'Enable password-only login')
+                  : t('settings.twoFactorDisable', 'Disable password-only login (require two-factor)')}
+                aria-pressed={mfaConfig.passwordLoginEnabled !== false}
                 className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all"
                 style={mfaConfig.passwordLoginEnabled === false
                   ? { background: 'rgb(245 158 11)', color: 'white' }
                   : { background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface)' }}
               >
                 {mfaConfig.passwordLoginEnabled === false
-                  ? <><ToggleLeft size={16} />{t('settings.passwordLoginOff', 'Disabled')}</>
-                  : <><ToggleRight size={16} />{t('settings.passwordLoginOn', 'Enabled')}</>}
+                  ? <><ToggleLeft size={16} aria-hidden="true" />{t('settings.passwordLoginOff', 'Disabled')}</>
+                  : <><ToggleRight size={16} aria-hidden="true" />{t('settings.passwordLoginOn', 'Enabled')}</>}
               </button>
             </div>
           )}
@@ -410,9 +424,9 @@ export default function MfaSection({ profile, emailServerConfig }: Props) {
               className="relative w-full max-w-xl bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10"
             >
               <div className="absolute top-6 right-6 z-10">
-                <button onClick={closeMfaModal} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                  <X size={20} className="text-slate-500" />
-                </button>
+                <button aria-label="Close" onClick={closeMfaModal} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
+  <X aria-hidden="true" size={20} className="text-slate-500" />
+</button>
               </div>
 
               <MfaModalContent

@@ -17,6 +17,13 @@ interface HealthEntry {
   isCommon: boolean;
 }
 
+/** djb2 fallback hash (no SubtleCrypto needed, non-cryptographic but sufficient for dedup). */
+function djb2(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(16);
+}
+
 function computeHealth(credentials: Credential[]): {
   entries: HealthEntry[];
   weakCount: number;
@@ -26,24 +33,29 @@ function computeHealth(credentials: Credential[]): {
 } {
   const withPasswords = credentials.filter(c => c.password && c.password.length > 0);
 
-  // Detect reused passwords: group by password string (all already in-memory)
-  const passwordGroups = new Map<string, number>();
+  // Detect reused passwords: group by an opaque hash so plaintext never sits in
+  // a long-lived Map keyed by the actual password string (heap-inspection risk).
+  const hashCounts = new Map<string, number>();
   for (const c of withPasswords) {
-    const p = c.password!;
-    passwordGroups.set(p, (passwordGroups.get(p) ?? 0) + 1);
+    const key = djb2(c.password!);
+    hashCounts.set(key, (hashCounts.get(key) ?? 0) + 1);
   }
 
   const entries: HealthEntry[] = withPasswords.map(c => {
     const p = c.password!;
     const score = passwordScore(p);
+    const key = djb2(p);
     return {
       credential: c,
       score,
       isWeak:   score <= 1,
-      isReused: (passwordGroups.get(p) ?? 1) > 1,
+      isReused: (hashCounts.get(key) ?? 1) > 1,
       isCommon: COMMON_PASSWORDS.has(p),
     };
   });
+
+  // Immediately drop the transient dedup map so it is GC-eligible.
+  hashCounts.clear();
 
   const weakCount   = entries.filter(e => e.isWeak).length;
   const reusedCount = entries.filter(e => e.isReused).length;
@@ -59,6 +71,7 @@ function computeHealth(credentials: Credential[]): {
 
   return { entries, weakCount, reusedCount, commonCount, healthScore };
 }
+
 
 function ScoreGauge({ score }: { score: number }) {
   const radius = 54;
@@ -104,7 +117,7 @@ function CredentialRow({ entry, navigate }: { entry: HealthEntry; navigate: Retu
       animate={{ opacity: 1, y: 0 }}
       className={`flex items-center gap-4 p-4 rounded-xl border ${borderColor}`}
     >
-      <ShieldAlert size={18} className={severity === 'critical' ? 'text-red-600 shrink-0' : severity === 'high' ? 'text-orange-600 shrink-0' : 'text-amber-600 shrink-0'} />
+      <ShieldAlert size={18} className={severity === 'critical' ? 'text-red-600 dark:text-red-400 shrink-0' : severity === 'high' ? 'text-orange-900 dark:text-orange-300 shrink-0' : 'text-amber-600 dark:text-amber-400 shrink-0'} />
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm truncate text-black dark:text-white">{entry.credential.service}</p>
         {entry.credential.username && entry.credential.username !== 'No username' && (
@@ -115,7 +128,7 @@ function CredentialRow({ entry, navigate }: { entry: HealthEntry; navigate: Retu
         {issues.map(issue => (
           <span key={issue} className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
             issue === 'Breached' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' :
-            issue === 'Weak'     ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300' :
+            issue === 'Weak'     ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-900 dark:text-orange-300' :
             'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
           }`}>
             {issue}
@@ -147,7 +160,7 @@ export default function VaultHealth() {
   const cleanCount   = entries.length - issueEntries.length;
 
   const scoreLabel = healthScore >= 90 ? 'Excellent' : healthScore >= 75 ? 'Good' : healthScore >= 50 ? 'Fair' : 'Poor';
-  const scoreColor = healthScore >= 75 ? 'text-green-600' : healthScore >= 50 ? 'text-orange-600' : 'text-red-600';
+  const scoreColor = healthScore >= 75 ? 'text-green-800 dark:text-green-400' : healthScore >= 50 ? 'text-orange-900 dark:text-orange-300' : 'text-red-600 dark:text-red-400';
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -179,15 +192,15 @@ export default function VaultHealth() {
         {/* Stats */}
         <div className="md:col-span-2 grid grid-cols-2 gap-4">
           {[
-            { labelKey: 'compromised', label: 'Compromised', value: commonCount,  color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-950/20',    border: 'border-red-200 dark:border-red-900/50',    descKey: 'compromisedDesc', desc: 'Found in known breach lists' },
-            { labelKey: 'weak',        label: 'Weak',        value: weakCount,    color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/20', border: 'border-orange-200 dark:border-orange-900/50', descKey: 'weakDesc', desc: 'Short or simple passwords' },
-            { labelKey: 'reused',      label: 'Reused',      value: reusedCount,  color: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-950/20',  border: 'border-amber-200 dark:border-amber-900/50',  descKey: 'reusedDesc', desc: 'Same password across accounts' },
-            { labelKey: 'healthy',     label: 'Healthy',     value: cleanCount,   color: 'text-green-600',  bg: 'bg-green-50 dark:bg-green-950/20',  border: 'border-green-200 dark:border-green-900/50',  descKey: 'healthyDesc', desc: 'No issues detected' },
+            { labelKey: 'compromised', label: 'Compromised', value: commonCount,  color: 'text-red-600 dark:text-red-400',    bg: 'bg-red-50 dark:bg-red-950/20',    border: 'border-red-200 dark:border-red-900/50',    descKey: 'compromisedDesc', desc: 'Found in known breach lists' },
+            { labelKey: 'weak',        label: 'Weak',        value: weakCount,    color: 'text-orange-900 dark:text-orange-300', bg: 'bg-orange-50 dark:bg-orange-950/20', border: 'border-orange-200 dark:border-orange-900/50', descKey: 'weakDesc', desc: 'Short or simple passwords' },
+            { labelKey: 'reused',      label: 'Reused',      value: reusedCount,  color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-950/20',  border: 'border-amber-200 dark:border-amber-900/50',  descKey: 'reusedDesc', desc: 'Same password across accounts' },
+            { labelKey: 'healthy',     label: 'Healthy',     value: cleanCount,   color: 'text-green-800 dark:text-green-400',  bg: 'bg-green-50 dark:bg-green-950/20',  border: 'border-green-200 dark:border-green-900/50',  descKey: 'healthyDesc', desc: 'No issues detected' },
           ].map(({ labelKey, label, value, color, bg, border, descKey, desc }) => (
             <div key={label} className={`rounded-2xl p-5 border ${bg} ${border}`}>
               <p className={`text-3xl font-black font-headline ${color}`}>{value}</p>
               <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant mt-0.5">{t(`health.${labelKey}`, label)}</p>
-              <p className="text-xs text-on-surface-variant mt-1 opacity-70">{t(`health.${descKey}`, desc)}</p>
+              <p className="text-xs text-on-surface-variant mt-1">{t(`health.${descKey}`, desc)}</p>
             </div>
           ))}
         </div>
@@ -216,7 +229,7 @@ export default function VaultHealth() {
       ) : entries.length > 0 ? (
         <section className="mb-12 flex flex-col items-center py-16 text-center gap-4">
           <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/40 flex items-center justify-center">
-            <CheckCircle2 size={32} className="text-green-600" />
+            <CheckCircle2 size={32} className="text-green-800 dark:text-green-400" />
           </div>
           <div>
             <h2 className="font-headline font-black text-2xl text-black dark:text-white mb-2">{t('health.allClear', 'All Clear')}</h2>
@@ -233,15 +246,15 @@ export default function VaultHealth() {
       {/* ── What we check ──────────────────────────────────────────────────── */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface-container-low/50 rounded-2xl p-8 border border-outline-variant/10">
         <div>
-          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.compromisedCheck', 'Compromised Check')}</h3>
+          <h2 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.compromisedCheck', 'Compromised Check')}</h2>
           <p className="text-xs text-on-surface-variant">{t('health.compromisedCheckDesc', 'Matches against 500+ passwords from the rockyou.txt top entries and HIBP research. Run the Breach Monitor for a deeper scan using the full 900M+ HIBP dataset.')}</p>
         </div>
         <div>
-          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.strengthAnalysis', 'Strength Analysis')}</h3>
+          <h2 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.strengthAnalysis', 'Strength Analysis')}</h2>
           <p className="text-xs text-on-surface-variant">{t('health.strengthAnalysisDesc', 'Evaluates length, character diversity (uppercase, lowercase, numbers, symbols). Passwords scoring ≤ 1/5 are flagged as weak.')}</p>
         </div>
         <div>
-          <h3 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.reuseDetection', 'Reuse Detection')}</h3>
+          <h2 className="font-bold text-sm mb-1 text-black dark:text-white">{t('health.reuseDetection', 'Reuse Detection')}</h2>
           <p className="text-xs text-on-surface-variant">{t('health.reuseDetectionDesc', 'Identifies passwords shared across multiple accounts. All comparisons happen locally - your passwords never leave this page.')}</p>
         </div>
       </section>

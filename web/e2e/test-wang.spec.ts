@@ -1,13 +1,13 @@
 import { test, expect, chromium } from '@playwright/test';
 
-test('login with wang@gmail.com', async () => {
+test('login with mfa-test@pwdnow.local', async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/brave-browser' });
   const page = await browser.newPage();
   page.on('console', msg => console.log(`[Browser Console ${msg.type()}] ${msg.text()}`));
   page.on('pageerror', err => console.log(`[Browser Page Error] ${err.message}`));
   await page.goto('http://localhost:1234/login');
   
-  await page.fill('#email', 'wang@gmail.com');
+  await page.fill('#email', 'mfa-test@pwdnow.local');
   await page.click('button[type="submit"]');
   
   // Wait for network and DOM update
@@ -20,7 +20,7 @@ test('login with wang@gmail.com', async () => {
   await expect(page.locator('#password')).toBeVisible();
   
   // Enter password
-  await page.fill('#password', 'wang@gmail.com');
+  await page.fill('#password', 'mfa-test@pwdnow.local');
   await page.click('button[type="submit"]');
   
   await page.waitForTimeout(2000);

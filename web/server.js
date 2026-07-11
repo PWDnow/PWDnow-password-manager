@@ -14,12 +14,14 @@ import { createServer as createHttpsServer } from 'https';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import { initAuth, mountAuthAndVault, getServerPublicIp } from './auth.js';
+import { checkRpcRate, checkDnsRate } from './lib/rateLimiter.js';
 import { promises as dnsPromises } from 'dns';
+import { logger, httpLogger } from './lib/logger.js';
 
 dotenv.config();
 
-// #8-FIX: fail closed if NODE_ENV is not set — defaults to 'development' silently
-// allow sensitive logging to fire in production-like launchers (CWE-209).
+// Fail closed if NODE_ENV is not explicitly set. Defaulting to 'development'
+// silently enables verbose logging in production-like launchers (CWE-209).
 if (!process.env.NODE_ENV) {
   throw new Error('NODE_ENV must be set explicitly (set to "production" in production launchers)');
 }
@@ -37,7 +39,7 @@ const DAEMON_GRPC_ADDR = process.env.DAEMON_GRPC_ADDR || '127.0.0.1:50051';
 
 // Guard: in production, nginx proxies to port 1234 — a mismatch causes 502.
 if (process.env.NODE_ENV === 'production' && PORT !== 1234) {
-  console.warn(`[server] WARNING: PORT=${PORT} but nginx upstream expects 1234. This will cause 502 Bad Gateway.`);
+  logger.warn({ port: PORT, expected: 1234 }, 'PORT mismatch: nginx upstream expects 1234 — this will cause 502 Bad Gateway');
 }
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -69,21 +71,19 @@ if (SSL_MODE === 'true' || SSL_MODE === 'force') {
       key:  [readFileSync(ecdsaKey),  readFileSync(rsaKey)],
       minVersion: 'TLSv1.3',
     };
-    console.log('[SSL] Dual-cert ECDSA+RSA loaded from', SSL_DIR);
+    logger.info({ sslDir: SSL_DIR, mode: 'ecdsa+rsa' }, 'SSL dual-cert loaded');
   } else if (hasEcdsa) {
     tlsOptions = { cert: readFileSync(ecdsaCert), key: readFileSync(ecdsaKey), minVersion: 'TLSv1.3' };
-    console.log('[SSL] ECDSA cert loaded from', SSL_DIR);
+    logger.info({ sslDir: SSL_DIR, mode: 'ecdsa' }, 'SSL cert loaded');
   } else if (hasRsa) {
     tlsOptions = { cert: readFileSync(rsaCert), key: readFileSync(rsaKey), minVersion: 'TLSv1.3' };
-    console.log('[SSL] RSA cert loaded from', SSL_DIR);
+    logger.info({ sslDir: SSL_DIR, mode: 'rsa' }, 'SSL cert loaded');
   } else if (hasFlat) {
     tlsOptions = { cert: readFileSync(flatCert), key: readFileSync(flatKey), minVersion: 'TLSv1.2' };
-    console.log('[SSL] Single cert loaded from', SSL_DIR);
+    logger.info({ sslDir: SSL_DIR, mode: 'flat' }, 'SSL cert loaded');
   } else {
-    console.warn(`[SSL] SSL=${SSL_MODE} but no certificates found in ${SSL_DIR}.`);
-    console.warn(`[SSL] Place your cert at: ${flatCert}`);
-    console.warn(`[SSL] Place your key  at: ${flatKey}`);
-    console.warn('[SSL] Or run:  npm run ssl:generate  to create a self-signed cert.');
+    logger.warn({ sslDir: SSL_DIR, sslMode: SSL_MODE, certPath: flatCert, keyPath: flatKey },
+      'SSL enabled but no certificates found — run: npm run ssl:generate');
   }
 }
 
@@ -140,14 +140,8 @@ app.use((req, res, next) => {
 });
 app.use(cookieParser());
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
-  });
-  next();
-});
+// Structured HTTP access logging with correlation ID and automatic severity mapping.
+app.use(httpLogger);
 
 
 // ── Setup token ───────────────────────────────────────────────────────────────
@@ -177,6 +171,18 @@ function isLocalhost(req) {
   }
 
   return true; // direct local connection
+}
+
+// Best-effort client IP for rate limiting: trust X-Real-IP only when the
+// connection itself terminates at Nginx on localhost (same trust model as
+// isLocalhost above).
+function clientIp(req) {
+  const socketAddr = req.socket.remoteAddress;
+  const socketIsLocal =
+    socketAddr === '127.0.0.1' || socketAddr === '::1' || socketAddr === '::ffff:127.0.0.1';
+  const realIp = req.headers['x-real-ip'];
+  if (socketIsLocal && realIp) return realIp;
+  return socketAddr || '127.0.0.1';
 }
 
 function requireSetupToken(req, res, next) {
@@ -220,8 +226,12 @@ app.use((req, res, next) => {
         styleSrc:       ["'self'"],
         fontSrc:        ["'self'"],
         imgSrc:         ["'self'", "blob:"],  // data: removed (exfil vector)
-        // 'self' already covers same-origin WS/WSS; no wildcard ws: needed.
-        connectSrc:     ["'self'", "ws:", "wss:", "https://api.pwnedpasswords.com"],
+        // WEB-04: 'self' already covers same-origin WS/WSS (the app has none —
+        // /ws is defunct, returns 410); a bare ws:/wss: wildcard would let a
+        // script-injection open a WebSocket to any host, so it's dropped.
+        // pwnedpasswords.com is a live runtime dependency (BreachMonitor.tsx
+        // k-anonymity range query), not the offline-only HIBP filter — keep it.
+        connectSrc:     ["'self'", "https://api.pwnedpasswords.com"],
         formAction:     ["'self'"],
         frameAncestors: ["'none'"],
         baseUri:        ["'none'"],
@@ -247,12 +257,20 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-// Cap JSON body size at 512 KB. Vault import uploads (which can be larger) must
-// use a dedicated chunked endpoint.
-app.use(express.json({ limit: '512kb' }));
+// Global JSON body limit is 512 KB. The travel-vault mirror endpoint accepts
+// up to 5 MiB of opaque ciphertext, so it uses a route-specific override.
+// Nginx's client_max_body_size must be set to 5m to match (deploy/nginx/vault.conf).
+const jsonDefault = express.json({ limit: '512kb' });
+const jsonTravelVault = express.json({ limit: '5mb' });
+app.use((req, res, next) => {
+  if (req.path === '/api/vault/travel-vault') return jsonTravelVault(req, res, next);
+  return jsonDefault(req, res, next);
+});
 
-app.use((_req, res, next) => {
-  res.setHeader('X-Request-ID', randomBytes(8).toString('hex'));
+// Echo the pino-http correlation ID back in the response header so clients
+// and downstream services can correlate logs for a specific request.
+app.use((req, res, next) => {
+  if (req.id) res.setHeader('X-Request-ID', req.id);
   next();
 });
 
@@ -350,10 +368,10 @@ function getSriHtml() {
       const raw = readFileSync(indexHtmlPath, 'utf-8');
       _sriHtml = computeSriForAssets(raw, distPath);
       _sriHtmlMtime = mtime;
-      console.log(`[Server] index.html updated (mtime: ${mtime}), refreshed SRI cache.`);
+      logger.debug({ mtime }, 'index.html SRI cache refreshed');
     }
   } catch (err) {
-    console.error('[Server] Failed to read index.html for SRI cache:', err.message);
+    logger.error({ err: err.message }, 'Failed to read index.html for SRI cache');
     _sriHtml = null;
   }
   return _sriHtml;
@@ -374,15 +392,14 @@ function refuseIfSetupDone(_req, res, next) {
 }
 
 // Vend the setup token only to localhost callers while setup is pending.
-// #10-FIX: also enforce that Origin/Host both resolve to localhost to block DNS-rebinding.
+// Host and Origin headers are also validated to block DNS-rebinding attacks.
 app.get('/api/setup-token', refuseIfSetupDone, (req, res) => {
   if (!isLocalhost(req)) {
     return res.status(403).json({ error: 'forbidden' });
   }
 
-  // #10-FIX: Strict Host header validation to block DNS-rebinding.
-  // Trusting only 'localhost' and '127.0.0.1' ensures the browser's 
-  // same-origin policy treats this as a distinct local origin.
+  // Strict Host header validation: only 'localhost' and '127.0.0.1' are trusted,
+  // ensuring the browser's same-origin policy treats this as a local-only origin.
   const host = req.headers['host'];
   const localHostRe = /^(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
   if (!host || !localHostRe.test(host)) {
@@ -479,9 +496,7 @@ app.post('/api/ubuntu-pro/enable-fips', requireSetupToken, (_req, res) => {
 // ── Prometheus metrics endpoint ───────────────────────────────────────────────
 // Loopback-only — never exposed to the internet.
 app.get('/metrics', async (req, res) => {
-  const socketAddr = req.socket.remoteAddress || '';
-  const isLocal = socketAddr === '127.0.0.1' || socketAddr === '::1' || socketAddr === '::ffff:127.0.0.1';
-  if (!isLocal) { return res.status(403).end(); }
+  if (!isLocalhost(req)) { return res.status(403).end(); }
   res.set('Content-Type', promRegister.contentType);
   res.end(await promRegister.metrics());
 });
@@ -536,7 +551,12 @@ app.get('/health', (req, res) => {
 });
 
 // ── DNS record check — public utility (DNS is public info, no auth needed) ────
+// Fans out ~35 DNS lookups per call (MX/TXT/DMARC/BIMI + DKIM selector probes)
+// against a caller-supplied domain. Rate-limited to prevent DNS amplification.
 app.get('/api/system/dns-check', async (req, res) => {
+  if (!await checkDnsRate(clientIp(req), res)) {
+    return res.status(429).json({ error: 'too_many_requests' });
+  }
   const { domain } = req.query;
   if (!domain || typeof domain !== 'string' || !/^[a-zA-Z0-9._-]{1,253}$/.test(domain)) {
     return res.status(400).json({ error: 'Invalid domain' });
@@ -598,8 +618,7 @@ app.get('/api/system/dns-check', async (req, res) => {
 
 mountAuthAndVault(app);
 
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ── SPA catch-all ────────────────────────────────────────────────────────────
 app.get('*path', (req, res) => {
   const indexHtml = getSriHtml();
   if (!indexHtml) {
@@ -655,7 +674,48 @@ function daemonMetadata() {
   return md;
 }
 
-app.post('/api/rpc', (req, res) => {
+// Defense-in-depth for the gRPC bridge: a standard CSRF cookie check is not
+// applicable here because daemon-mode auth carries its session token in the
+// request body rather than a cookie. Instead, (a) per-IP rate limiting and
+// (b) same-origin Origin/Referer enforcement are used to block cross-site
+// Unlock attempts from third-party pages.
+const RPC_LOCAL_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|::1|\[::1\])(:\d+)?$/i;
+
+app.post('/api/rpc', async (req, res) => {
+  if (!await checkRpcRate(clientIp(req), res)) {
+    return res.status(429).json({ error: 'too_many_requests' });
+  }
+
+  const host = req.headers['host'];
+  const sameOriginRe = host
+    ? new RegExp(`^https?://${host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+    : null;
+  const isAllowedOrigin = (originUrl) => {
+    if (sameOriginRe && sameOriginRe.test(originUrl)) return true;
+    return RPC_LOCAL_ORIGIN_RE.test(originUrl);
+  };
+
+  const origin = req.headers['origin'];
+  const referer = req.headers['referer'];
+  if (origin) {
+    if (!isAllowedOrigin(origin)) {
+      return res.status(403).json({ error: 'forbidden_origin' });
+    }
+  } else if (referer) {
+    try {
+      if (!isAllowedOrigin(new URL(referer).origin)) {
+        return res.status(403).json({ error: 'forbidden_origin' });
+      }
+    } catch {
+      return res.status(403).json({ error: 'forbidden_referer' });
+    }
+  } else {
+    // Fail closed: a same-origin browser fetch() always sends Origin, and
+    // same-origin navigations always send Referer. A request with neither is
+    // not a legitimate browser call and is rejected.
+    return res.status(403).json({ error: 'forbidden_no_origin' });
+  }
+
   const { method, payload } = req.body;
   if (!method) return res.status(400).json({ error: 'Method required' });
 
@@ -726,20 +786,21 @@ if (SSL_MODE === 'force' && tlsOptions) {
   });
   const redirectServer = createHttpServer(httpRedirect);
   redirectServer.listen(PORT, BIND_HOST, () => {
-    console.log(`[SSL] HTTP redirect server on http://${BIND_HOST}:${PORT} → HTTPS:${SSL_PORT}`);
+    logger.info({ bindHost: BIND_HOST, port: PORT, httpsPort: SSL_PORT }, 'HTTP→HTTPS redirect server listening');
   });
   redirectServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.warn(`[SSL] Could not bind HTTP redirect to port ${PORT}: already in use`);
+      logger.warn({ port: PORT, err: err.message }, 'Could not bind HTTP redirect server: port in use');
     }
   });
+  // Store ref so graceful shutdown can drain this server too.
+  app.locals._redirectServer = redirectServer;
 }
 
 mainServer.listen(listenPort, BIND_HOST, () => {
   const scheme = tlsOptions ? 'https' : 'http';
-  console.log(`Enterprise Vault Server running on ${scheme}://${BIND_HOST}:${listenPort}`);
-  if (tlsOptions) console.log(`[SSL] Mode: ${SSL_MODE} | Certs: ${SSL_DIR}`);
-  console.log(`Vault daemon status: connecting to backend...`);
+  logger.info({ scheme, host: BIND_HOST, port: listenPort, sslMode: SSL_MODE || 'off', env: process.env.NODE_ENV },
+    'Enterprise Vault Server listening');
   // Signal PM2 that the server is ready (requires wait_ready: true in ecosystem.config.cjs).
   if (process.send) process.send('ready');
 });
@@ -749,7 +810,7 @@ mainServer.listen(listenPort, BIND_HOST, () => {
 // at /api/rpc. We catch any stale /ws upgrade requests here and return 410 Gone.
 mainServer.on('upgrade', (req, socket) => {
   if (req.url === '/ws') {
-    console.log(`[server] Defunct /ws upgrade requested from ${req.socket.remoteAddress} — returning 410 Gone`);
+    logger.warn({ remoteAddress: req.socket.remoteAddress }, 'Defunct /ws upgrade rejected with 410 Gone');
     socket.write('HTTP/1.1 410 Gone\r\nConnection: close\r\n\r\n');
     socket.destroy();
   }
@@ -757,33 +818,44 @@ mainServer.on('upgrade', (req, socket) => {
 
 mainServer.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`\n CRITICAL ERROR: Port ${listenPort} is already in use!`);
-    console.error(`Please stop the process using port ${listenPort} or change the PORT/SSL_PORT in your .env file.\n`);
+    logger.fatal({ port: listenPort, err: error.message }, 'Port already in use — change PORT/SSL_PORT in .env');
     process.exit(1);
   } else {
-    console.error('An unexpected server error occurred:', error);
+    logger.fatal({ err: error.message, stack: error.stack }, 'Unexpected server error');
     process.exit(1);
   }
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
-// Stop accepting new connections, drain in-flight WS frames and HTTP requests,
-// then exit cleanly. PM2 kill_timeout must be > DRAIN_TIMEOUT_MS.
-const DRAIN_TIMEOUT_MS = 25_000;
+// Stop accepting new connections and drain in-flight HTTP requests before
+// exiting. PM2's kill_timeout must exceed DRAIN_TIMEOUT_MS.
+// Override via DRAIN_TIMEOUT_MS env var (milliseconds).
+const DRAIN_TIMEOUT_MS = parseInt(process.env.DRAIN_TIMEOUT_MS || '25000', 10);
 
 function gracefulShutdown(signal) {
-  console.log(`[server] ${signal} received — stopping listener, draining (max ${DRAIN_TIMEOUT_MS / 1000}s)...`);
+  logger.info({ signal, drainTimeoutMs: DRAIN_TIMEOUT_MS }, 'Signal received — stopping listener and draining');
 
-  // Stop accepting new HTTP(S) connections; drain existing keep-alive connections.
-  mainServer.close((err) => {
-    if (err) console.error('[server] mainServer.close error:', err);
-    else console.log('[server] Server closed — exiting cleanly');
-    process.exit(err ? 1 : 0);
-  });
+  let closed = 0;
+  const numServers = app.locals._redirectServer ? 2 : 1;
+  function onClosed(err) {
+    if (err) logger.error({ err: err.message }, 'Error while closing server');
+    if (++closed >= numServers) {
+      logger.info('All servers closed — exiting cleanly');
+      process.exit(err ? 1 : 0);
+    }
+  }
+
+  // Close the HTTPS/HTTP main server.
+  mainServer.close(onClosed);
+
+  // Also close the HTTP→HTTPS redirect server if it is running (Fix #9).
+  if (app.locals._redirectServer) {
+    app.locals._redirectServer.close(onClosed);
+  }
 
   // Hard-exit fallback to prevent hung deploys.
   setTimeout(() => {
-    console.error('[server] Drain timeout exceeded — forcing exit');
+    logger.error({ drainTimeoutMs: DRAIN_TIMEOUT_MS }, 'Drain timeout exceeded — forcing exit');
     process.exit(1);
   }, DRAIN_TIMEOUT_MS).unref();
 }

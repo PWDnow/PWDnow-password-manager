@@ -54,20 +54,23 @@ jobs:
           cache-dependency-path: 'web/package-lock.json'
       - name: NPM audit (web)
         working-directory: web
+        # set -o pipefail: without it, `cmd | tee file` reports tee's exit code
+        # (almost always 0), silently swallowing a failing `npm audit` and
+        # turning this into a non-blocking gate despite the lack of `|| true`.
         run: |
+          set -o pipefail
           npm ci --strict-peer-deps
           npm audit --audit-level=high --omit=dev 2>&1 | tee ../npm-audit.txt
-          npm audit --audit-level=critical || true
 
       # — Cargo audit —
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-audit
       - name: Cargo audit (daemon)
         working-directory: daemon
-        run: cargo audit --deny warnings 2>&1 | tee ../cargo-audit.txt
+        run: set -o pipefail; cargo audit --deny warnings 2>&1 | tee ../cargo-audit.txt
       - name: Cargo audit (monitor)
         working-directory: monitor
-        run: cargo audit --deny warnings 2>&1 | tee ../monitor-audit.txt || true
+        run: set -o pipefail; cargo audit --deny warnings 2>&1 | tee ../monitor-audit.txt || true
 
       - name: Upload audit reports
         if: always()

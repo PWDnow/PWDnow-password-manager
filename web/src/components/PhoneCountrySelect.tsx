@@ -85,6 +85,7 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={t('common.searchCountries', 'Search countries...')}
+            aria-label={t('common.searchCountries', 'Search countries...')}
             className="flex-1 bg-transparent text-xs text-black dark:text-white placeholder:text-on-surface-variant outline-none"
           />
         </div>
@@ -118,6 +119,7 @@ export default function PhoneCountrySelect({ value, onChange, countries }: Phone
         onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={t('common.country', 'Country calling code')}
         className="w-full flex items-center gap-2 pl-3 pr-2 py-4 bg-surface-container-low rounded-xl border border-black/15 dark:border-white/15 text-black dark:text-white font-bold focus:ring-2 focus:ring-on-primary-container/20 focus:border-black/30 dark:focus:border-white/30 transition-all outline-none cursor-pointer text-sm"
       >
         <span className="text-lg leading-none shrink-0">{isoToFlag(selected?.iso ?? 'US')}</span>

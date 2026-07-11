@@ -167,9 +167,9 @@ function ModalShell({
               <p className="text-[11px] text-on-surface-variant font-medium">{subtitle}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface-variant">
-            <X size={18} />
-          </button>
+          <button aria-label="Close" onClick={onClose} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface-variant">
+  <X aria-hidden="true" size={18} />
+</button>
         </div>
         <div className="px-8 py-6 space-y-5 overflow-y-auto">{children}</div>
       </motion.div>
@@ -466,7 +466,7 @@ export default function Setup() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen bg-surface flex flex-col items-center justify-center p-6">
       <SEO title={t('setup.pageTitle', 'Setup - PWDnow')} description={t('setup.pageDesc', 'First-run setup wizard for PWDnow.')} />
 
       <div className="w-full max-w-xl">
@@ -827,6 +827,6 @@ export default function Setup() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </main>
   );
 }

@@ -1,0 +1,49 @@
+1 in register fix the accessibility problem Elements must meet enhanced color contrast ratio thresholds
+serious · WCAG 2.0 AAA
+Ensure the contrast between foreground and background colors meets WCAG 2 AAA enhanced contrast ratio thresholds.
+
+Success criteria 1.4.6
+
+Highlight Element
+Highlight elementCreate Account
+<button type="submit" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+One of the following issues must be addressed
+Element has insufficient color contrast of 5.24 (foreground color: #ffffff, background color: #155dfc, font size: 12.0pt (16px), font weight: bold). Expected contrast ratio of 7:1
+
+
+
+2. in the password forgoth password I have Elements must meet enhanced color contrast ratio thresholds
+Ensure the contrast between foreground and background colors meets WCAG 2 AAA enhanced contrast ratio thresholds
+
+Affected Elements
+Highlight All Elements
+Highlight elementSend Reset Link
+.mt-4
+
+
+so once login in https://localhost:51234/vault I have those error Elements must meet enhanced color contrast ratio thresholds
+Ensure the contrast between foreground and background colors meets WCAG 2 AAA enhanced contrast ratio thresholds
+
+Affected Elements
+Highlight All Elements
+Highlight elementspan.font-headline
+.text-error > .font-semibold.font-headline.tracking-tight
+Highlight elementspan.text-sm
+.text-orange-700
+Highlight elementspan.text-[10px]
+.hover\:bg-white.dark\:hover\:bg-surface-container-high.md\:p-0:nth-child(2) > .col-span-3.z-10.justify-between:nth-child(4) > .flex-wrap.gap-2.items-center > .bg-emerald-500\/10.text-emerald-700.px-3
+Highlight elementspan.text-[10px]
+.hover\:bg-white.dark\:hover\:bg-surface-container-high.md\:p-0:nth-child(4) > .col-span-3.z-10.justify-between:nth-child(4) > .flex-wrap.gap-2.items-center > .bg-emerald-500\/10.text-emerald-700.px-3
+ 
+
+and setting have critical · WCAG 2.0 A · Success criteria 4.1.2
+Select element must have an accessible name
+Ensure select element has an accessible name
+
+Affected Elements
+Highlight All Elements
+Highlight element30 seconds 1 minute 5 minutes 10 minutes 25 minutes Off
+.pr-10
+Highlight elementselect.appearance-none
+.pr-9
+ error. fix them. 

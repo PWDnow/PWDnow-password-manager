@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Camera, ChevronDown, Check, RefreshCw, CheckCircle } from 'lucide-react';
 
 const FbUserCircle = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="10"/>
     <circle cx="12" cy="8.5" r="2.5"/>
@@ -15,6 +15,28 @@ import { useProfileForm } from './hooks/useProfileForm';
 import UserAvatar from '../../components/UserAvatar';
 import COUNTRY_LIST from '../../data/country-list.json';
 import type { UserProfile } from '../../context/UserContext';
+
+const EUROPE_COUNTRIES = new Set([
+  "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Faroe Islands", "Finland", "France", "Germany", "Gibraltar", "Greece", "Guernsey", "Hungary", "Iceland", "Ireland", "Isle of Man", "Italy", "Jersey", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Macedonia", "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands", "Norway", "Poland", "Portugal", "Romania", "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain", "Svalbard and Jan Mayen", "Sweden", "Switzerland", "Ukraine", "United Kingdom", "Vatican City"
+]);
+
+const CUSTOM_ALIASES: Record<string, string[]> = {
+  "United States": ["us", "usa", "america"],
+  "United Kingdom": ["uk", "britain", "england", "great britain"],
+  "United Arab Emirates": ["uae", "emirates"],
+  "Myanmar (Burma)": ["birmanie", "myanmar", "burma"]
+};
+
+function getCountrySearchText(country: string, translated: string): string {
+  let text = `${country} ${translated}`;
+  if (EUROPE_COUNTRIES.has(country)) {
+    text += " europe european europ";
+  }
+  if (CUSTOM_ALIASES[country]) {
+    text += " " + CUSTOM_ALIASES[country].join(" ");
+  }
+  return text.toLowerCase();
+}
 
 interface Props {
   profile: UserProfile;
@@ -61,7 +83,7 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
     <section>
       <div className="mb-6">
         <h2 className="text-[15px] font-semibold text-neutral-900 dark:text-white leading-snug">{t('settings.userProfile', 'User Profile')}</h2>
-        <p className="mt-1 text-[13px] text-neutral-500 dark:text-neutral-400">{t('settings.userProfileDesc', 'Your personal information and account preferences.')}</p>
+        <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-300">{t('settings.userProfileDesc', 'Your personal information and account preferences.')}</p>
         <div className="mt-4 h-px bg-neutral-200 dark:bg-white/8" />
       </div>
       <div className="bg-surface-container-low p-10 rounded-xl">
@@ -82,16 +104,17 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
                 photoUrl={localProfile.photoUrl}
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-[#000000]/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                <Camera size={32} className="mb-2" />
+              <button type="button" aria-label={t('settings.changePhoto', 'Change Photo')} className="absolute inset-0 w-full h-full bg-[#000000]/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <Camera size={32} className="mb-2" aria-hidden="true" />
                 <span className="text-[10px] font-black uppercase tracking-widest">{t('settings.changePhoto', 'Change Photo')}</span>
                 <span className="text-[8px] opacity-70 mt-1 uppercase">{t('settings.dragAndDrop', 'Drag & Drop')}</span>
-              </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
                 accept=".jpg,.jpeg,.png,.heic"
+                aria-label={t('settings.changePhoto', 'Change Photo')}
                 onChange={(e) => e.target.files?.[0] && handlePhotoUpload(e.target.files[0])}
               />
             </div>
@@ -103,33 +126,36 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
           {/* Profile Fields */}
           <div className="col-span-12 md:col-span-8 lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
+              <label htmlFor="input-3i5vdcdhb" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
                 {t('settings.firstName', 'First Name')}
               </label>
-              <input
+<input id="input-3i5vdcdhb"
                 type="text"
+                aria-label={t('settings.firstName', 'First Name')}
                 value={localProfile.firstName}
                 onChange={(e) => handleLocalProfileChange('firstName', e.target.value)}
                 className="w-full px-5 py-3.5 bg-white dark:bg-surface-container-high rounded-xl border border-on-surface-variant/50 dark:border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/10 dark:focus:ring-white/10 outline-none transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
+              <label htmlFor="input-s1jfw1tvw" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
                 {t('settings.lastName', 'Last Name')}
               </label>
-              <input
+<input id="input-s1jfw1tvw"
                 type="text"
+                aria-label={t('settings.lastName', 'Last Name')}
                 value={localProfile.lastName}
                 onChange={(e) => handleLocalProfileChange('lastName', e.target.value)}
                 className="w-full px-5 py-3.5 bg-white dark:bg-surface-container-high rounded-xl border border-on-surface-variant/50 dark:border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/10 dark:focus:ring-white/10 outline-none transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
+              <label htmlFor="input-qmbw3g72h" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
                 {t('settings.company', 'Company Name (Optional)')}
               </label>
-              <input
+<input id="input-qmbw3g72h"
                 type="text"
+                aria-label={t('settings.company', 'Company Name')}
                 value={localProfile.company}
                 onChange={(e) => handleLocalProfileChange('company', e.target.value)}
                 placeholder={t('settings.companyPlaceholder', 'Enter company name...')}
@@ -143,11 +169,14 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
+                  aria-label={t('settings.country', 'Country')}
+                  aria-haspopup="listbox"
+                  aria-expanded={isCountryDropdownOpen}
                   onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
                   className="w-full px-5 py-3.5 bg-white dark:bg-surface-container-high rounded-xl border border-on-surface-variant/50 dark:border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/10 dark:focus:ring-white/10 outline-none transition-all flex items-center justify-between"
                 >
                   <span>{localProfile.country ? t(`countries.${localProfile.country}`, localProfile.country) : ''}</span>
-                  <ChevronDown size={18} className={`transition-transform duration-300 ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={18} aria-hidden="true" className={`transition-transform duration-300 ${isCountryDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <AnimatePresence>
                   {isCountryDropdownOpen && (
@@ -164,27 +193,33 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
                           value={countrySearch}
                           onChange={e => setCountrySearch(e.target.value)}
                           placeholder={t('common.searchCountries', 'Search countries...')}
+                          aria-label={t('common.searchCountries', 'Search countries')}
                           className="w-full px-3 py-1.5 text-sm bg-surface dark:bg-surface-container-high rounded-lg border border-on-surface-variant/50 dark:border-outline-variant/10 outline-none"
                         />
                       </div>
-                      <div className="max-h-52 overflow-y-auto custom-scrollbar">
+                      <ul role="listbox" aria-label={t('settings.country', 'Country')} className="max-h-52 overflow-y-auto custom-scrollbar">
                         {COUNTRY_LIST.entities
-                          .filter(c => t(`countries.${c}`, c).toLowerCase().includes(countrySearch.toLowerCase()))
+                          .filter(c => {
+                            const searchStr = countrySearch.toLowerCase().trim();
+                            if (!searchStr) return true;
+                            return getCountrySearchText(c, t(`countries.${c}`, c)).includes(searchStr);
+                          })
                           .map((country) => (
-                            <button
-                              key={country}
-                              type="button"
-                              onClick={() => {
-                                handleLocalProfileChange('country', country);
-                                setIsCountryDropdownOpen(false);
-                                setCountrySearch('');
-                              }}
-                              className={`w-full text-left px-5 py-3 text-sm font-bold hover:bg-surface-container-low transition-colors ${localProfile.country === country ? 'bg-black text-white' : 'text-black dark:text-white'}`}
-                            >
-                              {t(`countries.${country}`, country)}
-                            </button>
+                            <li key={country} role="option" aria-selected={localProfile.country === country}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleLocalProfileChange('country', country);
+                                  setIsCountryDropdownOpen(false);
+                                  setCountrySearch('');
+                                }}
+                                className={`w-full text-left px-5 py-3 text-sm font-bold hover:bg-surface-container-low transition-colors ${localProfile.country === country ? 'bg-black text-white' : 'text-black dark:text-white'}`}
+                              >
+                                {t(`countries.${country}`, country)}
+                              </button>
+                            </li>
                           ))}
-                      </div>
+                      </ul>
                     </motion.div>
                   )}
                 </AnimatePresence>
