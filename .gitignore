@@ -56,6 +56,7 @@ web/.claude-flow/
 .swarm/
 .gemini/
 .mcp.json
+web/.superpowers/
 
 # ── SSL certs (dev-only, never commit) ────────────────────────────────────────
 web/ssl/
@@ -65,22 +66,30 @@ web/test-results/
 web/coverage/
 *.tsbuildinfo
 
-# ── Scratch/debug scripts (one-off, not production) ──────────────────────────
-add_logger_imports.mjs
-find_a11y.js
-fix_a11y.js
-fix_a11y_target.js
-fix_settings.py
-fix_settings_v2.py
-fix_settings_v3.py
-refactor_fetch.py
+# ── Logs ──────────────────────────────────────────────────────────────────────
+web/logs/
+*.log
+
+# ── Scratch / debug (one-off, not production) ────────────────────────────────
+web/scratch/
+web/debug_*.cjs
+web/debug_*.mjs
+web/debug_*.js
 web/fix*.mjs
 web/find_remaining_a11y.cjs
 web/migrate_*.mjs
 web/refactor_fetch.py
-web/debug_*.cjs
-web/debug_*.mjs
-web/debug_*.js
+
+# ── Lighthouse reports ────────────────────────────────────────────────────────
+web/lighthouse-*.json
+
+# ── Graphify AST cache ────────────────────────────────────────────────────────
+graphify-out/
+web/graphify-out/cache/
+
+# ── gRPC tokens (SENSITIVE) ──────────────────────────────────────────────────
+daemon/grpc.token
+*.token
 
 # ── Obsidian ──────────────────────────────────────────────────────────────────
 *.AppImage
