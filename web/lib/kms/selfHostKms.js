@@ -104,3 +104,10 @@ async function _unwrapMasterKeyWithPassphrase(raw, passphrase, keyPath) {
   d.setAuthTag(tag);
   return Buffer.concat([d.update(ct), d.final()]);
 }
+
+// Ties the key-file loader to the provider: the one entry point createKmsProvider (see
+// kmsProvider.js) calls for KMS_PROVIDER=selfhost.
+export async function createSelfHostKmsProvider({ keyPath, passphrase } = {}) {
+  const masterKey = await loadSelfHostMasterKey({ keyPath, passphrase });
+  return new SelfHostKmsProvider(masterKey);
+}

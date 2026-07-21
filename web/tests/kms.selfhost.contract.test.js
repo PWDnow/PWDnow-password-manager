@@ -10,6 +10,7 @@ import {
   SelfHostKmsProvider,
   generateSelfHostMasterKeyFile,
   loadSelfHostMasterKey,
+  createSelfHostKmsProvider,
 } from '../lib/kms/selfHostKms.js';
 
 kmsContractSuite('SelfHost (direct key)', async () => new SelfHostKmsProvider(randomBytes(32)));
@@ -117,4 +118,19 @@ describe('SelfHostKms master-key file (passphrase-wrapped)', () => {
     const { wrapped, keyId } = await kms.wrapDek(dek);
     assert.ok((await kms.unwrapDek(wrapped, keyId)).equals(dek));
   });
+});
+
+kmsContractSuite('SelfHost (factory, no passphrase)', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'selfhost-kms-factory-'));
+  const keyPath = path.join(dir, 'master.key');
+  await generateSelfHostMasterKeyFile({ keyPath });
+  return createSelfHostKmsProvider({ keyPath });
+});
+
+kmsContractSuite('SelfHost (factory, passphrase)', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'selfhost-kms-factory-pw-'));
+  const keyPath = path.join(dir, 'master.key');
+  const passphrase = 'factory-suite-passphrase';
+  await generateSelfHostMasterKeyFile({ keyPath, passphrase });
+  return createSelfHostKmsProvider({ keyPath, passphrase });
 });
