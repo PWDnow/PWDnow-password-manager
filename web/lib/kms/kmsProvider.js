@@ -11,7 +11,8 @@
 //   • keyId identifies the CMK/key-version used, so rotation can be tracked per row.
 //   • The plaintext DEK never leaves process memory toward the KMS in the wrapped form.
 //
-// Implementations: LocalDevKmsProvider (dev/CI), VaultTransitKmsProvider (default prod).
+// Implementations: LocalDevKmsProvider (dev/CI), VaultTransitKmsProvider (default prod),
+// SelfHostKmsProvider (small self-host, e.g. Raspberry Pi 5 — see selfHostKms.js).
 
 export function createKmsProvider(config) {
   const kind = (config?.provider || process.env.KMS_PROVIDER || 'local').toLowerCase();
@@ -30,6 +31,15 @@ export function createKmsProvider(config) {
         throw new Error('LOCAL_KMS_KEY must be 32 bytes hex when KMS_PROVIDER=local');
       }
       return new LocalDevKmsProvider(Buffer.from(hex, 'hex'));
+    });
+  }
+  if (kind === 'selfhost') {
+    return import('./selfHostKms.js').then(({ createSelfHostKmsProvider }) => {
+      const keyPath = process.env.SELF_HOST_KMS_KEY_PATH;
+      if (!keyPath) {
+        throw new Error('SELF_HOST_KMS_KEY_PATH is required when KMS_PROVIDER=selfhost');
+      }
+      return createSelfHostKmsProvider({ keyPath, passphrase: process.env.SELF_HOST_KMS_PASSPHRASE || undefined });
     });
   }
   throw new Error(`unknown KMS_PROVIDER: ${kind}`);
