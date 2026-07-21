@@ -45,14 +45,15 @@ Verified directly from `web/src/crypto/keystore.ts` and `web/src/utils/localCryp
   - If MFA is required: `{ok:true, partialToken, methods:[...]}`, **no** `X-Vault-Salt` yet.
   - Invalid creds: `{ok:false, error:'invalid_credentials'|'account_locked'|'too_many_requests'}`.
   - Hardware-key-only accounts: `403 hardware_mfa_requires_daemon` — the extension cannot support these in v1; show an explicit "not supported" message rather than a generic failure.
-- For a session where the extension already holds a valid `_pwd_sess` cookie but has lost its derived key (e.g., popup reopened after the service worker was evicted), it calls `POST /api/auth/crypto-salt` to re-fetch the salt without a full re-login. The password is still required at that point to re-derive the key (the extension never persists the password).
+- **Correction (found during final review, verified against `web/routes/auth/login.js`):** the MFA-completion endpoint is `POST /api/auth/login/finish` (not `/login/finish`), and its body is `{partialToken, totpCode}` for TOTP or `{partialToken, emailCode}` for email OTP — not a generic `code` field. `POST /api/auth/crypto-salt` also requires an authenticated session (`authMiddleware, requireAuth, requireCsrf`) and a `{cryptoSalt}` body (it both stores a first-time salt and returns the authoritative one) — it is not a bare unauthenticated fetch.
 
 **v1 login flow:**
 1. User enters server URL, email, master password in the Connect screen.
 2. Background asks for `host_permissions` on that origin via `chrome.permissions.request` (one-time).
 3. Relay content script POSTs `/api/auth/login`.
-4. If `methods` comes back (TOTP/email OTP required), popup shows a code-entry field and relay POSTs `/login/finish` with the code + `partialToken`. (Hardware-key-only → show unsupported message, stop.)
+4. If `methods` comes back (TOTP/email OTP required), popup shows a code-entry field and relay POSTs `/api/auth/login/finish` with `{partialToken, totpCode}` or `{partialToken, emailCode}` depending on which method was returned. (Hardware-key-only → show unsupported message, stop.)
 5. On full success, background captures `X-Vault-Salt`, derives the AES key, fetches + decrypts `/api/vault/credentials` and `/api/vault/folders`.
+6. **Correction:** for an account with no saved data yet, `GET /api/vault/credentials`/`/folders` returns the raw default value directly (e.g. `[]`), not `{data: "<encrypted-blob>"}` — mirror the web app's own `_localRead` passthrough (`VaultContext.tsx`): if the parsed response has a string `.data` field, decrypt it; otherwise treat the response itself as the already-plaintext value.
 
 **Storage tiers:**
 - `chrome.storage.local` (non-secret): server URL, email.
@@ -65,8 +66,8 @@ All HTTP calls (login, `/login/finish`, `/api/auth/crypto-salt`, `/api/vault/cre
 
 ## 6. Data model & sync (whole-blob replace)
 
-`/api/vault/credentials` and `/api/vault/folders` are GET/PUT whole-blob endpoints (`{data: "<encrypted-blob>"}`), matching `VaultContext.tsx`'s own pattern — there is no per-item endpoint. The extension:
-- Decrypts the full array on fetch.
+`/api/vault/credentials` and `/api/vault/folders` are GET/PUT whole-blob endpoints, matching `VaultContext.tsx`'s own pattern — there is no per-item endpoint. On PUT the body is always `{data: "<encrypted-blob>"}`; on GET, a resource that already has data returns `{data: "<encrypted-blob>"}`, but a never-written resource returns its raw default value directly (e.g. `[]`) — the extension must handle both shapes (see §4 correction). The extension:
+- Decrypts the full array on fetch (or, for a never-written resource, treats the raw default as already-plaintext).
 - For **Save**: appends a new credential (`crypto.randomUUID()` for `id`), defaulting `folderId` to the first folder returned by `/api/vault/folders` (creating folders from the extension is out of scope for v1 — if the vault has zero folders, show a "create a folder in the web app first" message).
 - Re-encrypts the full array and PUTs it back with the CSRF header.
 - Conflict handling: last-write-wins. Acceptable for v1 given this is a single-user-driven action (save is rare, and a stale overwrite would only lose credentials added from *another* device in the same few-second window).
