@@ -31,8 +31,12 @@ ExecStart=/usr/bin/node server.js
 Environment=NODE_ENV=production
 Environment=PORT=1234
 Environment=BIND_HOST=127.0.0.1
-Environment=VAULT_SOCKET=/run/vault-daemon/vault.sock
+Environment=DAEMON_GRPC_ADDR=127.0.0.1:50051
 Environment=VAULT_DATA_DIR=/var/lib/vault-server
+# Shares the daemon's gRPC peer-auth token (DAEMON_GRPC_TOKEN). Same file
+# vault-daemon.service reads; systemd loads EnvironmentFile as root before
+# dropping privileges, so the 0600 root-owned file is readable here too.
+EnvironmentFile=-/etc/vault-daemon/grpc.env
 
 # ── Watchdog ─────────────────────────────────────────────────────────────────
 # server.js pings sd_notify("WATCHDOG=1") at WATCHDOG_USEC/3. Worst-case hung

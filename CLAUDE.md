@@ -182,7 +182,7 @@ Nginx (`deploy/nginx/vault.conf`) proxies HTTPS → Express:3000. It handles TLS
 
 systemd unit (`deploy/vault-daemon.service`) runs the daemon as user `vault` with `MemorySwapMax=0`, `NoNewPrivileges`, `PrivateTmp`, and `CAP_IPC_LOCK` for mlock.
 
-AppArmor profile (`deploy/apparmor.d/vault-daemon`) currently has library paths hard-coded to `aarch64-linux-gnu`. Update for `x86_64-linux-gnu` when deploying on x86 hosts.
+AppArmor profile (`deploy/apparmor.d/vault-daemon`) uses the `@{multiarch}` tunable for library paths, so it applies unmodified on both `aarch64-linux-gnu` and `x86_64-linux-gnu` hosts. `install.sh` and `make install` both load it via `apparmor_parser -r`.
 
 ---
 
