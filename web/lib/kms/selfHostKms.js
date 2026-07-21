@@ -5,7 +5,8 @@
 // permission-locked file on disk, optionally itself wrapped by an Argon2id-derived key from an
 // admin-supplied passphrase (see loadSelfHostMasterKey / generateSelfHostMasterKeyFile below).
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { statSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import { statSync, readFileSync, writeFileSync, chmodSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
 import argon2 from 'argon2';
 
 export class SelfHostKmsProvider {
@@ -41,6 +42,7 @@ export async function generateSelfHostMasterKeyFile({ keyPath, passphrase } = {}
   if (!keyPath) throw new Error('generateSelfHostMasterKeyFile requires keyPath');
   const masterKey = randomBytes(32);
   const fileBytes = passphrase ? await _wrapMasterKeyWithPassphrase(masterKey, passphrase) : masterKey;
+  mkdirSync(dirname(keyPath), { recursive: true });
   writeFileSync(keyPath, fileBytes, { mode: 0o600 });
   chmodSync(keyPath, 0o600); // belt-and-suspenders: umask can affect the mode writeFileSync requested
 }
