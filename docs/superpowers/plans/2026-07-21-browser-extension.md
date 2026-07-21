@@ -647,7 +647,7 @@ export function generatePassphrase(opts: PassphraseOptions, wordlist: readonly s
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run lib/passwordGenerator.test.ts`
-Expected: PASS (9 tests).
+Expected: PASS (10 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -1045,7 +1045,7 @@ export async function putVaultResource(origin: string, resource: 'credentials' |
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run lib/serverClient.test.ts`
-Expected: PASS (9 tests).
+Expected: PASS (10 tests).
 
 - [ ] **Step 5: Commit**
 
