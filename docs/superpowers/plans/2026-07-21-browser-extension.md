@@ -422,7 +422,7 @@ Each non-empty line has the format `<5-digit-dice-roll>\t<word>` (e.g. `11111\ta
 Verify all of:
 - Exactly 7776 entries.
 - No duplicates (`new Set(words).size === 7776`).
-- Every entry matches `/^[a-z]+$/` (lowercase ASCII only, no whitespace/tabs leaked in).
+- Every entry matches `/^[a-z]+(-[a-z]+)*$/` (lowercase ASCII words, optionally hyphenated compounds like `drop-down` — the real EFF list contains a handful of these — no whitespace/tabs leaked in).
 
 If any check fails, STOP this task and report the discrepancy rather than writing a partial/corrupted list.
 
@@ -466,7 +466,7 @@ describe('WORDLIST', () => {
   });
 
   it('contains only lowercase ASCII words', () => {
-    expect(WORDLIST.every((w) => /^[a-z]+$/.test(w))).toBe(true);
+    expect(WORDLIST.every((w) => /^[a-z]+(-[a-z]+)*$/.test(w))).toBe(true);
   });
 });
 ```
