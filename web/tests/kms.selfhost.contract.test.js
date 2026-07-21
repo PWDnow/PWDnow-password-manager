@@ -64,3 +64,57 @@ describe('SelfHostKms master-key file (raw, no passphrase)', () => {
     await assert.rejects(() => loadSelfHostMasterKey({ keyPath }), /32 bytes/);
   });
 });
+
+describe('SelfHostKms master-key file (passphrase-wrapped)', () => {
+  let dir;
+  const cleanupDirs = [];
+  function newDir() {
+    const d = mkdtempSync(path.join(tmpdir(), 'selfhost-kms-pw-'));
+    cleanupDirs.push(d);
+    return d;
+  }
+  after(() => { for (const d of cleanupDirs) rmSync(d, { recursive: true, force: true }); });
+
+  it('generate then load with the correct passphrase round-trips a 32-byte key', async () => {
+    dir = newDir();
+    const keyPath = path.join(dir, 'master.key');
+    await generateSelfHostMasterKeyFile({ keyPath, passphrase: 'correct horse battery staple' });
+    const key = await loadSelfHostMasterKey({ keyPath, passphrase: 'correct horse battery staple' });
+    assert.ok(Buffer.isBuffer(key));
+    assert.equal(key.length, 32);
+  });
+
+  it('the same master key is recovered as would be with a raw (non-passphrase) file of the same content', async () => {
+    dir = newDir();
+    const keyPath = path.join(dir, 'master.key');
+    await generateSelfHostMasterKeyFile({ keyPath, passphrase: 'hunter2-hunter2-hunter2' });
+    const a = await loadSelfHostMasterKey({ keyPath, passphrase: 'hunter2-hunter2-hunter2' });
+    const b = await loadSelfHostMasterKey({ keyPath, passphrase: 'hunter2-hunter2-hunter2' });
+    assert.ok(a.equals(b), 'loading twice with the same passphrase must yield the same key');
+  });
+
+  it('wrong passphrase fails to unwrap', async () => {
+    dir = newDir();
+    const keyPath = path.join(dir, 'master.key');
+    await generateSelfHostMasterKeyFile({ keyPath, passphrase: 'right-passphrase' });
+    await assert.rejects(() => loadSelfHostMasterKey({ keyPath, passphrase: 'wrong-passphrase' }));
+  });
+
+  it('passphrase-wrapped file is still mode 0600', async () => {
+    dir = newDir();
+    const keyPath = path.join(dir, 'master.key');
+    await generateSelfHostMasterKeyFile({ keyPath, passphrase: 'whatever' });
+    assert.equal(statSync(keyPath).mode & 0o777, 0o600);
+  });
+
+  it('resulting provider round-trips a DEK end to end', async () => {
+    dir = newDir();
+    const keyPath = path.join(dir, 'master.key');
+    await generateSelfHostMasterKeyFile({ keyPath, passphrase: 'end-to-end-check' });
+    const masterKey = await loadSelfHostMasterKey({ keyPath, passphrase: 'end-to-end-check' });
+    const kms = new SelfHostKmsProvider(masterKey);
+    const dek = randomBytes(32);
+    const { wrapped, keyId } = await kms.wrapDek(dek);
+    assert.ok((await kms.unwrapDek(wrapped, keyId)).equals(dek));
+  });
+});

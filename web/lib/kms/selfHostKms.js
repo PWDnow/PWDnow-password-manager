@@ -6,6 +6,7 @@
 // admin-supplied passphrase (see loadSelfHostMasterKey / generateSelfHostMasterKeyFile below).
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { statSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import argon2 from 'argon2';
 
 export class SelfHostKmsProvider {
   constructor(masterKey) {
@@ -66,10 +67,40 @@ export async function loadSelfHostMasterKey({ keyPath, passphrase } = {}) {
   return _unwrapMasterKeyWithPassphrase(raw, passphrase, keyPath);
 }
 
-async function _wrapMasterKeyWithPassphrase(_masterKey, _passphrase) {
-  throw new Error('passphrase-wrapped SelfHostKms key files are implemented in Task 4');
+// Argon2id params for wrapping the master key file under a passphrase. This runs once at
+// process start (not on an interactive hot path), so cost is set high: 256 MiB / t=3 / p=1 —
+// matching the params already used for this codebase's other high-value, infrequent KDF use
+// (duress-mode password hashing in src/utils/securityModes.ts).
+const SELF_HOST_KDF_OPTS = {
+  type: argon2.argon2id,
+  memoryCost: 262144, // 256 MiB, in KiB
+  timeCost: 3,
+  parallelism: 1,
+  hashLength: 32,
+  raw: true,
+};
+
+// File layout when passphrase-wrapped: salt(16) || iv(12) || tag(16) || ciphertext(32) = 76 bytes.
+async function _wrapMasterKeyWithPassphrase(masterKey, passphrase) {
+  const salt = randomBytes(16);
+  const kek = await argon2.hash(passphrase, { ...SELF_HOST_KDF_OPTS, salt });
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', kek, iv);
+  const ct = Buffer.concat([c.update(masterKey), c.final()]);
+  const tag = c.getAuthTag();
+  return Buffer.concat([salt, iv, tag, ct]);
 }
 
-async function _unwrapMasterKeyWithPassphrase(_raw, _passphrase, _keyPath) {
-  throw new Error('passphrase-wrapped SelfHostKms key files are implemented in Task 4');
+async function _unwrapMasterKeyWithPassphrase(raw, passphrase, keyPath) {
+  if (raw.length !== 76) {
+    throw new Error(`SelfHostKms passphrase-wrapped key file ${keyPath} must be exactly 76 bytes (got ${raw.length})`);
+  }
+  const salt = raw.subarray(0, 16);
+  const iv = raw.subarray(16, 28);
+  const tag = raw.subarray(28, 44);
+  const ct = raw.subarray(44, 76);
+  const kek = await argon2.hash(passphrase, { ...SELF_HOST_KDF_OPTS, salt });
+  const d = createDecipheriv('aes-256-gcm', kek, iv);
+  d.setAuthTag(tag);
+  return Buffer.concat([d.update(ct), d.final()]);
 }
