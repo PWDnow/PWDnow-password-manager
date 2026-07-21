@@ -153,7 +153,8 @@ describe('createKmsProvider(KMS_PROVIDER=selfhost)', () => {
       const { wrapped, keyId } = await kms.wrapDek(dek);
       assert.ok((await kms.unwrapDek(wrapped, keyId)).equals(dek));
     } finally {
-      process.env.KMS_PROVIDER = prevProvider;
+      if (prevProvider === undefined) delete process.env.KMS_PROVIDER;
+      else process.env.KMS_PROVIDER = prevProvider;
       if (prevKeyPath === undefined) delete process.env.SELF_HOST_KMS_KEY_PATH;
       else process.env.SELF_HOST_KMS_KEY_PATH = prevKeyPath;
     }
@@ -167,7 +168,8 @@ describe('createKmsProvider(KMS_PROVIDER=selfhost)', () => {
     try {
       await assert.rejects(() => createKmsProvider(), /SELF_HOST_KMS_KEY_PATH/);
     } finally {
-      process.env.KMS_PROVIDER = prevProvider;
+      if (prevProvider === undefined) delete process.env.KMS_PROVIDER;
+      else process.env.KMS_PROVIDER = prevProvider;
       if (prevKeyPath !== undefined) process.env.SELF_HOST_KMS_KEY_PATH = prevKeyPath;
     }
   });
