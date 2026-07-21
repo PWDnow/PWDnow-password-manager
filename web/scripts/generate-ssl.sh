@@ -53,6 +53,60 @@ SSL_PERIOD="${SSL_PERIOD:-90d}"
 SSL_EV_OID="${SSL_EV_OID:-}"
 SSL_PORT="${SSL_PORT:-443}"
 
+# EV (Extended Validation) subject fields — required by the CA/Browser Forum
+# EV Guidelines in addition to the bare certificatePolicies OID. A self-signed
+# cert can't actually BE trusted as EV by real browsers (that requires a CA
+# audited under the EV Guidelines), but these fields make the structure a
+# faithful EV cert for internal/dev use.
+SSL_EV_BUSINESS_CATEGORY="${SSL_EV_BUSINESS_CATEGORY:-}"
+SSL_EV_SERIAL_NUMBER="${SSL_EV_SERIAL_NUMBER:-}"
+SSL_EV_JURISDICTION_COUNTRY="${SSL_EV_JURISDICTION_COUNTRY:-}"
+SSL_EV_JURISDICTION_STATE="${SSL_EV_JURISDICTION_STATE:-}"
+SSL_EV_JURISDICTION_LOCALITY="${SSL_EV_JURISDICTION_LOCALITY:-}"
+
+# ── Idempotent .env upsert (used by the EV prompt below) ─────────────────────
+set_env_var() {
+  local key="$1" value="$2"
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+  fi
+}
+
+# ── Interactive EV detail collection ──────────────────────────────────────────
+# Only fires when SSL_EV_OID is set (EV mode requested) but the subject
+# fields it needs aren't filled in yet, and stdin is an actual terminal (so a
+# non-interactive/CI run never hangs waiting for input).
+if [[ -n "$SSL_EV_OID" && -z "$SSL_EV_BUSINESS_CATEGORY" && -t 0 ]]; then
+  hdr "Extended Validation (EV) Certificate Details"
+  echo "  SSL_EV_OID is set (${SSL_EV_OID}) but the EV-specific subject fields"
+  echo "  aren't filled in yet. A real EV cert needs these alongside the policy"
+  echo "  OID — answer once, saved to .env so future runs are non-interactive."
+  echo ""
+  echo "  Business category:"
+  echo "    [1] Private Organization   [2] Government Entity"
+  echo "    [3] Business Entity        [4] Non-Commercial Entity"
+  read -rp "  Choice [1-4, default 1]: " ev_cat_choice
+  case "$ev_cat_choice" in
+    2) SSL_EV_BUSINESS_CATEGORY="Government Entity" ;;
+    3) SSL_EV_BUSINESS_CATEGORY="Business Entity" ;;
+    4) SSL_EV_BUSINESS_CATEGORY="Non-Commercial Entity" ;;
+    *) SSL_EV_BUSINESS_CATEGORY="Private Organization" ;;
+  esac
+  read -rp "  Registration/incorporation number: " SSL_EV_SERIAL_NUMBER
+  read -rp "  Jurisdiction of incorporation — country (2-letter, e.g. US): " SSL_EV_JURISDICTION_COUNTRY
+  read -rp "  Jurisdiction of incorporation — state/province (optional): " SSL_EV_JURISDICTION_STATE
+  read -rp "  Jurisdiction of incorporation — locality/city (optional): " SSL_EV_JURISDICTION_LOCALITY
+
+  set_env_var "SSL_EV_BUSINESS_CATEGORY" "$SSL_EV_BUSINESS_CATEGORY"
+  set_env_var "SSL_EV_SERIAL_NUMBER" "$SSL_EV_SERIAL_NUMBER"
+  set_env_var "SSL_EV_JURISDICTION_COUNTRY" "$SSL_EV_JURISDICTION_COUNTRY"
+  set_env_var "SSL_EV_JURISDICTION_STATE" "$SSL_EV_JURISDICTION_STATE"
+  set_env_var "SSL_EV_JURISDICTION_LOCALITY" "$SSL_EV_JURISDICTION_LOCALITY"
+  ok "EV details saved to .env"
+fi
+
 # ── Period → days ─────────────────────────────────────────────────────────────
 case "$SSL_PERIOD" in
   90d)  DAYS=90   ;;
@@ -78,6 +132,11 @@ echo -e "  DNS SANs:$SSL_SAN_DNS"
 echo -e "  IP SANs: $SSL_SAN_IP"
 echo -e "  Period:  ${BOLD}$SSL_PERIOD${NC} ($DAYS days)"
 echo -e "  EV OID:  ${SSL_EV_OID:-none (DV)}"
+if [[ -n "$SSL_EV_OID" ]]; then
+  echo -e "  EV Cat:  ${SSL_EV_BUSINESS_CATEGORY:-(not set)}"
+  echo -e "  EV Reg#: ${SSL_EV_SERIAL_NUMBER:-(not set)}"
+  echo -e "  EV Juris:${SSL_EV_JURISDICTION_COUNTRY:-?}${SSL_EV_JURISDICTION_STATE:+/$SSL_EV_JURISDICTION_STATE}${SSL_EV_JURISDICTION_LOCALITY:+/$SSL_EV_JURISDICTION_LOCALITY}"
+fi
 echo -e "  Output:  $SSL_DIR"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
@@ -171,6 +230,18 @@ ST           = ${SSL_STATE}
 C            = ${SSL_COUNTRY}
 emailAddress = ${SSL_EMAIL}
 CNF
+  # EV Guidelines subject fields. jurisdictionOfIncorporation* has no short
+  # name in OpenSSL's built-in OID table, so it's referenced by raw dotted
+  # OID directly — OpenSSL's config parser accepts that as a DN attribute key.
+  if [[ -n "$SSL_EV_OID" ]]; then
+    {
+      [[ -n "$SSL_EV_BUSINESS_CATEGORY" ]] && echo "businessCategory = ${SSL_EV_BUSINESS_CATEGORY}"
+      [[ -n "$SSL_EV_SERIAL_NUMBER" ]] && echo "serialNumber = ${SSL_EV_SERIAL_NUMBER}"
+      [[ -n "$SSL_EV_JURISDICTION_COUNTRY" ]] && echo "1.3.6.1.4.1.311.60.2.1.3 = ${SSL_EV_JURISDICTION_COUNTRY}"
+      [[ -n "$SSL_EV_JURISDICTION_STATE" ]] && echo "1.3.6.1.4.1.311.60.2.1.2 = ${SSL_EV_JURISDICTION_STATE}"
+      [[ -n "$SSL_EV_JURISDICTION_LOCALITY" ]] && echo "1.3.6.1.4.1.311.60.2.1.1 = ${SSL_EV_JURISDICTION_LOCALITY}"
+    } >> "$dir/server_req.cnf"
+  fi
 }
 
 write_server_ext_cnf() {
