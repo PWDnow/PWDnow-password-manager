@@ -134,3 +134,41 @@ kmsContractSuite('SelfHost (factory, passphrase)', async () => {
   await generateSelfHostMasterKeyFile({ keyPath, passphrase });
   return createSelfHostKmsProvider({ keyPath, passphrase });
 });
+
+import { createKmsProvider } from '../lib/kms/kmsProvider.js';
+
+describe('createKmsProvider(KMS_PROVIDER=selfhost)', () => {
+  it('builds a working SelfHostKmsProvider from env vars', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'selfhost-kms-env-'));
+    const keyPath = path.join(dir, 'master.key');
+    await generateSelfHostMasterKeyFile({ keyPath });
+
+    const prevProvider = process.env.KMS_PROVIDER;
+    const prevKeyPath = process.env.SELF_HOST_KMS_KEY_PATH;
+    process.env.KMS_PROVIDER = 'selfhost';
+    process.env.SELF_HOST_KMS_KEY_PATH = keyPath;
+    try {
+      const kms = await createKmsProvider();
+      const dek = randomBytes(32);
+      const { wrapped, keyId } = await kms.wrapDek(dek);
+      assert.ok((await kms.unwrapDek(wrapped, keyId)).equals(dek));
+    } finally {
+      process.env.KMS_PROVIDER = prevProvider;
+      if (prevKeyPath === undefined) delete process.env.SELF_HOST_KMS_KEY_PATH;
+      else process.env.SELF_HOST_KMS_KEY_PATH = prevKeyPath;
+    }
+  });
+
+  it('throws a clear error when SELF_HOST_KMS_KEY_PATH is missing', async () => {
+    const prevProvider = process.env.KMS_PROVIDER;
+    const prevKeyPath = process.env.SELF_HOST_KMS_KEY_PATH;
+    process.env.KMS_PROVIDER = 'selfhost';
+    delete process.env.SELF_HOST_KMS_KEY_PATH;
+    try {
+      await assert.rejects(() => createKmsProvider(), /SELF_HOST_KMS_KEY_PATH/);
+    } finally {
+      process.env.KMS_PROVIDER = prevProvider;
+      if (prevKeyPath !== undefined) process.env.SELF_HOST_KMS_KEY_PATH = prevKeyPath;
+    }
+  });
+});
