@@ -60,10 +60,16 @@ async function main() {
 
   await generateSelfHostMasterKeyFile({ keyPath, passphrase });
   console.error(`Wrote SelfHostKms master key to ${keyPath} (mode 0600).`);
+  console.error('Back this file up securely NOW — if it is lost or corrupted, every encrypted vault');
+  console.error('wrapped under it becomes permanently unrecoverable. There is no in-place rotation:');
+  console.error('regenerating a key file starts a brand-new trust root that cannot decrypt old data.');
   console.error('Set in web/.env:');
   console.error('  KMS_PROVIDER=selfhost');
   console.error(`  SELF_HOST_KMS_KEY_PATH=${keyPath}`);
   if (usePassphrase) console.error('  SELF_HOST_KMS_PASSPHRASE=<the passphrase you just entered>');
 }
 
-main();
+main().catch((e) => {
+  console.error(`Error: ${e.message}`);
+  process.exit(1);
+});
