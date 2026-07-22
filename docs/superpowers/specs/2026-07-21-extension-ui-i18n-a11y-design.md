@@ -68,7 +68,7 @@ Scope: `entrypoints/popup/App.tsx` (shell/loading state), `ConnectScreen.tsx`, `
 ## 6. Accessibility (WCAG 2.2 AAA)
 
 Beyond the ported base CSS rules in §2, the redesign explicitly addresses:
-- **1.4.6 Contrast (Enhanced, 7:1)**: verified programmatically via an automated accessibility test (§7), not just visual judgment.
+- **1.4.6 Contrast (Enhanced, 7:1)**: inherited from the web app's already-shipped, presumably-audited token palette (verbatim hex values, §2) — **correction (found during final review):** axe-core's `color-contrast` rule requires real layout/paint to measure ratios, which jsdom does not provide; under the project's jsdom-based Vitest suite the rule always lands in `incomplete`, never `passes`/`violations`, so `toHaveNoViolations()` cannot and does not actually catch a contrast regression. The automated axe checks in §7 do verify real structural AAA criteria (labeling, nested-interactive, heading order, aria-*) but NOT contrast. Contrast compliance rests solely on token-value fidelity to the audited web app palette, not on any automated check in this suite.
 - **2.4.9 Link Purpose (Link Only)** / button purpose: no icon-only control without an accessible name.
 - **2.4.10 Section Headings**: each screen has a real `<h1>`/`<h2>` heading, not just visually-styled text.
 - **3.3.5 Help**: the MFA screen and error banners give actionable next-step text, not just a status code.
@@ -78,7 +78,7 @@ Beyond the ported base CSS rules in §2, the redesign explicitly addresses:
 
 ## 7. Testing
 
-- **Automated accessibility checks**: add `vitest-axe` (axe-core wrapper for Vitest + Testing Library) as a dev dependency; each redesigned screen's existing RTL test gets an additional assertion that `axe(container)` reports zero violations. This is the concrete verification that AAA contrast/labeling requirements are actually met, not just asserted in prose.
+- **Automated accessibility checks**: add `vitest-axe` (axe-core wrapper for Vitest + Testing Library) as a dev dependency; each redesigned screen's existing RTL test gets an additional assertion that `axe(container)` reports zero violations. This is the concrete verification that AAA labeling/structural requirements (nested-interactive, button-name, heading order, aria-*, image-alt) are actually met, not just asserted in prose. **Contrast is explicitly excluded from this guarantee** — see §6's correction: jsdom cannot execute axe's `color-contrast` rule meaningfully, so contrast compliance is verified only by the token values being byte-identical to the already-shipped, audited web app palette.
 - **i18n completeness test**: a test that loads all 13 locale JSON files and asserts they have identical key sets (no missing/extra keys across languages) — catches an incomplete translation file mechanically rather than relying on manual review.
 - **RTL smoke test**: a test that renders with the Arabic locale active and asserts `document.dir === 'rtl'`.
 - Existing v1 component tests (`ConnectScreen.test.tsx`, `VaultScreen.test.tsx`, `App.test.tsx`) are updated for the new markup (e.g. `getByLabelText` instead of `getByPlaceholderText` now that real `<label>`s exist) but keep asserting the same underlying behavior — this is a presentation-layer pass, not a logic change, so no `lib/*` test should need to change.
