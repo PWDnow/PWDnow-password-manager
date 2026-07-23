@@ -39,11 +39,15 @@ const SecurityBadge = ({ status, statusColor }: { status: string, statusColor: s
   }, []);
 
   const isGood = ['Strong', 'Very Strong', 'Excellent'].includes(status);
-  const colorParts = statusColor.split(' ');
+  // `statusColor` is typed as a required string, but real vault data (older
+  // entries, non-`login` credentialTypes, imports) isn't guaranteed to carry
+  // it — fall back to an empty string rather than crashing the whole page.
+  const colorParts = (statusColor || '').split(' ');
   const dotColor = colorParts.length >= 4 ? colorParts[3] : (isGood ? 'bg-green-500' : 'bg-orange-500');
 
-  const statusKey = status.charAt(0).toLowerCase() + status.slice(1).replace(/\s+/g, '');
-  const translatedStatus = t(`vault.strength.${statusKey}`, status);
+  const safeStatus = status || '';
+  const statusKey = safeStatus.charAt(0).toLowerCase() + safeStatus.slice(1).replace(/\s+/g, '');
+  const translatedStatus = t(`vault.strength.${statusKey}`, safeStatus);
 
   return (
     <div
@@ -777,9 +781,11 @@ export default function Vault() {
                         </div>
 
                         <div className="col-span-2 flex items-center justify-between md:justify-end gap-3 w-full relative z-10 mt-2 md:mt-0 pt-4 md:pt-0 border-t border-outline-variant/10 md:border-none">
-                          <div className="sm:hidden">
-                            <SecurityBadge status={item.status} statusColor={item.statusColor} />
-                          </div>
+                          {(!item.credentialType || item.credentialType === 'login') && (
+                            <div className="sm:hidden">
+                              <SecurityBadge status={item.status} statusColor={item.statusColor} />
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 ml-auto">
                             {(!item.credentialType || item.credentialType === 'login') && (<>
                               {item.username && item.username !== 'No username' && (
