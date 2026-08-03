@@ -1,6 +1,6 @@
 import { getCsrfToken, apiFetch } from '../utils/api';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { sanitizeSvg } from '../utils/sanitize';
 import { useVault } from '../context/VaultContext';
 import ConfirmModal from './ConfirmModal';

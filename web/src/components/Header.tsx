@@ -2,7 +2,7 @@ import { getCsrfToken, apiFetch } from '../utils/api';
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Menu, Settings, LogOut, Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import LanguageModal from './LanguageModal';
 import UserAvatar from './UserAvatar';
 import NotificationDropdown from './NotificationDropdown';

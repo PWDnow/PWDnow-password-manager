@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Check, Trash2, Folder, ShieldCheck, Clock, ShieldAlert, TimerReset } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 

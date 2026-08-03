@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 
 // ── Mock the three React contexts Vault depends on ─────────────────────────────
 const SC = 'text-green-600 bg-green-100 border-green-200 bg-green-500';

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Shield, Lock, Key, AlertTriangle, CheckCircle, Activity, ArrowUpRight, ShieldAlert, Loader2, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import SEO from '../components/SEO';
 import { useVault } from '../context/VaultContext';
 import { getMfaConfig } from '../utils/mfa';

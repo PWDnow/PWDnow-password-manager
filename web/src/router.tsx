@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { keyStore } from './crypto/keystore';
 import { RouteErrorBoundary } from './components/ErrorBoundary';
 import { hasServerSession as _hasServerSession } from './utils/api';

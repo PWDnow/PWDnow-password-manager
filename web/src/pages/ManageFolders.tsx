@@ -19,7 +19,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslation, Trans } from 'react-i18next';
 import { Folder, Credential } from '../types';
 import { useVault } from '../context/VaultContext';

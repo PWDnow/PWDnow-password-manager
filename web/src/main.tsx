@@ -1,6 +1,6 @@
 import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { RouterProvider } from 'react-router-dom';
+import { RouterProvider } from 'react-router';
 import { HelmetProvider } from 'react-helmet-async';
 import { MotionConfig } from 'motion/react';
 import DOMPurify from 'dompurify';

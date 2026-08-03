@@ -1,6 +1,6 @@
 import { apiFetch, ApiError } from '../utils/api';
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Share2, Copy, Check, AlertTriangle, Clock, Loader2, Eye } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Credential } from '../types';
