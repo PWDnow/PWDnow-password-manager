@@ -1,14 +1,15 @@
 # Vault Manager — Build and deployment Makefile
 #
 # Usage:
-#   make build          — build daemon (classical) + web frontend
-#   make build-pq       — build daemon with ML-KEM-768 post-quantum feature + web frontend
+#   make build          — build daemon + web frontend (ML-KEM-768 hybrid PQ is
+#                          on by default; see Cargo.toml [features])
+#   make build-pq       — same, with the feature named explicitly (kept for
+#                          parity with older docs — produces the same binary)
 #   make test           — run all tests (cargo test + vitest)
 #   make install        — install daemon binary, systemd unit, AppArmor profile, nginx config
 #   make clean          — remove build artefacts
 #
 # 'make install' must be run as root (or with sudo).
-# 'make build-pq' requires the ml-kem crate; see Cargo.toml [features].
 
 PROJECT_ROOT := $(shell cd .. && pwd)
 DAEMON_DIR   := $(PROJECT_ROOT)/daemon
@@ -33,7 +34,7 @@ build:
 
 build-pq:
 	@echo "==> Building vault-daemon with ML-KEM-768 post-quantum support..."
-	cd $(DAEMON_DIR) && cargo build --release --features pq
+	cd $(DAEMON_DIR) && cargo build --release --features pq-hybrid-1024
 	@echo "==> Building web frontend..."
 	cd $(WEB_DIR) && npm run build
 	@echo "==> PQ build complete."

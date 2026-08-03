@@ -364,7 +364,7 @@ export default function MfaModalContent(props: Props) {
               </div>
 
               <div className="space-y-3">
-                <label htmlFor="input-fz4txwfl2" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('mfa.addAnotherKey', 'Add another security key')}</label>
+                <label htmlFor="input-webauthn-key-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('mfa.addAnotherKey', 'Add another security key')}</label>
                 <div className="flex gap-3">
                   <input type="text" value={webAuthnKeyName} onChange={e => setWebAuthnKeyName(e.target.value)}
                     placeholder="e.g. Blue YubiKey"
@@ -406,7 +406,7 @@ export default function MfaModalContent(props: Props) {
                   )}
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('mfa.giveKeyName', 'Give this key a name')}</label>
-<input id="input-fz4txwfl2" type="text" autoFocus value={webAuthnKeyName} onChange={e => setWebAuthnKeyName(e.target.value)}
+<input id="input-webauthn-key-name" type="text" autoFocus value={webAuthnKeyName} onChange={e => setWebAuthnKeyName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !webAuthnBusy) handleWebAuthnRegister(); }}
                       placeholder="e.g. YubiKey 5C"
                       className="w-full px-5 py-3.5 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/20 outline-none transition-all" />
@@ -619,7 +619,7 @@ export default function MfaModalContent(props: Props) {
               </div>
 
               <div className="space-y-3">
-                <label htmlFor="input-3aer0dh07" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.addAnotherPasskey', 'Add another passkey')}</label>
+                <label htmlFor="input-passkey-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.addAnotherPasskey', 'Add another passkey')}</label>
                 <div className="flex gap-3">
                   <input type="text" value={passkeyName} onChange={e => setPasskeyName(e.target.value)}
                     placeholder="e.g. MacBook Pro"
@@ -661,7 +661,7 @@ export default function MfaModalContent(props: Props) {
                   )}
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.passkeyRegisterName', 'Passkey name')}</label>
-<input id="input-3aer0dh07" type="text" autoFocus value={passkeyName} onChange={e => setPasskeyName(e.target.value)}
+<input id="input-passkey-name" type="text" autoFocus value={passkeyName} onChange={e => setPasskeyName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !passkeyBusy) handlePasskeyRegister(); }}
                       placeholder="e.g. MacBook Pro"
                       className="w-full px-5 py-3.5 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/20 outline-none transition-all" />
@@ -726,7 +726,7 @@ export default function MfaModalContent(props: Props) {
               </div>
 
               <div className="space-y-3">
-                <label htmlFor="input-sfnsul1h7" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.addAnotherDevice', 'Add another device')}</label>
+                <label htmlFor="input-platform-device-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.addAnotherDevice', 'Add another device')}</label>
                 <div className="flex gap-3">
                   <input type="text" value={platformName} onChange={e => setPlatformName(e.target.value)}
                     placeholder="e.g. MacBook Pro"
@@ -768,7 +768,7 @@ export default function MfaModalContent(props: Props) {
                   )}
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.platformRegisterName', 'Device name')}</label>
-<input id="input-sfnsul1h7" type="text" autoFocus value={platformName} onChange={e => setPlatformName(e.target.value)}
+<input id="input-platform-device-name" type="text" autoFocus value={platformName} onChange={e => setPlatformName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !platformBusy) handlePlatformRegister(); }}
                       placeholder="e.g. MacBook Pro"
                       className="w-full px-5 py-3.5 bg-surface-container-low rounded-xl border border-outline-variant/10 text-black dark:text-white font-bold focus:ring-2 focus:ring-black/20 outline-none transition-all" />

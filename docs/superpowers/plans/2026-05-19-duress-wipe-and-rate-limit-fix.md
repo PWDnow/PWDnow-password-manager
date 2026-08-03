@@ -1,5 +1,7 @@
 # Duress Wipe Trigger & Login Rate-Limit Fix — Implementation Plan
 
+> **Status (verified 2026-07-28): all four File Structure deliverables are shipped in current code**, even though every checkbox below is still unchecked — the plan was executed without ever being checked off, not left undone. Evidence: `web/src/pages/Login.tsx` awaits `recordFailedLoginAttempt()` with the exact comment describing this bug; `web/src/utils/securityModes.test.ts` has the "recordFailedLoginAttempt returns false until attemptsRemaining hits 0" / "...decrements even with no session key in memory" regression tests (passing); `web/lib/rateLimiter.js` has a dedicated `checkHintsRate` used by `/api/auth/login-hints` (`web/routes/auth/login.js`), separate from `checkLoginRate`; `web/e2e/duress-wipe-trigger.spec.ts` and `web/e2e/login-429-no-decrement.spec.ts` both exist. Don't re-implement this plan — if picking it up, verify against current code first.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix three coupled bugs on the login screen — (1) duress wipe firing on every wrong password instead of after N attempts, (2) the wrong-password error message no longer displaying, and (3) `/api/auth/login-hints` 429 errors after a handful of email re-entries.

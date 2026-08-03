@@ -15,6 +15,7 @@ import {
   armDuressMode, disarmDuressMode,
   enableTravelMode, disableTravelMode,
   wipeVaultData,
+  DuressSyncError,
   type DuressModeConfig, type TravelModeConfig,
 } from '../../utils/securityModes';
 import type { EmailServerConfig } from '../../types';
@@ -79,6 +80,7 @@ export default function SecurityModesSection({
   const [showDuressPassword, setShowDuressPassword] = useState(false);
   const [duressMaxAttempts, setDuressMaxAttempts] = useState(() => getDuressModeConfig().maxAttempts || 5);
   const [duressError, setDuressError] = useState('');
+  const [duressSyncWarning, setDuressSyncWarning] = useState('');
   const [isArmingDuress, setIsArmingDuress] = useState(false);
   const [isDuressWipeOpen, setIsDuressWipeOpen] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
@@ -112,10 +114,26 @@ export default function SecurityModesSection({
     if (duressPassword.length < 8) { setDuressError(t('settings.duressPasswordMinError', 'Duress password must be at least 8 characters.')); return; }
     if (duressPassword !== confirmDuressPassword) { setDuressError(t('settings.duressPasswordMismatch', 'Passwords do not match.')); return; }
     setIsArmingDuress(true);
-    await armDuressMode(duressPassword, duressMaxAttempts);
-    setDuressConfig(getDuressModeConfig());
-    setIsArmingDuress(false);
-    setDuressStep(3);
+    setDuressSyncWarning('');
+    try {
+      await armDuressMode(duressPassword, duressMaxAttempts);
+      setDuressConfig(getDuressModeConfig());
+      setDuressStep(3);
+    } catch (e) {
+      if (e instanceof DuressSyncError) {
+        // The local sentinel is armed (saveDuressModeConfig already succeeded
+        // before the server sync was attempted) - warn instead of blocking,
+        // since silently failing here would leave the user believing the
+        // wipe is fully enforced when it will not survive a cache clear.
+        setDuressConfig(getDuressModeConfig());
+        setDuressSyncWarning(t('settings.duressSyncWarning', 'Duress mode is armed on this device, but the server-side safeguard could not be enabled ({{reason}}). If this device\'s storage is ever cleared, the wipe will NOT trigger. Try again once you have a stable connection.', { reason: e.message }));
+        setDuressStep(3);
+      } else {
+        setDuressError(t('settings.duressArmFailed', 'Failed to arm duress mode. Please try again.'));
+      }
+    } finally {
+      setIsArmingDuress(false);
+    }
   }, [duressPassword, confirmDuressPassword, duressMaxAttempts, t]);
 
   const handleDisarmDuress = useCallback(async () => {
@@ -342,7 +360,7 @@ export default function SecurityModesSection({
                 </>
               ) : (
                 <button
-                  onClick={() => { setIsDuressModalOpen(true); setDuressStep(1); setDuressPassword(''); setConfirmDuressPassword(''); setDuressError(''); }}
+                  onClick={() => { setIsDuressModalOpen(true); setDuressStep(1); setDuressPassword(''); setConfirmDuressPassword(''); setDuressError(''); setDuressSyncWarning(''); }}
                   className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:opacity-90 transition-all flex items-center gap-3 shadow-lg"
                 >
                   <Skull size={18} />
@@ -471,8 +489,8 @@ export default function SecurityModesSection({
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelPasswordConfirm', 'Confirm Password')}</label>
-<input id="input-9j7w4zl1i" type="password" value={confirmTravelPassword}
+                      <label htmlFor="input-travel-confirm-password" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('settings.travelPasswordConfirm', 'Confirm Password')}</label>
+<input id="input-travel-confirm-password" type="password" value={confirmTravelPassword}
                         onChange={e => { setConfirmTravelPassword(e.target.value); setTravelError(''); }}
                         placeholder={t('settings.travelRepeatPassword', 'Repeat password')}
                         autoComplete="new-password"
@@ -624,6 +642,12 @@ export default function SecurityModesSection({
                         {t('settings.duressArmedConfirmDesc', 'Entering the duress password at login will trigger an immediate forensic wipe. Auto-wipe activates after {{count}} failed attempt(s).', { count: duressMaxAttempts })}
                       </p>
                     </div>
+                    {duressSyncWarning && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-start gap-3 text-left">
+                        <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{duressSyncWarning}</p>
+                      </div>
+                    )}
                     <button onClick={() => setIsDuressModalOpen(false)}
                       className="w-full py-4 bg-black text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-neutral-800 transition-all"
                     >

@@ -73,12 +73,12 @@ export class PostgresVaultRepository {
   }
 
   async findUserByEmailHash(emailHash) {
-    const r = await query('SELECT * FROM users WHERE email_hmac = $1', [emailHash]);
+    const r = await query('SELECT * FROM users WHERE email_hmac = $1', [emailHash], 'point_read');
     return rowToUser(this._env, r.rows[0]);
   }
 
   async findUserById(id) {
-    const r = await query('SELECT * FROM users WHERE id = $1', [id]);
+    const r = await query('SELECT * FROM users WHERE id = $1', [id], 'point_read');
     return rowToUser(this._env, r.rows[0]);
   }
 
@@ -92,6 +92,7 @@ export class PostgresVaultRepository {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active',$9, now())`,
         [user.id, user.emailHash, user.passwordHash, dek.wrappedDek, dek.kmsKeyId,
          dek.wrapMode, dek.pwWrapSalt, user.cryptoSalt ?? null, JSON.stringify(meta)],
+        'write',
       );
       return user.id;
     } catch (e) {
@@ -119,7 +120,7 @@ export class PostgresVaultRepository {
   }
 
   async deleteUserById(id) {
-    await query('DELETE FROM users WHERE id = $1', [id]); // vault_items cascade
+    await query('DELETE FROM users WHERE id = $1', [id], 'write'); // vault_items cascade
   }
 
   // Interface-completeness: load all users, apply fn, diff, write back changed rows.
@@ -147,7 +148,7 @@ export class PostgresVaultRepository {
   async getResource(uid, name) {
     const user = await this.findUserById(uid);
     if (!user) return null;
-    const r = await query('SELECT ciphertext FROM vault_items WHERE user_id=$1 AND name=$2', [uid, name]);
+    const r = await query('SELECT ciphertext FROM vault_items WHERE user_id=$1 AND name=$2', [uid, name], 'point_read');
     if (r.rows.length === 0) return null;
     return this._env.decryptResource(user, r.rows[0].ciphertext);
   }
@@ -160,15 +161,16 @@ export class PostgresVaultRepository {
        VALUES ($1,$2,$3,1, now())
        ON CONFLICT (user_id, name) DO UPDATE SET ciphertext=EXCLUDED.ciphertext, version=vault_items.version+1, updated_at=now()`,
       [uid, name, blob],
+      'write',
     );
   }
 
   async deleteResource(uid, name) {
-    await query('DELETE FROM vault_items WHERE user_id=$1 AND name=$2', [uid, name]);
+    await query('DELETE FROM vault_items WHERE user_id=$1 AND name=$2', [uid, name], 'write');
   }
 
   async deleteUserData(uid) {
-    await query('DELETE FROM users WHERE id=$1', [uid]); // cascades vault_items
+    await query('DELETE FROM users WHERE id=$1', [uid], 'write'); // cascades vault_items
   }
 
   // Sessions modeled as a 'sessions' resource row (faithful port; dedicated table is P2).

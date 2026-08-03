@@ -7,4 +7,5 @@
 *.tmp
 *.wipe_tmp
 *.lock
+!Cargo.lock
 .master_key

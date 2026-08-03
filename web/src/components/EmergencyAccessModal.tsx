@@ -193,10 +193,10 @@ export default function EmergencyAccessModal({ onClose }: Props) {
                 <div className="space-y-8">
                   {/* Email Input */}
                   <div className="space-y-3">
-                    <label htmlFor="input-0bz6u6yj6" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+                    <label htmlFor="input-trusted-contact-email" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
                       <Mail size={12} /> {t('emergency.trustedContactEmail', 'Trusted Contact Email')}
                     </label>
-<input id="input-0bz6u6yj6"
+<input id="input-trusted-contact-email"
                       type="email"
                       value={email}
                       onChange={e => { setEmail(e.target.value); setError(''); }}

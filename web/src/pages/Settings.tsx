@@ -1136,16 +1136,16 @@ export default function Settings() {
               <div className="px-6 py-5 space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-1.5">
-                    <label htmlFor="input-0r5lt0x14" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerHost', 'SMTP Host')}</label>
-<input id="input-0r5lt0x14" type="text" value={emailServerForm.host}
+                    <label htmlFor="input-smtp-host" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerHost', 'SMTP Host')}</label>
+<input id="input-smtp-host" type="text" value={emailServerForm.host}
                       onChange={e => { setEmailServerForm({ ...emailServerForm, host: e.target.value }); setEmailServerError(''); setDnsCheckResult(null); }}
                       placeholder="smtp.example.com"
                       className={inputCls}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label htmlFor="input-uyncl7xda" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerPort', 'Port')}</label>
-<input id="input-uyncl7xda" type="number" value={emailServerForm.port}
+                    <label htmlFor="input-smtp-port" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerPort', 'Port')}</label>
+<input id="input-smtp-port" type="number" value={emailServerForm.port}
                       onChange={e => setEmailServerForm({ ...emailServerForm, port: Number(e.target.value) })}
                       min={1} max={65535}
                       className={inputCls}
@@ -1154,8 +1154,8 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="input-h0trif5l7" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerUser', 'Username / Email')}</label>
-<input id="input-h0trif5l7" type="text" value={emailServerForm.user}
+                  <label htmlFor="input-smtp-user" className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">{t('settings.emailServerUser', 'Username / Email')}</label>
+<input id="input-smtp-user" type="text" value={emailServerForm.user}
                     onChange={e => { setEmailServerForm({ ...emailServerForm, user: e.target.value }); setEmailServerError(''); setDnsCheckResult(null); }}
                     placeholder="user@example.com" autoComplete="off"
                     className={inputCls}

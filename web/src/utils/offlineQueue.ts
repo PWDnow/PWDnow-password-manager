@@ -98,12 +98,6 @@ export async function getQueueSize(): Promise<number> {
   return Object.keys(await readOutbox()).length;
 }
 
-/** Forensic-wipe / logout hook: drop the queue entirely without flushing it. */
-export function discardQueue(): void {
-  localStorage.removeItem(OUTBOX_KEY);
-  notifyChanged();
-}
-
 // ── Flush ──────────────────────────────────────────────────────────────────
 
 let flushing = false;

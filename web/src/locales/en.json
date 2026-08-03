@@ -770,6 +770,8 @@
     "duressArming": "Arming…",
     "duressPasswordMinError": "Duress password must be at least 8 characters.",
     "duressPasswordMismatch": "Passwords do not match.",
+    "duressSyncWarning": "Duress mode is armed on this device, but the server-side safeguard could not be enabled ({{reason}}). If this device's storage is ever cleared, the wipe will NOT trigger. Try again once you have a stable connection.",
+    "duressArmFailed": "Failed to arm duress mode. Please try again.",
     "forensicWipe": "Forensic Wipe",
     "forensicWipeDesc": "Permanently destroy all vault data on this device.",
     "twoFactorTitle": "Two-Factor Requirement",

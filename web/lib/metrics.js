@@ -45,4 +45,13 @@ export const grpcLatency = new promClient.Histogram({
   registers: [register],
 });
 
+// Buckets straddle the per-shape p50/p99 latency targets in docs/sla.md.
+export const pgQueryDuration = new promClient.Histogram({
+  name: 'pwdnow_pg_query_duration_seconds',
+  help: 'Duration of Postgres queries by query shape',
+  labelNames: ['shape'],
+  buckets: [0.001, 0.002, 0.005, 0.008, 0.01, 0.012, 0.02, 0.03, 0.05, 0.06, 0.1, 0.25],
+  registers: [register],
+});
+
 export const metricsRegister = register;

@@ -46,10 +46,10 @@ export default function PasswordPromptModal({ isOpen, onClose, onConfirm, title,
 
             <form onSubmit={(e) => { e.preventDefault(); onConfirm(password); }} className="space-y-6">
               <div>
-                <label htmlFor="input-jfy6bo31a" className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
+                <label htmlFor="input-master-password" className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
                   {t('settings.masterPassword', 'Master Password')}
                 </label>
-<input id="input-jfy6bo31a"
+<input id="input-master-password"
                   type="password"
                   autoFocus
                   value={password}

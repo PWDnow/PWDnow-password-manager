@@ -919,7 +919,7 @@ describe('login', () => {
 describe('loginFinish', () => {
   it('completes MFA and returns the salt', async () => {
     relayFetch.mockResolvedValue({ status: 200, headers: { 'x-vault-salt': 'aabbccddeeff00112233445566778899' }, body: '{"ok":true}' });
-    const result = await loginFinish('https://vault.example.com', 'pt', '123456');
+    const result = await loginFinish('https://vault.example.com', 'pt', '123456', 'totp');
     expect(result.ok).toBe(true);
     expect(result.cryptoSaltHex).toBe('aabbccddeeff00112233445566778899');
   });
@@ -1004,11 +1004,15 @@ export async function login(origin: string, email: string, password: string): Pr
   };
 }
 
-export async function loginFinish(origin: string, partialToken: string, code: string): Promise<LoginResult> {
-  const res = await relayFetch(origin, '/login/finish', {
+export async function loginFinish(origin: string, partialToken: string, code: string, method: 'totp' | 'email'): Promise<LoginResult> {
+  // The server's /api/auth/login/finish (routes/auth/login.js) expects distinct
+  // totpCode/emailCode fields, not a generic `code` — it reads
+  // `const code = totpCode ?? emailCode` internally based on which MFA method
+  // is actually enforced for the account, so only the active one is sent.
+  const res = await relayFetch(origin, '/api/auth/login/finish', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ partialToken, code }),
+    body: JSON.stringify({ partialToken, ...(method === 'totp' ? { totpCode: code } : { emailCode: code }) }),
   });
   const parsed = JSON.parse(res.body) as RawLoginBody;
   return {
@@ -1092,7 +1096,7 @@ export interface NewCredentialInput {
 
 export type ExtMessage =
   | { type: 'connect'; origin: string; email: string; password: string }
-  | { type: 'loginFinish'; password: string; code: string }
+  | { type: 'loginFinish'; password: string; code: string; method: 'totp' | 'email' }
   | { type: 'getStatus' }
   | { type: 'getVault' }
   | { type: 'saveCredential'; credential: NewCredentialInput }
@@ -1187,13 +1191,13 @@ describe('finishMfaLogin', () => {
     login.mockResolvedValue({ ok: true, methods: ['totp'], partialToken: 'pt' });
     await session.connect('https://vault.example.com', 'a@b.com', 'correct horse battery staple');
     loginFinish.mockResolvedValue({ ok: true, cryptoSaltHex: SALT });
-    const result = await session.finishMfaLogin('https://vault.example.com', 'correct horse battery staple', '123456');
+    const result = await session.finishMfaLogin('https://vault.example.com', 'correct horse battery staple', '123456', 'totp');
     expect(result).toEqual({ ok: true });
     expect(storageSession.has('pwdnow_derived_key')).toBe(true);
   });
 
   it('errors when there is no pending MFA login', async () => {
-    const result = await session.finishMfaLogin('https://vault.example.com', 'pw', '123456');
+    const result = await session.finishMfaLogin('https://vault.example.com', 'pw', '123456', 'totp');
     expect(result).toEqual({ ok: false, error: 'no_pending_login' });
   });
 });
@@ -1335,9 +1339,10 @@ export async function finishMfaLogin(
   origin: string,
   password: string,
   code: string,
+  method: 'totp' | 'email',
 ): Promise<{ ok: boolean; error?: string }> {
   if (!pendingPartialToken) return { ok: false, error: 'no_pending_login' };
-  const result = await loginFinish(origin, pendingPartialToken, code);
+  const result = await loginFinish(origin, pendingPartialToken, code, method);
   pendingPartialToken = null;
   if (!result.ok) return { ok: false, error: result.error ?? 'unknown_error' };
   if (!result.cryptoSaltHex) return { ok: false, error: 'missing_salt' };
@@ -1509,7 +1514,7 @@ export async function handleMessage(message: ExtMessage): Promise<ExtResponse> {
       case 'loginFinish': {
         const status = await session.getStatus();
         if (!status.origin) return { type: 'connectResult', ok: false, error: 'not_connected' };
-        const result = await session.finishMfaLogin(status.origin, message.password, message.code);
+        const result = await session.finishMfaLogin(status.origin, message.password, message.code, message.method);
         return { type: 'connectResult', ok: result.ok, error: result.error };
       }
       case 'getStatus': {
@@ -2002,7 +2007,7 @@ export function ConnectScreen({ onConnected }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const message: ExtMessage = { type: 'loginFinish', password, code };
+      const message: ExtMessage = { type: 'loginFinish', password, code, method: (mfaMethods?.[0] as 'totp' | 'email') ?? 'totp' };
       const response = (await browser.runtime.sendMessage(message)) as ExtResponse;
       if (response.type !== 'connectResult' || !response.ok) {
         setError(response.type === 'connectResult' ? response.error ?? 'unknown_error' : 'unexpected_response');

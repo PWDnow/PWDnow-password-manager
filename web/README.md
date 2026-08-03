@@ -1,20 +1,22 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# PWDnow Web
 
-# Run and deploy your AI Studio app
+React 19 + Express frontend and IPC proxy for the PWDnow vault daemon.
 
-This contains everything you need to run your app locally.
+See the [project README](../README.md) for an overview, installation instructions, and supported platforms, and [`CLAUDE.md`](CLAUDE.md) in this directory for frontend architecture, conventions, and the cryptographic boundaries the frontend must never cross.
 
-View your app in AI Studio: https://ai.studio/apps/75b21388-7bdf-4718-9f22-a6c628ee8387
+## Quick start
 
-## Run Locally
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+This starts the Vite dev server on port 3000 with hot module reload. It does not require the vault daemon to be running for basic UI work, but daemon-backed features (unlock, credential CRUD, MFA) need `vault-daemon` running and reachable at the address configured in `.env`.
 
+For a production build:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm run build
+npm start
+```

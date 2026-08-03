@@ -5,6 +5,7 @@
 Thumbs.db
 *.swp
 *~
+.~lock.*#
 
 # ── Node.js ───────────────────────────────────────────────────────────────────
 node_modules/
@@ -30,6 +31,7 @@ target/
 *.tmp
 *.wipe_tmp
 *.lock
+!Cargo.lock
 .master_key
 auth_data/
 /vault/
@@ -93,3 +95,12 @@ daemon/grpc.token
 
 # ── Obsidian ──────────────────────────────────────────────────────────────────
 *.AppImage
+
+# ── Internal security/audit docs (never public — vuln roadmap for attackers) ──
+docs/flaws.md
+docs/pentest-report.md
+web/FOLDER_BUG.md
+web/p2w-flaw.md
+web/MASTER_SECURITY_REPORT.md
+web/SECURITY_AUDIT_REPORT.md
+web/need-fix.md

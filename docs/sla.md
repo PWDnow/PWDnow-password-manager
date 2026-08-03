@@ -94,6 +94,22 @@ NONE 17                                                           99.99%
 | "C-01 `mfaCfg` ReferenceError crashes every server-mode login" | Already fixed at `web/auth.js:1004` — `const mfaCfg = readUserBlob(u.id, 'mfa_config', {});`. flaws.md is stale. | +4 pts |
 | "AppArmor profile hardcoded to `aarch64-linux-gnu`" | Profile uses the `@{multiarch}` tunable (`deploy/apparmor.d/vault-daemon:18-21`), which the AppArmor parser resolves to the correct triple per host. **The CLAUDE.md note that says it's hardcoded is itself outdated.** | +1 pt |
 
+### Corrections to *this* (v2) assessment (added 2026-07-28)
+
+This document's own citations against `web/auth.js:NNN` are now stale too — `auth.js` has since been split into `routes/auth/*.js` + `lib/*.js` (current `auth.js` is a 98-line init/mount shim; e.g. `mfaCfg` now lives at `routes/auth/login.js:234`, not `auth.js:1004`). More importantly, most of the "Nine new genuine penalties" in the headline box above have themselves been fixed since 2026-05-16 and should not be treated as current:
+
+| v2 claim (headline box, items 1-9) | Reality on disk (verified 2026-07-28) | Status |
+|---|---|---|
+| 1-3. `build.rs` hardcodes `/usr/lib/aarch64-linux-gnu`, `LIBCLANG_PATH=/usr/lib/llvm-21/lib`, `/usr/include/fido.h` | `daemon/build.rs` calls `pkg_config::probe_library` first for every native dep, with cross-platform fallback scanning (Debian/RHEL/macOS Homebrew paths) only when pkg-config is unavailable; `find_libclang_path()`/`find_fido_header()` search `llvm-config`/`clang`/multiple llvm-14..21 + Homebrew paths, not one hardcoded path. | **Fixed** — the "daemon WILL NOT BUILD on amd64" claim no longer holds. |
+| 4. CI runs test/lint/audit with `\|\| true` — "CI is GREEN ALWAYS" | `.github/workflows/ci.yml` — only the `Lint` step (line 28) has `\|\| true`. `Test` (`npm run test`, `cargo test`), `npm audit --audit-level=high`, and `cargo audit --deny warnings` all run unguarded and can fail the build. | **Stale** — CI can and does fail on test/audit regressions today. |
+| 5. Release workflow runs only on `ubuntu-latest` (amd64), no matrix | `.github/workflows/release.yml` has `strategy.matrix` over `ubuntu-latest` (amd64), `ubuntu-24.04-arm64`, and `macos-14`. | **Fixed** — three-platform release matrix already exists. |
+| 7. `synchronous=NORMAL` risks lost commits on power loss | `daemon/src/vault/db.rs:60` sets `conn.pragma_update(None, "synchronous", "FULL")`. | **Fixed.** |
+| 8. `setup_autostart.sh` runs the daemon under PM2, destroying systemd hardening | `setup_autostart.sh` no longer exists in the repo. | **Moot** — re-verify against whatever the current autostart path is before re-flagging. |
+| 9. Per-`(uid, conn_id)` lockout bypassable by opening a new WebSocket (fresh `conn_id` resets the counter) | `daemon/src/vault/lockout.rs`'s `LockoutTracker` keys **only** on `uid` (`HashMap<u32, (u32, Instant)>`); `conn_id` is threaded through every call site but never read by the tracker. So the described bypass mechanism is backwards — the lockout isn't keyed on `conn_id` at all (in this single-tenant daemon `uid` is hardcoded to `1000`, so this is currently a global-per-installation lockout, not a per-connection one). | **Mischaracterized** — real issue is dead `conn_id` plumbing (tracked separately), not a `conn_id`-reset bypass. |
+| 6. Hourly backup `cp`s `vault.db` only, misses `-wal`/`-shm` under `journal_mode=WAL` | `deploy/vault-daemon-backup.service` still does a bare `cp .../vault.db ...` with no `-wal`/`-shm` handling. | **Still valid** — not re-verified as fixed. |
+
+Six of the nine "genuine new penalties" behind the −12 in the headline box are now fixed, moot, or mischaracterized; only #6 was confirmed still open. The 17/100 headline score should be recomputed before being relied on — this note corrects the record, it does not re-run the scoring formula.
+
 ### Scoring formula (revised)
 
 ```
@@ -409,6 +425,15 @@ PWDnow does not currently define SLIs. To run a 99.99 % SLO you need explicit, m
 | 12 | RSS memory of Express / daemon | Capacity | `pwdnow-monitor` | < 700 MiB / < 1.5 GiB | breach → warn |
 | 13 | npm/cargo audit clean | Supply chain | CI on each PR + daily cron | 0 high-severity | 1 high → block merge, alert |
 | 14 | Session token revocation propagation | Correctness | Logout test on synthetic | ≤ 1 s | breach → warn |
+| 15 | Postgres point read (`users` by `id`/`email_hmac`, `vault_items` by `(user_id, name)`) — indexed single-row lookup, `findUserById`/`findUserByEmailHash`/`getResource` | Latency | `pg` pool query timer, per-query-shape histogram | p50 < 5 ms · p99 < 30 ms | 10 % budget in 6 h → warn |
+| 16 | Postgres write (`vault_items` upsert via `setResource`; `users` insert via `insertUser`) | Latency | `pg` pool query timer | p50 < 10 ms · p99 < 50 ms | 10 % budget in 6 h → warn |
+| 17 | Postgres row-locked read-modify-write (`updateUserById` — `SELECT ... FOR UPDATE` + `UPDATE` in one tx) | Latency | `pg` pool query timer | p50 < 12 ms · p99 < 60 ms | 10 % budget in 6 h → warn |
+| 18 | Postgres pool saturation (active connections / `PG_POOL_MAX`) | Capacity | `pg` pool stats | < 70 % | ≥ 85 % → warn, ≥ 95 % → page |
+| 19 | Postgres transport encryption | Security | `web/lib/db/pool.js` TLS config (`PG_TLS_OPTIONS`) | TLS 1.3 only, `TLS_AES_256_GCM_SHA384` only | any negotiation outside this profile is a hard TLS failure, not a downgrade |
+
+SLIs #15–17 are new with the P1 Postgres backend (`web/lib/postgresVaultRepository.js`, schema in `web/migrations/1718000000000_init-saas-schema.js`) and are now instrumented: `pwdnow_pg_query_duration_seconds{shape}` (Prometheus histogram, `web/lib/metrics.js`), scraped via the existing loopback-only `/metrics` endpoint (`server.js`). Numbers are proposed targets pending real k6 measurement at the P3 100k load test; tighten or loosen once observed.
+
+**SLI #19 detail (CNSA 2.0 / NIST PQC L5 posture, added 2026-08-01):** `getPool()` pins `minVersion`/`maxVersion` to `TLSv1.3` and `ciphers` to `TLS_AES_256_GCM_SHA384` (never AES-128, matching [[pwdnow-crypto-baseline]]). Its `ecdhCurve` preference list is `SecP384r1MLKEM1024:X25519MLKEM768:secp384r1:X25519` — the first two are hybrid ML-KEM groups (SecP384r1MLKEM1024 mirrors the daemon's own P-384 + ML-KEM-1024 hybrid choice for PQC L5); the trailing classical groups are the fallback for today's managed Postgres/local dev, none of which speak a PQC TLS group yet. Verified against this project's Node 24 / OpenSSL 3.5.5: `SecP384r1MLKEM1024` genuinely negotiates end-to-end when both sides support it (self-contained `tls.createServer`/`tls.connect` test, both restricted to that one group with no fallback available — connection succeeded). The classical fallback is an accepted residual, not a gap: `vault_items.ciphertext` and `wrapped_dek` are already envelope-encrypted before they reach the TLS layer (see [[saas-scalability-design]] §"Data-in-transit"), so a classical-only transport leg never exposes plaintext, only ciphertext-in-transit. Local dev (`PGSSL=disable`) intentionally bypasses this profile entirely — the dev docker Postgres has no TLS listener.
 
 The error budget for SLI #1 is 4 min 23 s per month. Two `pm2 restart` events with no graceful drain (each ~ 2 min of degraded WS) consume the entire budget. Any unplanned daemon panic adds 35 s on top.
 

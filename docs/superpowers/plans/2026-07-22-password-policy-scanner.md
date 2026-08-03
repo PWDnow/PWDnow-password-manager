@@ -580,8 +580,15 @@ export function mergePolicies(...parts: PartialPolicy[]): PasswordPolicy {
 
 export function generateCompliantPassword(policy: PasswordPolicy): string {
   const symbolSet = policy.allowedSymbols && policy.allowedSymbols.length > 0 ? policy.allowedSymbols : SYMBOLS;
-  const minLength = Math.max(ABSOLUTE_MIN_LENGTH, policy.minLength);
-  const maxLength = Math.min(ABSOLUTE_MAX_LENGTH, Math.max(minLength, policy.maxLength));
+  // Resolve maxLength from the *unfloored* policy.minLength first (only
+  // pulling maxLength up if the policy itself is contradictory, min > max —
+  // mirroring mergePolicies' own "clamps maxLength up to minLength" contract).
+  // ABSOLUTE_MIN_LENGTH must never leak into this step: doing `Math.max(floor,
+  // policy.minLength)` before computing maxLength let a floor of 4 silently
+  // override an explicit, tighter policy.maxLength of 2 — failing the
+  // restrictive-maxLength test below, which expects length <= 2.
+  const maxLength = Math.min(ABSOLUTE_MAX_LENGTH, Math.max(policy.minLength, policy.maxLength));
+  const minLength = Math.min(maxLength, Math.max(ABSOLUTE_MIN_LENGTH, policy.minLength));
 
   let requiredCharsets: string[] = [];
   if (policy.requireLower) requiredCharsets.push(LOWER);

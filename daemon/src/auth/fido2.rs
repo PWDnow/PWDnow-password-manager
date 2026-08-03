@@ -29,6 +29,13 @@ pub trait DeviceBackend: Send + Sync {
         client_data_hash: &[u8; 32],
         resident_key: bool,
     ) -> Result<RegisterOutput, VaultError>;
+    // Genuinely unreachable from production code: the WebAuthn ceremony runs
+    // in the browser (navigator.credentials.get()), and the daemon only ever
+    // verifies the resulting assertion (verify_assertion) — it never drives
+    // an attached authenticator to produce one itself. Kept (not deleted)
+    // because it's real, working libfido2 FFI on both backends and is what
+    // the unit tests below exercise to prove that binding is correct; only
+    // `make_credential`/`list_devices` are reachable from grpc_server.rs today.
     #[allow(dead_code)]
     fn get_assertion(
         &self,

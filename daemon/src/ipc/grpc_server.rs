@@ -86,9 +86,8 @@ impl VaultService for GrpcServer {
     async fn unlock(&self, request: Request<vault_proto::UnlockRequest>) -> Result<Response<vault_proto::UnlockedResponse>, Status> {
         let req = request.into_inner();
         let uid = 1000;
-        let conn_id = 1;
         let yk: Option<[u8; 20]> = req.yubikey_response.and_then(|v| if v.is_empty() { None } else { v.try_into().ok() });
-        match self.state.unlock(&req.password, yk.as_ref(), uid, conn_id) {
+        match self.state.unlock(&req.password, yk.as_ref(), uid) {
             Err(e) => Err(err(tonic::Code::Unauthenticated, e)),
             Ok(sess) => {
                 let totp_ok = self.state.with_vmk(|vmk| {
@@ -109,19 +108,19 @@ impl VaultService for GrpcServer {
                         // exponential lockout, not cleared by lock()) and
                         // re-lock the vault state without wiping either
                         // lockout tracker.
-                        self.state.record_totp_failure(uid, conn_id);
+                        self.state.record_totp_failure(uid);
                         self.state.lock_keep_lockout();
                         Err(err(tonic::Code::Unauthenticated, e))
                     }
                     Ok(false) => {
-                        self.state.record_totp_failure(uid, conn_id);
+                        self.state.record_totp_failure(uid);
                         self.state.lock_keep_lockout();
                         Err(err(tonic::Code::Unauthenticated, "invalid TOTP code"))
                     }
                     Ok(true) => {
                         // D3 fix: only now — once both factors have verified —
                         // clear the unlock-failure and TOTP-failure counters.
-                        self.state.complete_unlock(uid, conn_id);
+                        self.state.complete_unlock(uid);
                         let _ = self.state.audit_log("UNLOCK", Some(&sess.user_id));
                         let ticket = self.state.wipe_ticket_bytes().unwrap_or_default();
                         let vmk_guard = self.state.vmk_read_guard();
@@ -176,7 +175,7 @@ impl VaultService for GrpcServer {
 
     async fn unlock_with_passkey(&self, request: Request<vault_proto::UnlockWithPasskeyRequest>) -> Result<Response<vault_proto::UnlockedResponse>, Status> {
         let req = request.into_inner();
-        match self.state.unlock_with_passkey(&req.credential_id, &req.auth_data, &req.signature, &req.client_data_json, 1000, 1) {
+        match self.state.unlock_with_passkey(&req.credential_id, &req.auth_data, &req.signature, &req.client_data_json, 1000) {
             Ok(sess) => {
                 let _ = self.state.audit_log("UNLOCK_PASSKEY", Some(&sess.user_id));
                 let ticket = self.state.wipe_ticket_bytes().unwrap_or_default();
@@ -200,7 +199,7 @@ impl VaultService for GrpcServer {
 
     async fn unlock_with_pqc(&self, request: Request<vault_proto::UnlockWithPqcRequest>) -> Result<Response<vault_proto::UnlockedResponse>, Status> {
         let req = request.into_inner();
-        match self.state.unlock_with_pqc(1000, &req.credential_id, &req.signature, &req.kem_ciphertext, &req.client_data_json, 1) {
+        match self.state.unlock_with_pqc(1000, &req.credential_id, &req.signature, &req.kem_ciphertext, &req.client_data_json) {
             Ok(sess) => {
                 let _ = self.state.audit_log("UNLOCK_PQC", Some(&sess.user_id));
                 let ticket = self.state.wipe_ticket_bytes().unwrap_or_default();
@@ -271,7 +270,7 @@ impl VaultService for GrpcServer {
 
     async fn quick_unlock(&self, request: Request<vault_proto::QuickUnlockRequest>) -> Result<Response<vault_proto::UnlockedResponse>, Status> {
         let req = request.into_inner();
-        match self.state.quick_unlock(&req.credential_id, &req.auth_data, &req.signature, &req.client_data_json, &req.dbk, 1000, 1) {
+        match self.state.quick_unlock(&req.credential_id, &req.auth_data, &req.signature, &req.client_data_json, &req.dbk, 1000) {
             Ok(sess) => {
                 let _ = self.state.audit_log("UNLOCK_QUICK", Some(&sess.user_id));
                 let ticket = self.state.wipe_ticket_bytes().unwrap_or_default();
@@ -325,9 +324,9 @@ impl VaultService for GrpcServer {
 
     async fn unlock_with_recovery_key(&self, request: Request<vault_proto::UnlockWithRecoveryKeyRequest>) -> Result<Response<vault_proto::UnlockedResponse>, Status> {
         let req = request.into_inner();
-        match self.state.unlock_with_recovery_key(&req.recovery_key, 1000, 1) {
+        match self.state.unlock_with_recovery_key(&req.recovery_key, 1000) {
             Err(e) => {
-                self.state.record_failed_unlock(1000, 1);
+                self.state.record_failed_unlock(1000);
                 Err(err(tonic::Code::Unauthenticated, e))
             }
             Ok(sess) => {
@@ -787,7 +786,7 @@ impl VaultService for GrpcServer {
             return Err(err(tonic::Code::InvalidArgument, "backup code too long"));
         }
         let yk: Option<[u8; 20]> = req.yubikey_response.and_then(|v| if v.is_empty() { None } else { v.try_into().ok() });
-        match self.state.unlock(&req.password, yk.as_ref(), 1000, 1) {
+        match self.state.unlock(&req.password, yk.as_ref(), 1000) {
             Err(e) => Err(err(tonic::Code::Unauthenticated, e)),
             Ok(sess) => {
                 let result = self.state.with_vmk(|vmk| {
@@ -805,16 +804,16 @@ impl VaultService for GrpcServer {
                 match result {
                     Err(e) => {
                         self.state.lock();
-                        self.state.record_failed_unlock(1000, 1);
+                        self.state.record_failed_unlock(1000);
                         Err(err(tonic::Code::Unauthenticated, e))
                     }
                     Ok(false) => {
                         self.state.lock();
-                        self.state.record_failed_unlock(1000, 1);
+                        self.state.record_failed_unlock(1000);
                         Err(err(tonic::Code::Unauthenticated, "invalid or already-used backup code"))
                     }
                     Ok(true) => {
-                        self.state.reset_unlock_counter(1000, 1);
+                        self.state.reset_unlock_counter(1000);
                         let _ = self.state.audit_log("UNLOCK_BACKUP_CODE", Some(&sess.user_id));
                         let ticket = self.state.wipe_ticket_bytes().unwrap_or_default();
                         let vmk_guard = self.state.vmk_read_guard();
@@ -879,7 +878,7 @@ impl VaultService for GrpcServer {
     async fn change_password(&self, request: Request<vault_proto::ChangePasswordRequest>) -> Result<Response<vault_proto::OkResponse>, Status> {
         let req = request.into_inner();
         auth_then!(self.state, 1000, req.session_token, {
-            match self.state.change_password(&req.old_password, &req.new_password, None, 1000, 1) {
+            match self.state.change_password(&req.old_password, &req.new_password, None, 1000) {
                 Ok(()) => {
                     let v_uuid = self.state.vault_uuid_str();
                     self.state.sessions.revoke_all_except(&v_uuid, &req.session_token);
@@ -896,7 +895,7 @@ impl VaultService for GrpcServer {
     async fn verify_master_password(&self, request: Request<vault_proto::VerifyMasterPasswordRequest>) -> Result<Response<vault_proto::OkResponse>, Status> {
         let req = request.into_inner();
         auth_then!(self.state, 1000, req.session_token, {
-            match self.state.verify_master_password(&req.password, 1000, 1) {
+            match self.state.verify_master_password(&req.password, 1000) {
                 Ok(()) => Ok(Response::new(vault_proto::OkResponse {})),
                 Err(e) => Err(err(tonic::Code::Unauthenticated, e)),
             }

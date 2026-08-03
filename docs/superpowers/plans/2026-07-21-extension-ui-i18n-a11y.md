@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the v1 extension's unstyled popup with an enterprise-grade, Tailwind-styled UI matching the PWDnow web app's own design tokens, add a real SVG-sourced toolbar icon, support 13 languages (with RTL for Arabic), and meet WCAG 2.2 AAA (verified via automated axe checks), without changing any `lib/*` message/session/crypto logic except `lib/errorMessages.ts`.
+**Goal:** Replace the v1 extension's unstyled popup with a Tailwind-styled UI matching the PWDnow web app's own design tokens, add a real SVG-sourced toolbar icon, support 13 languages (with RTL for Arabic), and meet WCAG 2.2 AAA — structural criteria (labeling, target size, focus, motion, heading order) verified via automated axe checks; contrast is not axe-checkable under jsdom and instead rests on token-value fidelity to the audited web app palette (see the design spec's §6 correction) — without changing any `lib/*` message/session/crypto logic except `lib/errorMessages.ts`.
 
 **Architecture:** Presentation-layer pass over the existing, already-reviewed v1 extension at `~/Documents/PWDnow_extension`. Tailwind CSS v4 with hand-ported design tokens from `PWDnow/web/src/index.css`. `react-i18next` with statically bundled (not HTTP-fetched) locale JSON. `lucide-react` for in-UI icons, matching the web app's own icon library. `vitest-axe` for automated accessibility verification.
 
@@ -393,7 +393,7 @@ describe('detectDefaultLanguage', () => {
 });
 ```
 
-Run: `npx vitest run lib/i18n.test.ts` — expected FAIL, then implement Step 2 above, then PASS (4 tests).
+Run: `npx vitest run lib/i18n.test.ts` — expected FAIL, then implement Step 2 above, then PASS (5 tests).
 
 - [ ] **Step 4: Enable JSON module imports**
 
@@ -548,7 +548,7 @@ describe('locale completeness', () => {
 });
 ```
 
-Run: `npx vitest run entrypoints/popup/locales/locales.test.ts` — expected PASS (27 tests: 1 count + 13 key-match + 13 non-empty, note `en` is skipped from the non-empty loop) once all 13 files exist and match.
+Run: `npx vitest run entrypoints/popup/locales/locales.test.ts` — expected PASS (26 tests: 1 count + 13 key-match + 12 non-empty, since `en` is skipped from the non-empty loop) once all 13 files exist and match.
 
 - [ ] **Step 8: Write the i18next bootstrap**
 

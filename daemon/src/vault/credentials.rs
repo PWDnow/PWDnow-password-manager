@@ -41,6 +41,39 @@ fn build_aad(vault_uuid: &str, cred_id: &str) -> Vec<u8> {
     aad
 }
 
+/// Generate a fresh per-credential DEK, wrap it with the VMK, and encrypt
+/// `plaintext_blob` under the DEK. Shared by `add`/`update` so a future field
+/// added to this sealing step only needs to change in one place.
+fn seal_blob(
+    vmk: &[u8; 32],
+    vault_uuid: &str,
+    cred_id: &str,
+    plaintext_blob: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>), VaultError> {
+    let mut dek = [0u8; 32]; OsRng.fill_bytes(&mut dek);
+    let (enc_dek, dek_nonce) = aes_gcm::encrypt(vmk, &dek, b"credential-dek-v1")?;
+    let aad = build_aad(vault_uuid, cred_id);
+    let (ciphertext, ct_nonce) = xchacha20::encrypt(&dek, plaintext_blob, &aad)?;
+    dek.zeroize();
+    Ok((enc_dek, dek_nonce.to_vec(), ciphertext, ct_nonce.to_vec(), aad))
+}
+
+/// Compute the (service, url, username) blind indices for a credential blob.
+/// Shared by `add`/`update` so the set of indexed fields stays in sync.
+fn compute_blind_indices(
+    blind_index_key: &[u8; 64],
+    plaintext_blob: &[u8],
+) -> Result<(Option<String>, Option<String>, Option<String>), VaultError> {
+    let fields: CredentialFields = serde_json::from_slice(plaintext_blob)
+        .map_err(|_| VaultError::Crypto("invalid JSON blob".into()))?;
+
+    let service_hash  = fields.service.and_then(|s| blind_index::compute(blind_index_key, &s).ok());
+    let url_hash      = fields.url.and_then(|u| blind_index::compute(blind_index_key, &u).ok());
+    let username_hash = fields.username.and_then(|u| blind_index::compute(blind_index_key, &u).ok());
+
+    Ok((service_hash, url_hash, username_hash))
+}
+
 /// Add a new credential to the vault.
 pub fn add(
     conn: &Connection,
@@ -53,22 +86,10 @@ pub fn add(
     let id = Uuid::new_v4();
     let id_str = id.to_string();
 
-    // 1. Generate DEK and wrap it with VMK
-    let mut dek = [0u8; 32]; OsRng.fill_bytes(&mut dek);
-    let (enc_dek, dek_nonce) = aes_gcm::encrypt(vmk, &dek, b"credential-dek-v1")?;
-
-    // 2. Encrypt plaintext_blob with DEK
-    let aad = build_aad(vault_uuid, &id_str);
-    let (ciphertext, ct_nonce) = xchacha20::encrypt(&dek, plaintext_blob, &aad)?;
-    dek.zeroize();
-
-    // 3. Compute blind indices
-    let fields: CredentialFields = serde_json::from_slice(plaintext_blob)
-        .map_err(|_| VaultError::Crypto("invalid JSON blob".into()))?;
-    
-    let service_hash  = fields.service.and_then(|s| blind_index::compute(blind_index_key, &s).ok());
-    let url_hash      = fields.url.and_then(|u| blind_index::compute(blind_index_key, &u).ok());
-    let username_hash = fields.username.and_then(|u| blind_index::compute(blind_index_key, &u).ok());
+    let (enc_dek, dek_nonce, ciphertext, ct_nonce, aad) =
+        seal_blob(vmk, vault_uuid, &id_str, plaintext_blob)?;
+    let (service_hash, url_hash, username_hash) =
+        compute_blind_indices(blind_index_key, plaintext_blob)?;
 
     let ts = now();
     conn.execute(
@@ -140,18 +161,10 @@ pub fn update(
     plaintext_blob: &[u8],
 ) -> Result<(), VaultError> {
     let id_str = id.to_string();
-    let mut dek = [0u8; 32]; OsRng.fill_bytes(&mut dek);
-    let (enc_dek, dek_nonce) = aes_gcm::encrypt(vmk, &dek, b"credential-dek-v1")?;
-    let aad = build_aad(vault_uuid, &id_str);
-    let (ciphertext, ct_nonce) = xchacha20::encrypt(&dek, plaintext_blob, &aad)?;
-    dek.zeroize();
-
-    let fields: CredentialFields = serde_json::from_slice(plaintext_blob)
-        .map_err(|_| VaultError::Crypto("invalid JSON blob".into()))?;
-    
-    let service_hash  = fields.service.and_then(|s| blind_index::compute(blind_index_key, &s).ok());
-    let url_hash      = fields.url.and_then(|u| blind_index::compute(blind_index_key, &u).ok());
-    let username_hash = fields.username.and_then(|u| blind_index::compute(blind_index_key, &u).ok());
+    let (enc_dek, dek_nonce, ciphertext, ct_nonce, aad) =
+        seal_blob(vmk, vault_uuid, &id_str, plaintext_blob)?;
+    let (service_hash, url_hash, username_hash) =
+        compute_blind_indices(blind_index_key, plaintext_blob)?;
 
     conn.execute(
         "UPDATE credentials SET 

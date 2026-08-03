@@ -1555,7 +1555,7 @@ Plan file: `docs/superpowers/plans/2026-06-08-saas-p2-redis-everywhere.md`.
 - **Secrets:** KMS/Vault token, `DATABASE_URL`, JWE session secret → K8s Secrets / Vault Agent injection. Make the JWE key a managed secret with a **key-id header** for zero-downtime rotation (today it's HKDF from the local master key, `web/lib/session.js:28`).
 - **Data-in-transit:** TLS 1.3 to Postgres/Redis. Document the accepted residual: managed services rarely speak PQC TLS yet — **ALE is the zero-knowledge-at-rest guarantee**; data is ciphertext before it leaves the pod.
 - **Load test:** k6 ramp to 100k users; tune `PG_POOL_MAX`, DEK LRU TTL, Argon2 admission bucket, HPA thresholds.
-- **Observability:** request latency, KMS QPS + DEK cache hit-rate, login-queue depth, Argon2 concurrency, PG pool saturation, Redis op latency.
+- **Observability:** request latency, KMS QPS + DEK cache hit-rate, login-queue depth, Argon2 concurrency, PG pool saturation, Redis op latency. PG query-shape p50/p99 targets: `docs/sla.md` SLIs #15–18.
 
 Plan file: `docs/superpowers/plans/2026-06-08-saas-p3-kubernetes.md`.
 
