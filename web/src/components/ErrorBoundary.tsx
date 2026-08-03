@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import React, { ErrorInfo, ReactNode } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { useRouteError } from 'react-router-dom';
+import { useRouteError } from 'react-router';
 
 interface Props {
   children?: ReactNode;

@@ -1,6 +1,6 @@
 import { apiFetch, ApiError } from '../utils/api';
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { ShieldAlert, Mail, User, Clock, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 

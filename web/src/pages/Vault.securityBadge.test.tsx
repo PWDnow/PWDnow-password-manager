@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 
 // A passkey credential is the shape most likely to be missing `statusColor`
 // in real, older vault data: non-'login' credentialTypes have never had a

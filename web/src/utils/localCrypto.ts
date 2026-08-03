@@ -193,5 +193,28 @@ export async function readDecryptedLocal(key: string): Promise<string | null> {
     } catch { return null; }
   }
 
-  return null;
+  // ── v1 (PBKDF2) legacy format ────────────────────────────────────────────
+  // Pre-Argon2id blobs: header.payload.sig, always signed (unlike v2's
+  // optional signature during its own migration window).
+  try {
+    const parts = raw.split('.');
+    if (parts.length !== 3) return null;
+
+    const header = JSON.parse(new TextDecoder().decode(fromB64u(parts[0])));
+    if (header.v !== '1') return null;
+
+    const sk = keyStore.getSigningKey(1);
+    if (!sk) return null;
+    const sigInput = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+    if (!await crypto.subtle.verify('HMAC', sk, fromB64u(parts[2]), sigInput)) return null;
+
+    const ck = keyStore.getLocalKey(1);
+    if (!ck) return null;
+
+    const ivCt = fromB64u(parts[1]);
+    const iv = ivCt.slice(0, 12);
+    const ct = ivCt.slice(12);
+
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, ck, ct));
+  } catch { return null; }
 }

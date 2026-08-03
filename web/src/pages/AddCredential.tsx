@@ -3,7 +3,7 @@ import { ChevronRight, ChevronLeft, Calendar, RefreshCw, Copy, Info, Lock, Brief
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { TOTP } from 'totp-generator';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Folder, Credential, type CredentialType } from '../types';
 import { useVault } from '../context/VaultContext';
 import { generateUUID } from '../utils/crypto';

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Shield, ShieldAlert, RefreshCw, Copy, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import SEO from '../components/SEO';
 import { useVault } from '../context/VaultContext';
 import { passwordScore } from '../utils/passwordStrength';

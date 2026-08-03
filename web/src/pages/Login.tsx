@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Shield, ArrowRight, CheckCircle2, Loader2, ShieldAlert, Fingerprint, ChevronLeft, ShieldCheck, AlertTriangle, Smartphone, Key } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';

@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Wallet, Verified, Key, ChevronRight, Copy, MoreVertical, PlusCircle, TrendingUp, ShieldCheck, ArrowLeft, Check, Trash2, Pencil, AlertTriangle, X, Search, Globe, ImageOff, Shield, Clock, Timer, Share2, FileText, CreditCard } from 'lucide-react';
 import { secureClipboard, ClipboardGuardHandle } from '../utils/clipboardGuard';
 import { motion, AnimatePresence } from 'motion/react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { useTranslation, Trans } from 'react-i18next';
 import { TOTP } from 'totp-generator';
 import AddCredential from './AddCredential';
