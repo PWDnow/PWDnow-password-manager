@@ -57,7 +57,7 @@ KMS CMK  (never leaves KMS / HSM)
 ### 2.3 Postgres schema (replaces the flat `.enc` file-store)
 - `users(id uuid pk, email_hmac text unique, password_hash text, wrapped_dek bytea, kms_key_id text, status text, created_at timestamptz)` — keep the HMAC-SHA256 blind index on email (`hashEmail`, `web/lib/fileCrypto.js:118-122`).
 - `vault_items(id uuid pk, user_id uuid fk, type text, ciphertext bytea, nonce bytea, aad bytea, version int, updated_at timestamptz)` — **one row per item**; eliminates `users.enc`/per-resource-file rewrite amplification (B3/B7). `type ∈ {credential, folder, asset, profile, mfa}`.
-- `sessions(jti text pk, user_id uuid fk, expires_at timestamptz, device text, ip_hash text, revoked bool)` — enables cross-node revocation (replaces `sessions.enc`).
+- `sessions(jti text pk, user_id uuid fk, expires_at timestamptz, device text, ip_hash text, revoked bool)` — target schema for cross-node revocation (replaces `sessions.enc`). **Correction (found during P1 implementation):** this dedicated queryable table is P2 scope, not P1. P1 instead models sessions as a generic per-user encrypted resource row (`name='sessions'`) through the same `getResource`/`setResource` interface as credentials/folders — an opaque envelope-encrypted blob, not yet queryable by `jti`/`user_id` without decrypting it. `authMiddleware` cannot check revocation cross-node without a per-user DEK-decrypt until the real table lands in P2; see the P1 plan's migration/rollout notes.
 - `audit_log(...)` — append-only, HMAC hash-chained (port existing chain).
 - **Driver:** `pg` (node-postgres) with a connection pool + a thin parameterized query module (no heavy ORM — matches the lightweight `web/lib/` style). Parameterized queries only.
 - **Migrations:** SQL files via `node-pg-migrate`.
@@ -106,7 +106,7 @@ Argon2id stays at AAL3 params. Capacity = more pods + the Redis admission bucket
 - **Contract tests:** a single suite that both `VaultRepository` implementations (file + Postgres) and both `StateStore` implementations (in-memory + Redis) must pass.
 - **Load tests:** k6 per phase against the scale target.
 - **Regression gate:** keep `web/e2e/comprehensive-platform.spec.ts` green throughout, in **both** modes.
-- **Metrics:** request latency, KMS QPS, DEK cache hit-rate, login-queue depth, Argon2 concurrency, Postgres pool saturation, Redis op latency.
+- **Metrics:** request latency, KMS QPS, DEK cache hit-rate, login-queue depth, Argon2 concurrency, Postgres pool saturation, Redis op latency. Postgres query-shape latency SLOs (point read/write/row-locked RMW, p50+p99) and pool saturation thresholds are tracked as SLIs #15–18 in `docs/sla.md`.
 
 ---
 

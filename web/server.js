@@ -14,7 +14,7 @@ import { createServer as createHttpsServer } from 'https';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import { initAuth, mountAuthAndVault, getServerPublicIp } from './auth.js';
-import { checkRpcRate, checkDnsRate } from './lib/rateLimiter.js';
+import { checkRpcRate, checkDnsRate, checkSetupExecRate } from './lib/rateLimiter.js';
 import { promises as dnsPromises } from 'dns';
 import { logger, httpLogger } from './lib/logger.js';
 
@@ -30,6 +30,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = parseInt(process.env.PORT || '1234', 10);
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 // The daemon now exposes gRPC (Phase 1 of the horizontal-scalability migration)
@@ -183,6 +184,39 @@ function clientIp(req) {
   const realIp = req.headers['x-real-ip'];
   if (socketIsLocal && realIp) return realIp;
   return socketAddr || '127.0.0.1';
+}
+
+// Localhost + Host + Origin/Referer re-validation, shared by every setup-phase
+// route that executes something consequential (vending the token itself, or
+// running privileged commands via execFile). A leaked X-Setup-Token alone
+// must not be sufficient from a non-local origin — DNS-rebinding guard.
+function requireLocalOrigin(req, res, next) {
+  if (!isLocalhost(req)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+
+  const host = req.headers['host'];
+  const localHostRe = /^(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
+  if (!host || !localHostRe.test(host)) {
+    return res.status(403).json({ error: 'forbidden: invalid host' });
+  }
+
+  const origin = req.headers['origin'];
+  const referer = req.headers['referer'];
+  const localOriginRe = /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
+  if (origin && !localOriginRe.test(origin)) {
+    return res.status(403).json({ error: 'forbidden: invalid origin' });
+  }
+  if (referer) {
+    try {
+      if (!localOriginRe.test(new URL(referer).origin)) {
+        return res.status(403).json({ error: 'forbidden: invalid referer' });
+      }
+    } catch {
+      return res.status(403).json({ error: 'forbidden: malformed referer' });
+    }
+  }
+  next();
 }
 
 function requireSetupToken(req, res, next) {
@@ -393,35 +427,7 @@ function refuseIfSetupDone(_req, res, next) {
 
 // Vend the setup token only to localhost callers while setup is pending.
 // Host and Origin headers are also validated to block DNS-rebinding attacks.
-app.get('/api/setup-token', refuseIfSetupDone, (req, res) => {
-  if (!isLocalhost(req)) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
-
-  // Strict Host header validation: only 'localhost' and '127.0.0.1' are trusted,
-  // ensuring the browser's same-origin policy treats this as a local-only origin.
-  const host = req.headers['host'];
-  const localHostRe = /^(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
-  if (!host || !localHostRe.test(host)) {
-    return res.status(403).json({ error: 'forbidden: invalid host' });
-  }
-
-  // DNS-rebinding guard: if Origin or Referer is present, it must be a localhost origin.
-  const origin = req.headers['origin'];
-  const referer = req.headers['referer'];
-  const localOriginRe = /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i;
-  if (origin && !localOriginRe.test(origin)) {
-    return res.status(403).json({ error: 'forbidden: invalid origin' });
-  }
-  if (referer) {
-    try {
-      if (!localOriginRe.test(new URL(referer).origin)) {
-        return res.status(403).json({ error: 'forbidden: invalid referer' });
-      }
-    } catch {
-      return res.status(403).json({ error: 'forbidden: malformed referer' });
-    }
-  }
+app.get('/api/setup-token', refuseIfSetupDone, requireLocalOrigin, (req, res) => {
   res.json({ token: SETUP_TOKEN });
 });
 
@@ -450,7 +456,7 @@ app.post('/api/setup-complete', refuseIfSetupDone, requireSetupToken, (_req, res
 });
 
 // Only accessible during setup phase.
-app.get('/api/system-info', refuseIfSetupDone, requireSetupToken, (_req, res) => {
+app.get('/api/system-info', refuseIfSetupDone, requireSetupToken, requireLocalOrigin, (_req, res) => {
   const script = path.join(__dirname, 'scripts', 'detect-system.sh');
   // execFile passes the script path as an argument to bash — not interpolated into
   // a shell string — eliminating any injection surface from the server-controlled path.
@@ -466,7 +472,10 @@ app.get('/api/system-info', refuseIfSetupDone, requireSetupToken, (_req, res) =>
 
 // Pro token validated to alphanumeric-only and passed as execFile argument (not a shell
 // string) to eliminate injection surface. Setup token acts as CSRF protection.
-app.post('/api/ubuntu-pro/attach', requireSetupToken, (req, res) => {
+app.post('/api/ubuntu-pro/attach', requireSetupToken, requireLocalOrigin, async (req, res) => {
+  if (!await checkSetupExecRate(clientIp(req), res)) {
+    return res.status(429).json({ success: false, error: 'too_many_requests' });
+  }
   const { token } = req.body ?? {};
   if (!token || typeof token !== 'string' || !/^[A-Za-z0-9]+$/.test(token)) {
     return res.status(400).json({ success: false, error: 'Invalid token format. Token must be alphanumeric.' });
@@ -481,7 +490,10 @@ app.post('/api/ubuntu-pro/attach', requireSetupToken, (req, res) => {
 });
 
 // Requires Ubuntu Pro to be attached first. A reboot is needed after enabling FIPS.
-app.post('/api/ubuntu-pro/enable-fips', requireSetupToken, (_req, res) => {
+app.post('/api/ubuntu-pro/enable-fips', requireSetupToken, requireLocalOrigin, async (req, res) => {
+  if (!await checkSetupExecRate(clientIp(req), res)) {
+    return res.status(429).json({ success: false, error: 'too_many_requests' });
+  }
   execFile('sudo', ['-n', 'pro', 'enable', 'fips', '--assume-yes'], { timeout: 300_000 }, (err, stdout, stderr) => {
     const output = (stdout + stderr).trim();
     // exit code 0 = success; some pro versions exit 1 but still succeed — check output

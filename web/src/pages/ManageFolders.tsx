@@ -361,8 +361,8 @@ export default function ManageFolders() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label htmlFor="input-ynr6df09k" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.folderName', 'Folder Name')}</label>
-<input id="input-ynr6df09k" 
+                      <label htmlFor="input-folder-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.folderName', 'Folder Name')}</label>
+<input id="input-folder-name" 
                         type="text" 
                         value={newLabel}
                         onChange={(e) => setNewLabel(e.target.value)}
@@ -388,8 +388,8 @@ export default function ManageFolders() {
  
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label htmlFor="input-rt7xis3ng" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.customSvg', 'Custom SVG Icon (Optional)')}</label>
-<textarea id="input-rt7xis3ng" 
+                      <label htmlFor="input-custom-svg-icon" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">{t('manageFolders.customSvg', 'Custom SVG Icon (Optional)')}</label>
+<textarea id="input-custom-svg-icon" 
                         value={newCustomSvg}
                         onChange={(e) => setNewCustomSvg(e.target.value)}
                         placeholder={t('manageFolders.customSvgPlaceholder', 'Paste SVG code here...')}

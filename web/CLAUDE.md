@@ -113,7 +113,7 @@ These are absolute rules. Never violate them.
 | `localCrypto.ts` | `writeEncryptedLocal`, `readDecryptedLocal`, `encryptForServer`, `decryptFromServer` |
 | `mfa.ts` | TOTP/HOTP/Email OTP/WebAuthn/Passkey/Platform auth, `MfaConfig`, `LoginHints` |
 | `securityModes.ts` | `wipeVaultData`, `armDuressMode`, `enableTravelMode`, `disableTravelMode`, `recordFailedLoginAttempt` |
-| `sanitize.ts` | `sanitizeSvg`, `sanitizeDescriptionHtml`, `sanitizeDescriptionString` |
+| `sanitize.ts` | `sanitizeSvg` |
 | `clipboardGuard.ts` | `secureClipboard` — copies to clipboard, auto-clears after N seconds |
 | `passwordStrength.ts` | `passwordScore` (0–5), `scoreLabel` |
 | `importExport.ts` | Import/export to PWDnow/Bitwarden/1Password/NordPass formats |
@@ -227,7 +227,7 @@ Never add new localStorage keys without documenting them here. Vault keys use `w
 | `_cache_local_xvc` | Yes (travel key) | Travel mode hidden vault ciphertext |
 | `duress_mode_config` | No | Duress mode armed state + hashed password |
 | `login_lockout_config` | No | Lockout counter + expiry |
-| `travel_mode_config` | No | Travel mode state + hashed password |
+| `_tm_cfg` | No | Travel mode state + hashed password (intentionally non-descriptive key name, same rationale as `_cache_local_xvc` — see `securityModes.ts`) |
 
 ---
 

@@ -88,8 +88,11 @@ export default function AccessibilityWidget() {
     const settingsStr = JSON.stringify(settings);
     localStorage.setItem('a11y-settings', settingsStr);
     
-    // Save to Accessibility cookie (1 year expiry)
-    document.cookie = `Accessibility=${encodeURIComponent(settingsStr)}; max-age=31536000; path=/; SameSite=Lax`;
+    // Save to Accessibility cookie (1 year expiry). Secure is conditional on
+    // HTTPS — browsers silently drop Secure cookies set over plain HTTP, which
+    // would break this in local dev (Vite serves :3000 over HTTP).
+    const secureAttr = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `Accessibility=${encodeURIComponent(settingsStr)}; max-age=31536000; path=/; SameSite=Lax${secureAttr}`;
 
     const root = document.documentElement;
     // Text Size

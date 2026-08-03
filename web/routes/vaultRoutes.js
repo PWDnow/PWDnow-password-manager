@@ -4,6 +4,7 @@ import { lock } from 'proper-lockfile';
 import path from 'path';
 
 import { ctx } from '../lib/context.js';
+import { logger } from '../lib/logger.js';
 import {
   readEncryptedFile,
   writeEncryptedFile,
@@ -33,6 +34,7 @@ import {
 import {
   resetAccountFailures,
   checkEmergencyRate,
+  checkShareCreateRate,
 } from '../lib/rateLimiter.js';
 import {
   readUserBlob,
@@ -292,6 +294,9 @@ export function mountVaultRoutes(app) {
   }
 
   app.post('/api/vault/shares', authMiddleware, requireAuth, requireCsrf, async (req, res) => {
+    if (!await checkShareCreateRate(req.user.id, res)) {
+      return res.status(429).json({ ok: false, error: 'too_many_requests' });
+    }
     const { encryptedBlob, iv, ttl, singleView, label } = req.body ?? {};
     if (!encryptedBlob || typeof encryptedBlob !== 'string') return res.status(400).json({ ok: false, error: 'missing_blob' });
     if (!iv || typeof iv !== 'string') return res.status(400).json({ ok: false, error: 'missing_iv' });
@@ -628,7 +633,7 @@ export function mountVaultRoutes(app) {
       });
       res.json({ ok: true, sent: expiredCreds.length });
     } catch (err) {
-      console.error('[expiry-notify]', err.message);
+      logger.error({ err: err.message }, '[expiry-notify] smtp send failed');
       res.status(502).json({ ok: false, error: 'smtp_error' });
     }
   });

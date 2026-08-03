@@ -54,8 +54,11 @@ pub fn derive_kek_pbkdf2(
     Ok(key_buf)
 }
 
-/// Default KEK derivation. For NIST Level 5, we prioritize PBKDF2-HMAC-SHA512.
-/// (Wait: we'll keep Argon2id as the default in code but allow switching).
+/// KEK derivation dispatcher: `m_cost == 0` selects PBKDF2-HMAC-SHA512 (using
+/// `t_cost` as the iteration count, floor 100,000 per CNSA 2.0); any other
+/// `m_cost` selects Argon2id (floor 64 MiB / nonzero t_cost, p_cost). Argon2id
+/// is the default used by `unlock_existing`/`create_and_unlock` — PBKDF2 is
+/// reachable only when a caller explicitly passes `m_cost == 0`.
 pub fn derive_kek(
     password: &[u8],
     yubikey_response: Option<&[u8; 20]>,

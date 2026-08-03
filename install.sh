@@ -16,6 +16,12 @@ ARROW="${CYN}➜${RST}"; DOT="${DIM}•${RST}"
 WEB_PORT=1234
 DAEMON_PORT=51234
 
+# Vite 6 / React 19 need a current Node LTS. Distro-default apt/dnf packages
+# are frequently years out of date (Ubuntu 22.04's "nodejs" is v12) and would
+# fail the build silently late in the install — so a version floor is
+# enforced below rather than just checking that `node` exists at all.
+NODE_MIN_MAJOR=20
+
 # ── State Variables ───────────────────────────────────────────────
 OS_FAMILY=""        # debian | fedora
 OS_NAME=""          # Ubuntu, Debian, Fedora, Rocky, etc.
@@ -791,6 +797,16 @@ check_dependencies() {
                 protoc)  ver=$(protoc --version 2>/dev/null | awk '{print $2}' || echo "?") ;;
                 *)       ver="installed" ;;
             esac
+
+            if [ "$cmd" = "node" ]; then
+                local node_major="${ver#v}"; node_major="${node_major%%.*}"
+                if ! [[ "$node_major" =~ ^[0-9]+$ ]] || [ "$node_major" -lt "$NODE_MIN_MAJOR" ]; then
+                    result_line "${pkg}:" "${RED}${ver} — too old, need >=${NODE_MIN_MAJOR}${RST}" "$CROSS"
+                    MISSING_DEPS+=("$pkg")
+                    continue
+                fi
+            fi
+
             result_line "${pkg}:" "${GRN}${ver}${RST}" "$CHECK"
         else
             result_line "${pkg}:" "${RED}Not found${RST}" "$CROSS"
@@ -799,15 +815,13 @@ check_dependencies() {
     done
 
     # The daemon's build.rs links these native libraries directly (libsodium,
-    # SQLCipher, libfido2), and the tss-esapi-sys crate (TPM2 support, a
-    # transitive dependency) links libtss2 — none of them ship a CLI binary,
-    # so `command -v` can't see them. Check via pkg-config (matching exactly
-    # what build.rs / the crate's own build script probes) instead.
+    # SQLCipher, libfido2) — none of them ship a CLI binary, so `command -v`
+    # can't see them. Check via pkg-config (matching exactly what build.rs /
+    # the crate's own build script probes) instead.
     local libs=(
         "libsodium:libsodium-dev"
         "sqlcipher:libsqlcipher-dev"
         "libfido2:libfido2-dev"
-        "tss2-sys:libtss2-dev"
     )
     for entry in "${libs[@]}"; do
         IFS=':' read -r pcname pkg <<< "$entry"
@@ -859,13 +873,13 @@ install_missing_deps() {
     # ALSO missing (rustup's own bootstrap has nothing to fetch itself with).
     local pkgs=()
     local need_rust=false
+    local need_node=false
     for dep in "${MISSING_DEPS[@]}"; do
         case "$dep" in
-            nodejs)
-                if [ "$OS_FAMILY" = "debian" ]; then pkgs+=("nodejs")
-                else pkgs+=("nodejs"); fi
-                ;;
-            npm)        pkgs+=("npm") ;;
+            # Distro apt/dnf "nodejs" is frequently ancient (Ubuntu 22.04 ships
+            # v12) and too old for this project's Vite 6/React 19 toolchain —
+            # installed via NodeSource below instead, which bundles npm too.
+            nodejs|npm) need_node=true ;;
             rust/cargo) need_rust=true ;;
             python3)    pkgs+=("python3") ;;
             curl)       pkgs+=("curl") ;;
@@ -900,10 +914,6 @@ install_missing_deps() {
                 if [ "$OS_FAMILY" = "debian" ]; then pkgs+=("libclang-dev")
                 else pkgs+=("clang-devel"); fi
                 ;;
-            libtss2-dev)
-                if [ "$OS_FAMILY" = "debian" ]; then pkgs+=("libtss2-dev")
-                else pkgs+=("tpm2-tss-devel"); fi
-                ;;
         esac
     done
 
@@ -915,6 +925,22 @@ install_missing_deps() {
                 ;;
             fedora)
                 sudo dnf install -y "${pkgs[@]}"
+                ;;
+        esac
+    fi
+
+    # Deferred until after the apt/dnf pass above for the same reason as rustup
+    # below: this needs curl, which that pass may have just installed.
+    if [ "$need_node" = true ]; then
+        printf "    ${ARROW}  Installing Node.js %s.x (LTS) via NodeSource...\n" "$NODE_MIN_MAJOR"
+        case "$OS_FAMILY" in
+            debian)
+                curl --proto '=https' --tlsv1.2 -fsSL "https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x" | sudo -E bash -
+                sudo apt-get install -y nodejs
+                ;;
+            fedora)
+                curl --proto '=https' --tlsv1.2 -fsSL "https://rpm.nodesource.com/setup_${NODE_MIN_MAJOR}.x" | sudo -E bash -
+                sudo dnf install -y nodejs
                 ;;
         esac
     fi

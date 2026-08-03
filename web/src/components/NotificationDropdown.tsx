@@ -122,7 +122,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                   <div className="w-12 h-12 bg-surface-container-low rounded-2xl flex items-center justify-center mx-auto mb-4 text-on-surface-variant/20">
                     <ShieldCheck size={24} />
                   </div>
-                  <p className="text-xs font-bold text-on-surface-variant">
+                  <p className="text-xs font-bold text-on-surface-variant text-center">
                     {t('notifications.empty', 'No new notifications')}
                   </p>
                 </div>

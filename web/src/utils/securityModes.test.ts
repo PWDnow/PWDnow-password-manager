@@ -403,6 +403,36 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
     }, 180000);
   });
 
+  describe('Login lockout gate', () => {
+    // checkIsLockedOut() reads the same LockoutConfig that
+    // recordFailedLoginAttempt/resetLoginAttempts already maintained, but
+    // nothing called it back — Login.tsx now gates handleLogin on it.
+    it('stays unlocked below maxAttempts, locks at the threshold, clears on reset', async () => {
+      const { checkIsLockedOut, recordFailedLoginAttempt, resetLoginAttempts } = await import('./securityModes');
+
+      expect(checkIsLockedOut().locked).toBe(false);
+
+      // Default LockoutConfig: maxAttempts = 3.
+      await recordFailedLoginAttempt();
+      expect(checkIsLockedOut().locked).toBe(false);
+      await recordFailedLoginAttempt();
+      expect(checkIsLockedOut().locked).toBe(false);
+      await recordFailedLoginAttempt();
+      expect(checkIsLockedOut().locked).toBe(true);
+
+      await resetLoginAttempts();
+      expect(checkIsLockedOut().locked).toBe(false);
+    }, 60000);
+
+    it('reports locked as false once lockedUntil has passed', async () => {
+      const { checkIsLockedOut, saveLockoutConfig, getLockoutConfig } = await import('./securityModes');
+      const cfg = getLockoutConfig();
+      saveLockoutConfig({ ...cfg, attemptsMade: cfg.maxAttempts, lockedUntil: Date.now() - 1000 });
+
+      expect(checkIsLockedOut().locked).toBe(false);
+    });
+  });
+
   describe('Duress check login-path cost', () => {
     // The duress check runs FIRST and serially in Login.tsx handleLogin, so its
     // cost is added to every login while Duress Mode is armed. The pure-JS

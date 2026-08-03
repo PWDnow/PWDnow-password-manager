@@ -245,6 +245,25 @@ export async function checkEmergencyRate(ip, res = null) {
   return count <= EMERGENCY_MAX_PER_WINDOW;
 }
 
+// ── Per-IP setup-phase exec rate limiter ──────────────────────────────────────
+// /api/ubuntu-pro/attach and /api/ubuntu-pro/enable-fips shell out to `sudo
+// pro ...` (up to a 300s timeout). Already gated to localhost + a single-use
+// setup token, but a compromised local process could still loop the call and
+// pile up subprocesses for the duration of the setup window.
+
+export const SETUP_EXEC_MAX_PER_WINDOW = 5;
+export const SETUP_EXEC_WINDOW_MS      = 5 * 60 * 1000;
+
+export async function checkSetupExecRate(ip, res = null) {
+  const count = await ctx.stateStore.incrExpire(`rl:setupexec:${ip}`, SETUP_EXEC_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', SETUP_EXEC_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, SETUP_EXEC_MAX_PER_WINDOW - count));
+    if (count > SETUP_EXEC_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(SETUP_EXEC_WINDOW_MS / 1000));
+  }
+  return count <= SETUP_EXEC_MAX_PER_WINDOW;
+}
+
 // ── Per-IP DNS-check rate limiter (WEB-02) ────────────────────────────────────
 // /api/system/dns-check and /api/auth/smtp-check each fan out ~35 DNS lookups
 // (MX/TXT/DMARC/BIMI + DKIM selector probes) per call. Without a cap here, an
@@ -263,6 +282,24 @@ export async function checkDnsRate(ip, res = null) {
     if (count > DNS_CHECK_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(DNS_CHECK_WINDOW_MS / 1000));
   }
   return count <= DNS_CHECK_MAX_PER_WINDOW;
+}
+
+// ── Per-user share-creation rate limiter ──────────────────────────────────────
+// Each call writes a new file under the user's shares/ dir with no cap on
+// count — without a limiter, a compromised/malicious session could exhaust
+// disk space by looping POST /api/vault/shares.
+
+export const SHARE_CREATE_MAX_PER_WINDOW = 20;
+export const SHARE_CREATE_WINDOW_MS      = 60 * 60 * 1000;
+
+export async function checkShareCreateRate(uid, res = null) {
+  const count = await ctx.stateStore.incrExpire(`rl:sharecreate:${uid}`, SHARE_CREATE_WINDOW_MS);
+  if (res) {
+    res.setHeader('X-RateLimit-Limit', SHARE_CREATE_MAX_PER_WINDOW);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, SHARE_CREATE_MAX_PER_WINDOW - count));
+    if (count > SHARE_CREATE_MAX_PER_WINDOW) res.setHeader('Retry-After', Math.ceil(SHARE_CREATE_WINDOW_MS / 1000));
+  }
+  return count <= SHARE_CREATE_MAX_PER_WINDOW;
 }
 
 // ── Dummy Argon2id hash for timing equalisation ────────────────────────────────

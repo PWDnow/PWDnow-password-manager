@@ -387,11 +387,6 @@ export function generateEmailCode(email: string): string {
   return code;
 }
 
-/** Return the email the pending code was sent to (for display only). */
-export function getPendingOtpEmail(): string | null {
-  return _pendingOtp?.email ?? null;
-}
-
 /** Verify the code and clear it regardless of outcome. */
 export function verifyEmailCode(token: string): boolean {
   if (!_pendingOtp) return false;

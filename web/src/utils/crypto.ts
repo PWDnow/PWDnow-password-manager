@@ -14,9 +14,8 @@
  */
 // PBKDF2-HMAC-SHA-512, 1,000,000 iterations — NSA CNSA 2.0 (CSI-CNSA-2.0, Sept 2022); salt per NIST SP 800-132 (2010).
 // Noble sha512 used as fallback when WebCrypto is unavailable (plain HTTP dev).
-// sha256 retained only for hashEmail (lookup, not key establishment — CNSA 2.0 allows this).
 import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2.js';
-import { sha512 as nobleSha512, sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
+import { sha512 as nobleSha512 } from '@noble/hashes/sha2.js';
 
 const PBKDF2_ITERATIONS = 1_000_000;
 
@@ -33,30 +32,9 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 /**
- * One-way hash of an email address for localStorage lookup.
- * SHA-256 of the lowercased, trimmed email - never stored in plaintext.
- * Works on plain HTTP (noble) and HTTPS (WebCrypto).
- */
-export async function hashEmail(email: string): Promise<string> {
-  const normalized = new TextEncoder().encode(email.trim().toLowerCase());
-  if (typeof crypto !== 'undefined' && crypto.subtle) {
-    const buf = await crypto.subtle.digest('SHA-256', normalized);
-    return bytesToHex(new Uint8Array(buf));
-  }
-  return bytesToHex(nobleSha256(normalized));
-}
-
-/** Generate a random 16-byte hex salt for a new user registration. */
-export function generateSalt(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return bytesToHex(bytes);
-}
-
-/**
  * Hash a password for demo-mode localStorage storage.
  * @param password  The plaintext password.
- * @param saltHex   Hex-encoded 16-byte random salt (from generateSalt()).
+ * @param saltHex   Hex-encoded 16-byte random salt.
  *                  Legacy callers may pass an email string; we handle both.
  */
 export async function hashPassword(password: string, saltHex = ''): Promise<string> {

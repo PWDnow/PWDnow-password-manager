@@ -16,7 +16,7 @@ import {
   loadMfaConfigFromServer,
   type LoginHints,
 } from '../utils/mfa';
-import { checkIsDuressPassword, recordFailedLoginAttempt, resetLoginAttempts, wipeVaultData, getDuressModeConfig } from '../utils/securityModes';
+import { checkIsDuressPassword, checkIsLockedOut, recordFailedLoginAttempt, resetLoginAttempts, wipeVaultData, getDuressModeConfig } from '../utils/securityModes';
 import { generateUUID } from '../utils/crypto';
 import { hasLocalQuickUnlock, getQuickUnlockDbk } from '../utils/quickUnlock';
 import { LoginPerfTracker } from '../utils/perf';
@@ -86,6 +86,13 @@ export default function Login() {
   // When false, we MUST publish the local salt to the server after successful
   // login to prevent the "folders vanish after cache clear" bug.
   const [serverHasCryptoSalt, setServerHasCryptoSalt] = useState(false);
+
+  // True once the email step's server-hints call recognizes this email as a
+  // server-mode account. The daemon is a single local vault with no concept
+  // of multiple emails, so daemon.unlock() is guaranteed to fail for these
+  // accounts — handleLogin uses this to skip that pointless (and slow,
+  // Argon2id-costly) attempt entirely instead of paying for it every login.
+  const [isServerAccount, setIsServerAccount] = useState(false);
 
   // Login hints come live from daemon/server per email-step - never from localStorage.
   const [loginHints, setLoginHints] = useState<LoginHints>(getLoginHints());
@@ -188,8 +195,9 @@ export default function Login() {
       const [dh, sh] = await Promise.all([daemonHintsPromise, serverHintsPromise]);
 
       let hints: LoginHints | null = null;
-      
+
       // ── Senior Dev Fix: Prioritize user-specific server hints ───────────
+      setIsServerAccount(!!(sh && sh.hints));
       if (sh && sh.hints) {
         hints = sh.hints;
       } else if (dh) {
@@ -430,6 +438,17 @@ export default function Login() {
     // FIFO queue (which would tear down the WebSocket on timeout).
     if (loading) return;
     setError('');
+
+    // recordFailedLoginAttempt/resetLoginAttempts already track this client-side
+    // lockout state on every attempt; nothing previously read it back, so it
+    // was tracked but never enforced. Gate the submit on it, same as the
+    // server-mode 'account_locked' response below re-uses the same message.
+    const lockout = checkIsLockedOut();
+    if (lockout.locked) {
+      setError(t('login.accountLocked', 'This account is temporarily locked after repeated failed attempts. Please wait a few minutes and try again.'));
+      return;
+    }
+
     setLoading(true);
 
     const perf = LoginPerfTracker.get();
@@ -463,18 +482,24 @@ export default function Login() {
       return null as { encKey: CryptoKey; sigKey: CryptoKey } | null;
     });
 
-    try {
-      if (!daemon.isConnected) await daemon.connect();
-      perf.markStart('daemonUnlock');
-      const isRecoveryKey = /^[A-Z2-9]{8}-[A-Z2-9]{8}-[A-Z2-9]{8}-[A-Z2-9]{8}$/i.test(password.trim());
-      if (isRecoveryKey) {
-        await daemon.unlockWithRecoveryKey(password.trim());
-      } else {
-        await daemon.unlock(password);
-      }
-      perf.markEnd('daemonUnlock');
-      daemonUnlocked = true;
-    } catch { /* daemon unavailable - fall through to offline auth */ }
+    // Skip the daemon entirely when the email step already told us this is a
+    // server-mode account — the daemon is a single local vault with no email
+    // concept, so unlock() here is guaranteed to fail after paying its full
+    // Argon2id cost. Go straight to the offline/server-mode path below.
+    if (!isServerAccount) {
+      try {
+        if (!daemon.isConnected) await daemon.connect();
+        perf.markStart('daemonUnlock');
+        const isRecoveryKey = /^[A-Z2-9]{8}-[A-Z2-9]{8}-[A-Z2-9]{8}-[A-Z2-9]{8}$/i.test(password.trim());
+        if (isRecoveryKey) {
+          await daemon.unlockWithRecoveryKey(password.trim());
+        } else {
+          await daemon.unlock(password);
+        }
+        perf.markEnd('daemonUnlock');
+        daemonUnlocked = true;
+      } catch { /* daemon unavailable - fall through to offline auth */ }
+    }
 
     if (daemonUnlocked) {
       let v1KeyAvailable = false;

@@ -126,10 +126,10 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
           {/* Profile Fields */}
           <div className="col-span-12 md:col-span-8 lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="input-3i5vdcdhb" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
+              <label htmlFor="input-first-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
                 {t('settings.firstName', 'First Name')}
               </label>
-<input id="input-3i5vdcdhb"
+<input id="input-first-name"
                 type="text"
                 aria-label={t('settings.firstName', 'First Name')}
                 value={localProfile.firstName}
@@ -138,10 +138,10 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="input-s1jfw1tvw" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
+              <label htmlFor="input-last-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
                 {t('settings.lastName', 'Last Name')}
               </label>
-<input id="input-s1jfw1tvw"
+<input id="input-last-name"
                 type="text"
                 aria-label={t('settings.lastName', 'Last Name')}
                 value={localProfile.lastName}
@@ -150,10 +150,10 @@ export default function ProfileSection({ profile, updateProfile, reloadProfile }
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="input-qmbw3g72h" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
+              <label htmlFor="input-company-name" className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-1">
                 {t('settings.company', 'Company Name (Optional)')}
               </label>
-<input id="input-qmbw3g72h"
+<input id="input-company-name"
                 type="text"
                 aria-label={t('settings.company', 'Company Name')}
                 value={localProfile.company}

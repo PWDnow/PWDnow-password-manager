@@ -8,7 +8,7 @@
 
 ## 1. Goal
 
-Replace the v1 extension's completely unstyled popup (bare `<div>`/`<input>`/`<button>`, no CSS at all today) with a polished, enterprise-grade UI that:
+Replace the v1 extension's completely unstyled popup (bare `<div>`/`<input>`/`<button>`, no CSS at all today) with a UI that:
 - Visually matches the PWDnow web app's own design system (same color tokens, same look-and-feel), not a separate brand.
 - Has a real toolbar icon (master SVG + generated manifest icon sizes).
 - Supports 13 languages with a compact switcher, including right-to-left rendering for Arabic.
@@ -16,7 +16,7 @@ Replace the v1 extension's completely unstyled popup (bare `<div>`/`<input>`/`<b
 
 ## 2. Design tokens (ported, not reinvented)
 
-`PWDnow/web/src/index.css` already defines a light/dark Material-3-style token system, and its own code comments show it was already built to WCAG 2.2 AAA (contrast, focus, target size, motion) — see `index.css:74-114`. The extension ports these tokens verbatim rather than inventing new ones, which solves brand consistency and AAA contrast simultaneously:
+`PWDnow/web/src/index.css` already defines a light/dark Material-3-style token system, and its own code comments show structural AAA rules already in place for focus, target size, and motion — see `index.css:74-114`. **Contrast is not part of that citation** — those lines contain no contrast-ratio rule; AAA contrast (1.4.6) depends on the actual color token *values*, which is a claim about the palette, not something a CSS rule at a fixed line range can demonstrate (see §6's correction for why this can't be automated either). The extension ports these tokens verbatim rather than inventing new ones, which solves brand consistency and gives the extension the same contrast posture as the web app — audited or not:
 
 ```
 Light: primary #000000, primary-container #00174b, on-primary-container #ffffff,
@@ -59,7 +59,7 @@ Scope: `entrypoints/popup/App.tsx` (shell/loading state), `ConnectScreen.tsx`, `
 
 **Library**: `react-i18next` + `i18next` (matching the web app's stack), but with **bundled static resources**, not the web app's `i18next-http-backend` — an extension has no server to fetch `/locales/{{lng}}.json` from, so each locale's JSON is imported directly and passed to `i18next.init({resources: {...}})`. This also means translations are available instantly and offline, with no loading flash.
 
-**Content strategy**: the web app's existing `web/src/locales/*.json` files already contain professional translations for common vocabulary (Cancel, Copy, Save, Password, error strings, etc.) in exactly these 13 languages. The implementer reuses this existing wording for any shared term (for terminology consistency between the web app and the extension) and writes new translations only for extension-specific strings that don't already exist in those files (Connect screen copy, MFA prompts, Fill/Generate/Save button labels not already present, etc.). Every one of the 13 extension locale files must have complete parity — no missing keys, no silent fallback to English for a real language file.
+**Content strategy**: the web app's existing `web/src/locales/*.json` files already contain translations for common vocabulary (Cancel, Copy, Save, Password, error strings, etc.) in exactly these 13 languages — reused here for consistency with the web app, not because they've been professionally reviewed (they haven't been). The implementer reuses this existing wording for any shared term (for terminology consistency between the web app and the extension) and writes new translations only for extension-specific strings that don't already exist in those files (Connect screen copy, MFA prompts, Fill/Generate/Save button labels not already present, etc.). Every one of the 13 extension locale files must have complete parity — no missing keys, no silent fallback to English for a real language file.
 
 **RTL**: Arabic sets `dir="rtl"` on the popup's root element when active; Tailwind's logical properties (`ps-`/`pe-`/`ms-`/`me-` instead of `pl-`/`pr-`/`ml-`/`mr-`) are used throughout the redesigned components specifically so the mirrored layout works correctly without per-language CSS overrides.
 

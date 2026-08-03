@@ -4,7 +4,7 @@
 This document outlines the architectural migration of PWDnow from a secure, single-node local appliance to a horizontally scalable distributed system. It strictly enforces a Zero-Knowledge architecture while adhering to **NIST Post-Quantum Cryptography (PQC) Level 5** and **CNSA 2.0 (Commercial National Security Algorithm Suite)** mandates.
 
 ## 2. Core Cryptographic Mandates (CNSA 2.0 Strict Mode)
-To maintain compliance during horizontal scaling, all components across the distributed cluster must enforce the following cryptographic primitive suite. Legacy algorithms (e.g., X25519, Ed25519, ChaCha20) must be stripped from active communication paths.
+To maintain compliance during horizontal scaling, all components across the distributed cluster must enforce the following cryptographic primitive suite. Legacy algorithms (e.g., X25519, Ed25519, ChaCha20) must be stripped from active communication paths, **except** for the ratified transport-mTLS exception in the Phase 1 feasibility note below: no Rust TLS stack today offers a pure ML-KEM-1024 key-exchange group, so the distributed gRPC transport uses the standardized X25519MLKEM768 hybrid instead — every other primitive (payload encryption, signatures, hashing, KDF) still follows the strict suite unchanged.
 
 *   **Symmetric Encryption:** AES-256-GCM.
 *   **Key Establishment:** ML-KEM-1024 (FIPS 203).
@@ -67,6 +67,8 @@ To maintain compliance during horizontal scaling, all components across the dist
 3.  **Multi-tenant identity** — the interceptor + handlers still assume a single UID (`auth_then!(… 1000 …)`); distributed/multi-user mode needs real per-request identity (cert CN or token-bound user id).
 
 ### Phases 2–4 (not started)
+
+> **Scope note (added 2026-07-28):** Phases 2-4 describe a speculative future where the Rust daemon *itself* becomes distributed/multi-tenant (K8s HPA over Daemon Pods, per §Phase 4). Two other design docs assume the opposite and do not cross-reference this one: `2026-07-20-extension-and-selfhost-vault-design.md` states plainly "The Rust daemon remains single-tenant; this design does not make it multi-tenant" and that scaling the daemon "is not revisited here"; `2026-06-07-saas-scalability-design.md` scales PWDnow horizontally by keeping the daemon single-tenant/self-host-only and moving the SaaS track to stateless Express pods + Postgres + KMS with **no daemon in that path at all**. Until one of these visions is picked, Phases 2-4 here should be read as an unratified alternative, not a plan in progress alongside the other two.
 4.  **Storage Layer Rewrite (Phase 2):** Refactor `daemon/src/vault/` + `daemon/migrations/` to target PostgreSQL via `sqlx`, wrapping all reads/writes in an AES-256-GCM ALE layer (VMK-keyed). Zero-knowledge DB: ciphertext only.
 5.  **State Management (Phase 3):** Add `redis` for ephemeral state (sessions, lockout counters, MFA caches) behind PQC mTLS, encrypted with a rotating Master Cache Key.
 6.  **Stateless Memory (Phase 4):** "Encrypted Session Box" — VMK wrapped by a session-token-derived KEK, stored in Redis, fetched + `mlock`ed + `zeroize`d per request so any pod can serve any request (K8s HPA).

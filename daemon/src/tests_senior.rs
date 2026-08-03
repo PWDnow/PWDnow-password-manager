@@ -33,7 +33,7 @@ mod senior_tests {
         let state = DaemonState::new(db_path.clone());
 
         // Create vault
-        let sess = state.unlock(b"password-wipe-security-test!", None, 1000, 0).unwrap();
+        let sess = state.unlock(b"password-wipe-security-test!", None, 1000).unwrap();
         let _ = sess;
         let ticket = state.wipe_ticket_bytes().expect("No wipe ticket issued");
 
@@ -58,15 +58,15 @@ mod senior_tests {
         let state = DaemonState::new(db_path.clone());
 
         // Initialise the vault so unlock_existing has a header to work with.
-        state.unlock(b"lockout-test-password!", None, 1000, 0).unwrap();
+        state.unlock(b"lockout-test-password!", None, 1000).unwrap();
 
         // Simulate 5 consecutive failures for uid=1000 (index-5 triggers a 30s lock).
         for _ in 0..5 {
-            state.record_failed_unlock(1000, 0);
+            state.record_failed_unlock(1000);
         }
 
         // uid=1000 must now be locked out regardless of correct password.
-        let err_1000 = state.unlock(b"lockout-test-password!", None, 1000, 0)
+        let err_1000 = state.unlock(b"lockout-test-password!", None, 1000)
             .expect_err("uid=1000 should be locked out after 5 failures");
         let msg = format!("{err_1000:?}");
         assert!(msg.contains("locked"), "Expected lockout error for uid=1000, got: {msg}");
@@ -74,7 +74,7 @@ mod senior_tests {
         // uid=9999 has zero failures — it must NOT be refused for lockout reasons.
         // The unlock may still succeed (correct password) or fail for a non-lockout reason
         // (e.g. the vault was already open); what matters is the error is NOT "locked out".
-        let res_9999 = state.unlock(b"lockout-test-password!", None, 9999, 0);
+        let res_9999 = state.unlock(b"lockout-test-password!", None, 9999);
         if let Err(ref e) = res_9999 {
             let msg2 = format!("{e:?}");
             assert!(!msg2.contains("locked out"),

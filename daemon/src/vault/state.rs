@@ -221,14 +221,14 @@ impl DaemonState {
         })
     }
 
-    fn check_unlock_lockout(&self, uid: u32, _conn_id: u64) -> Result<(), VaultError> {
+    fn check_unlock_lockout(&self, uid: u32) -> Result<(), VaultError> {
         self.lockout.check_unlock_lockout(uid)
     }
 
     /// D1 fix: independent exponential lockout for TOTP failures that follow a
     /// *correct* password. Checked up-front (alongside the password lockout)
     /// so a TOTP-locked-out caller cannot even spend an Argon2id derivation.
-    pub fn check_totp_lockout(&self, uid: u32, _conn_id: u64) -> Result<(), VaultError> {
+    pub fn check_totp_lockout(&self, uid: u32) -> Result<(), VaultError> {
         self.totp_lockout.check_unlock_lockout(uid)
     }
 
@@ -236,9 +236,9 @@ impl DaemonState {
     /// TOTP-specific schedule (which `lock()` does not clear) and the
     /// password-unlock schedule, since the overall authentication attempt
     /// failed.
-    pub fn record_totp_failure(&self, uid: u32, conn_id: u64) {
+    pub fn record_totp_failure(&self, uid: u32) {
         let count = self.totp_lockout.record_failed_unlock(uid);
-        self.record_failed_unlock(uid, conn_id);
+        self.record_failed_unlock(uid);
 
         // NIST SP 800-88 Rev. 2 — trigger wipe if TOTP failure threshold reached.
         if let Ok(header) = self.read_header() {
@@ -250,12 +250,12 @@ impl DaemonState {
 
     /// D1/D3 fix: called only once *both* the password and (if required) TOTP
     /// have been verified. Resets both lockout trackers for this uid.
-    pub fn complete_unlock(&self, uid: u32, conn_id: u64) {
-        self.reset_unlock_counter(uid, conn_id);
+    pub fn complete_unlock(&self, uid: u32) {
+        self.reset_unlock_counter(uid);
         self.totp_lockout.reset_lockout(uid);
     }
 
-    pub fn record_failed_unlock(&self, uid: u32, _conn_id: u64) {
+    pub fn record_failed_unlock(&self, uid: u32) {
         {
             let mut pending = self.pending_audit.lock().unwrap();
             if pending.len() < 100 {
@@ -280,7 +280,7 @@ impl DaemonState {
         self.totp_lockout.prune();
     }
 
-    pub fn reset_unlock_counter(&self, uid: u32, _conn_id: u64) {
+    pub fn reset_unlock_counter(&self, uid: u32) {
         self.lockout.reset_lockout(uid);
         
         // M-62 fix: only drain and log if the vault is actually open.
@@ -300,53 +300,51 @@ impl DaemonState {
         }
     }
 
-    pub fn verify_master_password(&self, password: &[u8], uid: u32, conn_id: u64) -> Result<(), VaultError> {
-        self.check_unlock_lockout(uid, conn_id)?;
+    pub fn verify_master_password(&self, password: &[u8], uid: u32) -> Result<(), VaultError> {
+        self.check_unlock_lockout(uid)?;
         let res = self.verify_master_password_inner(password);
-        if res.is_err() { self.record_failed_unlock(uid, conn_id); }
+        if res.is_err() { self.record_failed_unlock(uid); }
         res
     }
 
     fn verify_master_password_inner(&self, password: &[u8]) -> Result<(), VaultError> {
         if password.len() > 1024 { return Err(VaultError::Auth("password too long".into())); }
         let header = self.read_header()?;
-        let salt_bytes = hex::decode(&header.argon2_salt).map_err(|e| { tracing::error!("salt decode fail"); VaultError::Crypto("invalid salt".into()) })?;
+        let salt_bytes = hex::decode(&header.argon2_salt).map_err(|_| VaultError::Crypto("salt".into()))?;
         let mut salt = [0u8; 32];
         salt.copy_from_slice(&salt_bytes);
         let kek_buf = kdf::derive_kek(password, None, &salt, header.argon2_m_cost, header.argon2_t_cost, header.argon2_p_cost)?;
         let kek: [u8; 32] = kek_buf.as_bytes()[..32].try_into().unwrap();
-        let ct = hex::decode(&header.encrypted_vmk).map_err(|e| { tracing::error!("vmk decode fail"); VaultError::Crypto("invalid vmk".into()) })?;
-        let nonce_vec = hex::decode(&header.vmk_nonce).map_err(|e| { tracing::error!("nonce decode fail"); VaultError::Crypto("invalid nonce".into()) })?;
-        
+        let ct = hex::decode(&header.encrypted_vmk).map_err(|_| VaultError::Crypto("vmk".into()))?;
+        let nonce_vec = hex::decode(&header.vmk_nonce).map_err(|_| VaultError::Crypto("nonce".into()))?;
+
         let mut vmk_plain = match nonce_vec.len() {
             12 => {
                 let nonce: [u8; 12] = nonce_vec.try_into().unwrap();
-                crate::crypto::aes_gcm::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1").map_err(|e| VaultError::Auth(format!("aes_gcm fail: {:?}", e)))?
+                crate::crypto::aes_gcm::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1").map_err(|_| VaultError::Auth("wrong password".into()))?
             }
             24 => {
                 let nonce: [u8; 24] = nonce_vec.try_into().unwrap();
-                crate::crypto::xchacha20::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1").map_err(|e| VaultError::Auth(format!("xchacha20 fail: {:?}", e)))?
+                crate::crypto::xchacha20::decrypt(&kek, &ct, &nonce, b"vmk-aad-v1").map_err(|_| VaultError::Auth("wrong password".into()))?
             }
-            _ => { return Err(VaultError::Auth("invalid vmk_nonce length".into())); }
+            _ => { return Err(VaultError::Crypto("nonce len".into())); }
         };
 
-        let result = self.with_vmk(|k| {
-            if k != vmk_plain.as_slice() {
-                return Err(VaultError::Auth("vmk_plain mismatch".into()));
-            }
-            Ok(())
-        });
-        if result.is_err() {
-            return Err(VaultError::Auth(format!("with_vmk fail: {:?}", result)));
-        }
+        // Zeroize on every path, including the mismatch branch below — the
+        // prior version returned early on mismatch without zeroizing,
+        // leaving VMK plaintext in memory longer than necessary.
+        let matches = self.with_vmk(|k| Ok(k == vmk_plain.as_slice())).unwrap_or(false);
         vmk_plain.zeroize();
+        if !matches {
+            return Err(VaultError::Auth("wrong password".into()));
+        }
         Ok(())
     }
 
-    pub fn change_password(&self, old_password: &[u8], new_password: &[u8], yk: Option<&[u8; 20]>, uid: u32, conn_id: u64) -> Result<(), VaultError> {
-        self.check_unlock_lockout(uid, conn_id)?;
+    pub fn change_password(&self, old_password: &[u8], new_password: &[u8], yk: Option<&[u8; 20]>, uid: u32) -> Result<(), VaultError> {
+        self.check_unlock_lockout(uid)?;
         let res = self.change_password_inner(old_password, new_password, yk);
-        if res.is_err() { self.record_failed_unlock(uid, conn_id); }
+        if res.is_err() { self.record_failed_unlock(uid); }
         res
     }
 
@@ -525,11 +523,11 @@ impl DaemonState {
     }
 
     pub fn unlock_with_passkey(
-        &self, cid: &[u8], auth_data: &[u8], sig: &[u8], client_data_json: &[u8], uid: u32, conn_id: u64,
+        &self, cid: &[u8], auth_data: &[u8], sig: &[u8], client_data_json: &[u8], uid: u32,
     ) -> Result<Session, VaultError> {
-        self.check_unlock_lockout(uid, conn_id)?;
+        self.check_unlock_lockout(uid)?;
         let res = self.unlock_with_passkey_inner(cid, auth_data, sig, client_data_json, uid);
-        if res.is_ok() { self.reset_unlock_counter(uid, conn_id); self.touch(); } else { self.record_failed_unlock(uid, conn_id); }
+        if res.is_ok() { self.reset_unlock_counter(uid); self.touch(); } else { self.record_failed_unlock(uid); }
         res
     }
 
@@ -746,16 +744,16 @@ impl DaemonState {
         }
     }
 
-    pub fn unlock(&self, pw: &[u8], yk: Option<&[u8; 20]>, uid: u32, conn_id: u64) -> Result<Session, VaultError> {
+    pub fn unlock(&self, pw: &[u8], yk: Option<&[u8; 20]>, uid: u32) -> Result<Session, VaultError> {
         if pw.len() > 1024 { return Err(VaultError::Auth("password too long".into())); }
         if !self.vault_path.exists() && pw.len() < 12 {
             return Err(VaultError::Auth("password must be at least 12 characters".into()));
         }
-        self.check_unlock_lockout(uid, conn_id)?;
+        self.check_unlock_lockout(uid)?;
         // D1 fix: also reject up-front if this uid is in TOTP-failure lockout,
         // so a locked-out caller can't spend an Argon2id derivation just to
         // get to the TOTP check.
-        self.check_totp_lockout(uid, conn_id)?;
+        self.check_totp_lockout(uid)?;
         let res = if self.vault_path.exists() { self.unlock_existing(pw, yk, uid) } else { self.create_and_unlock(pw, yk, uid) };
         if res.is_ok() {
             // D3 fix: do NOT reset the unlock-failure counter here. If TOTP is
@@ -771,7 +769,7 @@ impl DaemonState {
             // wiping the just-issued session token.
             self.touch();
         } else {
-            self.record_failed_unlock(uid, conn_id);
+            self.record_failed_unlock(uid);
         }
         res
     }
@@ -1006,46 +1004,23 @@ impl DaemonState {
         wipe_result
     }
 
-    pub fn unlock_with_pqc(&self, _uid: u32, cid: &[u8], sig: &[u8], _ct: &[u8], client_data_json: &[u8], conn_id: u64) -> Result<Session, VaultError> {
-        self.check_unlock_lockout(_uid, conn_id)?;
+    pub fn unlock_with_pqc(&self, _uid: u32, cid: &[u8], sig: &[u8], _ct: &[u8], client_data_json: &[u8]) -> Result<Session, VaultError> {
+        self.check_unlock_lockout(_uid)?;
         let res = self.unlock_with_pqc_inner(_uid, cid, sig, _ct, client_data_json);
-        if res.is_ok() { self.reset_unlock_counter(_uid, conn_id); self.touch(); } else { self.record_failed_unlock(_uid, conn_id); }
+        if res.is_ok() { self.reset_unlock_counter(_uid); self.touch(); } else { self.record_failed_unlock(_uid); }
         res
     }
 
-    fn unlock_with_pqc_inner(&self, _uid: u32, cid: &[u8], sig: &[u8], _ct: &[u8], client_data_json: &[u8]) -> Result<Session, VaultError> {
-
-        let cdata: serde_json::Value = serde_json::from_slice(client_data_json)
-            .map_err(|_| VaultError::Auth("invalid clientDataJSON".into()))?;
-
-        // #28-FIX: validate type and crossOrigin (W3C WebAuthn §7.2 step 11).
-        let cdtype = cdata.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        if cdtype != "webauthn.get" {
-            return Err(VaultError::Auth("invalid clientDataJSON type".into()));
-        }
-        if cdata.get("crossOrigin").and_then(|v| v.as_bool()).unwrap_or(false) {
-            return Err(VaultError::Auth("cross-origin passkey assertion not allowed".into()));
-        }
-
-        let chal_b64 = cdata.get("challenge").and_then(|v| v.as_str())
-            .ok_or_else(|| VaultError::Auth("missing challenge".into()))?;
-        use base64::Engine;
-        let chal_b64_clean = chal_b64.trim_end_matches('=').to_string();
-        let chal_decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(&chal_b64_clean)
-            .map_err(|_| VaultError::Auth("invalid challenge b64".into()))?;
-
-        if chal_decoded.len() != 32 { return Err(VaultError::Auth("invalid challenge length".into())); }
-        let mut chal_arr = [0u8; 32]; chal_arr.copy_from_slice(&chal_decoded);
-        if !self.consume_challenge(&chal_arr) {
-            return Err(VaultError::Auth("challenge invalid or expired".into()));
-        }
-
-        let header = self.read_header()?;
-        let cid_hex = hex::encode(cid);
-        let entry = header.pqc_credentials.iter().find(|e| e.credential_id_hex == cid_hex).ok_or_else(|| VaultError::Auth("not reg".into()))?;
-        let vk_bytes = hex::decode(&entry.verifying_key_hex).map_err(|_| VaultError::Crypto("hex".into()))?;
-        crate::crypto::sign::verify(&vk_bytes, client_data_json, sig).map_err(|_| VaultError::Auth("sig".into()))?;
-        Err(VaultError::Auth("PQC binding planned".into()))
+    fn unlock_with_pqc_inner(&self, _uid: u32, _cid: &[u8], _sig: &[u8], _ct: &[u8], _client_data_json: &[u8]) -> Result<Session, VaultError> {
+        // PQC-only unlock cannot succeed yet: PqcSidecarEntry::dk_seed_hex (the
+        // ML-KEM-1024 decapsulation key seed) is itself encrypted under the VMK,
+        // which is exactly what this endpoint is supposed to unwrap without a
+        // password — that's circular until enrollment stores a KEM-derived VMK
+        // wrap (mirroring PasskeySidecarEntry::encrypted_vmk_copy). Fail closed
+        // immediately instead of validating clientDataJSON/consuming the caller's
+        // one-time challenge/verifying the ML-DSA-87 signature for a request that
+        // can never succeed.
+        Err(VaultError::Auth("PQC unlock not yet implemented".into()))
     }
 
     pub fn quick_unlock_enroll(&self, password: &[u8], cid: &[u8], pub_key_cbor: &[u8], dbk: &[u8]) -> Result<(), VaultError> {
@@ -1071,11 +1046,11 @@ impl DaemonState {
     }
 
     pub fn quick_unlock(
-        &self, cid: &[u8], auth_data: &[u8], sig: &[u8], client_data_json: &[u8], dbk: &[u8], uid: u32, conn_id: u64
+        &self, cid: &[u8], auth_data: &[u8], sig: &[u8], client_data_json: &[u8], dbk: &[u8], uid: u32
     ) -> Result<Session, VaultError> {
-        self.check_unlock_lockout(uid, conn_id)?;
+        self.check_unlock_lockout(uid)?;
         let res = self.quick_unlock_inner(cid, auth_data, sig, client_data_json, dbk, uid);
-        if res.is_ok() { self.reset_unlock_counter(uid, conn_id); self.touch(); } else { self.record_failed_unlock(uid, conn_id); }
+        if res.is_ok() { self.reset_unlock_counter(uid); self.touch(); } else { self.record_failed_unlock(uid); }
         res
     }
 
@@ -1224,8 +1199,8 @@ impl DaemonState {
         self.write_header(&h)
     }
 
-    pub fn unlock_with_recovery_key(&self, recovery_key: &[u8], uid: u32, conn_id: u64) -> Result<Session, VaultError> {
-        self.check_unlock_lockout(uid, conn_id)?;
+    pub fn unlock_with_recovery_key(&self, recovery_key: &[u8], uid: u32) -> Result<Session, VaultError> {
+        self.check_unlock_lockout(uid)?;
         let header = self.read_header()?;
         let entry = header.recovery_key_copy.as_ref().ok_or(VaultError::Auth("No recovery key enrolled".into()))?;
         
@@ -1257,7 +1232,7 @@ impl DaemonState {
         *self.vault_uuid.lock().unwrap() = Some(header.vault_uuid.clone());
         *self.wipe_ticket.lock().unwrap() = None;
 
-        self.reset_unlock_counter(uid, conn_id);
+        self.reset_unlock_counter(uid);
         let sess = self.sessions.create(&header.vault_uuid, uid, DEFAULT_TTL_SECS)?;
         Ok(sess)
     }
@@ -1339,11 +1314,11 @@ mod stress {
         let password = b"senior_dev_password";
 
         // Initial setup
-        state.unlock(password, None, 1000, 0).unwrap();
+        state.unlock(password, None, 1000).unwrap();
         state.lock();
 
         for _ in 0..10 {
-            state.unlock(password, None, 1000, 0).expect("Unlock failed during stability test");
+            state.unlock(password, None, 1000).expect("Unlock failed during stability test");
             assert!(!state.is_locked());
             state.lock();
             assert!(state.is_locked());
@@ -1374,7 +1349,7 @@ mod stress {
 
         let state = Arc::new(DaemonState::new(db_path.clone()));
         let password = b"correct horse battery staple";
-        state.unlock(password, None, 1000, 0).expect("initial unlock");
+        state.unlock(password, None, 1000).expect("initial unlock");
         let ticket = state.wipe_ticket_bytes().expect("wipe ticket present");
         assert_eq!(ticket.len(), 32);
 
@@ -1417,7 +1392,7 @@ mod stress {
 
         let state = Arc::new(DaemonState::new(db_path.clone()));
         let password = b"another good password";
-        state.unlock(password, None, 1000, 0).unwrap();
+        state.unlock(password, None, 1000).unwrap();
 
         let mut handles = vec![];
         for i in 0..6u32 {
@@ -1425,7 +1400,7 @@ mod stress {
             handles.push(thread::spawn(move || {
                 for _ in 0..8 {
                     s.lock();
-                    let _ = s.unlock(password, None, 1000 + i, i as u64);
+                    let _ = s.unlock(password, None, 1000 + i);
                 }
             }));
         }
@@ -1458,7 +1433,7 @@ mod stress {
 
         let state = Arc::new(DaemonState::new(db_path.clone()));
         let password = b"yet another good password";
-        state.unlock(password, None, 1000, 0).unwrap();
+        state.unlock(password, None, 1000).unwrap();
 
         let mut handles = vec![];
         for i in 0..4 {

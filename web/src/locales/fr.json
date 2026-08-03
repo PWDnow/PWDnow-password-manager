@@ -772,6 +772,8 @@
     "duressArming": "Armement en cours…",
     "duressPasswordMinError": "Le mot de passe de contrainte doit comporter au moins 8 caractères.",
     "duressPasswordMismatch": "Les mots de passe ne correspondent pas.",
+    "duressSyncWarning": "Le mode de contrainte est armé sur cet appareil, mais la protection côté serveur n'a pas pu être activée ({{reason}}). Si le stockage de cet appareil est un jour effacé, l'effacement ne se déclenchera PAS. Réessayez lorsque vous aurez une connexion stable.",
+    "duressArmFailed": "Échec de l'armement du mode de contrainte. Veuillez réessayer.",
     "forensicWipe": "Effacement forensique",
     "forensicWipeDesc": "Détruire définitivement toutes les données du coffre sur cet appareil.",
     "twoFactorTitle": "Exigence de double facteur",

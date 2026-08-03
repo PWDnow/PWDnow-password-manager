@@ -1,6 +1,6 @@
 import { logger } from './logger';
 import { getCsrfToken, apiFetch, hasServerSession as _hasServerSession, ApiError } from './api';
-import { hashPassword, generateUUID } from './crypto';
+import { hashPassword, generateUUID, timingSafeEqual } from './crypto';
 import { daemon, WIPE_TICKET_KEY } from './daemonClient'; // kept for legacy localStorage cleanup
 import { readDecryptedLocal } from './localCrypto';
 import { keyStore, argon2idOffThread } from '../crypto/keystore';
@@ -404,14 +404,6 @@ export async function disarmDuressMode(): Promise<void> {
   }
 }
 
-// Timing-safe comparison for hex strings
-function timingSafeHash(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 export async function checkIsDuressPassword(entered: string): Promise<boolean> {
   // #29-FIX: use the full (encrypted) config to read the passwordHash.
   const cfg = await getDuressModeConfigFull();
@@ -439,7 +431,7 @@ export async function checkIsDuressPassword(entered: string): Promise<boolean> {
   const hash = await argon2idOffThread(new TextEncoder().encode(entered), salt, { m, t, p, dkLen: 32 });
   const enteredHashHex = Array.from(hash, b => b.toString(16).padStart(2, '0')).join('');
 
-  return timingSafeHash(enteredHashHex, hashHex);
+  return timingSafeEqual(enteredHashHex, hashHex);
 }
 
 export function checkIsLockedOut(): { locked: boolean; remainingMins: number } {
@@ -620,7 +612,7 @@ export async function disableTravelMode(
   if (!cfg.active || !cfg.passwordHash) return { ok: false, credentials: [], folders: [] };
 
   const hash  = await hashPassword(travelPassword, cfg.salt);
-  const match = await timingSafeHash(hash, cfg.passwordHash);
+  const match = timingSafeEqual(hash, cfg.passwordHash);
   if (!match) return { ok: false, credentials: [], folders: [] };
 
   let hiddenCredentials: unknown[] = [];

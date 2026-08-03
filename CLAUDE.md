@@ -32,8 +32,8 @@ A per-directory `web/CLAUDE.md` exists and covers web-specific commands and patt
 ### Full project (from `deploy/`)
 
 ```bash
-make build          # cargo build --release + npm run build
-make build-pq       # same but with --features pq (ML-KEM-768 hybrid KEM)
+make build          # cargo build --release + npm run build (ML-KEM-768 hybrid PQ is on by default)
+make build-pq       # same, with the feature named explicitly (--features pq-hybrid-1024) — kept for parity with older docs
 make test           # cargo test + vitest run
 make lint           # cargo clippy -D warnings + tsc --noEmit
 make install        # installs binary, systemd, AppArmor, nginx (needs sudo)
@@ -42,8 +42,8 @@ make install        # installs binary, systemd, AppArmor, nginx (needs sudo)
 ### Daemon (from `daemon/`)
 
 ```bash
-cargo build --release
-cargo build --release --features pq   # post-quantum KEM enabled
+cargo build --release                          # ML-KEM-768 hybrid PQ is on by default (pq-hybrid-1024)
+cargo build --release --features cnsa-strict   # CNSA 2.0 strict mode (drops BLAKE3/SHA3/XChaCha20/Ed25519/X25519)
 cargo test
 cargo test -- <test_name>             # run a single test
 cargo clippy -- -D warnings
@@ -103,7 +103,7 @@ master_password + YubiKey HMAC-SHA256  →  Argon2id  →  512-bit master materi
 - `daemon/src/vault/credentials.rs` — encrypted credential CRUD with per-item DEKs
 - `daemon/src/auth/session.rs` — session token issuance and validation
 
-**Build features**: `--features pq` enables the `ml-kem` crate for hybrid X25519+ML-KEM-768 KEM (post-quantum VMK encapsulation). `--features mock-fido2` replaces real libfido2 with a stub for CI.
+**Build features** (`daemon/Cargo.toml`): `pq-hybrid-1024` (default) — hybrid X25519+ML-KEM-768 KEM for VMK encapsulation; the `ml-kem` crate is an unconditional dependency, so this flag has no build-time effect today and exists for explicitness/older-doc parity. `cnsa-strict` — CNSA 2.0 strict mode (SHA-384 HKDF, PBKDF2-SHA-512, SHA-384 audit hash; drops BLAKE3/SHA3/XChaCha20/Ed25519/X25519 from active code paths). `mock-fido2` — replaces real libfido2 with a stub for CI. `legacy-overwrite` — legacy forensic-wipe overwrite path.
 
 ### Layer 2 — Web (`web/`)
 
