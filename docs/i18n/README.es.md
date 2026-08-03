@@ -145,7 +145,7 @@ El instalador detecta tu distribución, comprueba las dependencias que falten y 
 
 ### Compilación desde el código fuente
 
-Requisitos: Node.js 20 o superior, Rust 1.94 o superior (fijado en `daemon/rust-toolchain.toml`), `protoc`, y las cabeceras de desarrollo de `libsodium`, `sqlcipher` y `libfido2`.
+Requisitos: Node.js 24 o superior, Rust 1.94 o superior (fijado en `daemon/rust-toolchain.toml`), `protoc`, y las cabeceras de desarrollo de `libsodium`, `sqlcipher` y `libfido2`.
 
 ```bash
 # Daemon

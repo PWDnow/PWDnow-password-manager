@@ -144,7 +144,7 @@ Installer mendeteksi distribusi Anda, memeriksa dependensi yang hilang dan menaw
 
 ### Membangun dari Kode Sumber
 
-Persyaratan: Node.js 20 atau lebih baru, Rust 1.94 atau lebih baru (ditetapkan di `daemon/rust-toolchain.toml`), `protoc`, serta header pengembangan untuk `libsodium`, `sqlcipher`, dan `libfido2`.
+Persyaratan: Node.js 24 atau lebih baru, Rust 1.94 atau lebih baru (ditetapkan di `daemon/rust-toolchain.toml`), `protoc`, serta header pengembangan untuk `libsodium`, `sqlcipher`, dan `libfido2`.
 
 ```bash
 # Daemon

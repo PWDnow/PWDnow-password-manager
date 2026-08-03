@@ -20,7 +20,7 @@ DAEMON_PORT=51234
 # are frequently years out of date (Ubuntu 22.04's "nodejs" is v12) and would
 # fail the build silently late in the install — so a version floor is
 # enforced below rather than just checking that `node` exists at all.
-NODE_MIN_MAJOR=20
+NODE_MIN_MAJOR=24
 
 # ── State Variables ───────────────────────────────────────────────
 OS_FAMILY=""        # debian | fedora

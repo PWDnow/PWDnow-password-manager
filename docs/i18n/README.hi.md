@@ -144,7 +144,7 @@ cd PWDnow
 
 ### सोर्स से बिल्ड करना
 
-आवश्यकताएँ: Node.js 20 या नया, Rust 1.94 या नया (`daemon/rust-toolchain.toml` में तय किया गया), `protoc`, और `libsodium`, `sqlcipher`, तथा `libfido2` के लिए डेवलपमेंट हेडर।
+आवश्यकताएँ: Node.js 24 या नया, Rust 1.94 या नया (`daemon/rust-toolchain.toml` में तय किया गया), `protoc`, और `libsodium`, `sqlcipher`, तथा `libfido2` के लिए डेवलपमेंट हेडर।
 
 ```bash
 # डेमन

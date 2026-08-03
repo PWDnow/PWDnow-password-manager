@@ -28,11 +28,6 @@ fn main() {
         }
     }
 
-    // ── liboqs (post-quantum) ────────────────────────────────────────────────
-    if env::var("CARGO_FEATURE_PQ").is_ok() {
-        link_lib_via_pkg_config_or_fallback("liboqs", "oqs", &["/usr/local/lib"]);
-    }
-
     // ── LIBCLANG_PATH (for bindgen) ──────────────────────────────────────────
     // Prefer LIBCLANG_PATH already set in the environment (CI / cross builds).
     if env::var("LIBCLANG_PATH").is_err() {

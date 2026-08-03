@@ -144,7 +144,7 @@ L'installateur détecte votre distribution, vérifie les dépendances manquantes
 
 ### Compilation depuis les sources
 
-Prérequis : Node.js 20 ou supérieur, Rust 1.94 ou supérieur (fixé dans `daemon/rust-toolchain.toml`), `protoc`, ainsi que les en-têtes de développement pour `libsodium`, `sqlcipher` et `libfido2`.
+Prérequis : Node.js 24 ou supérieur, Rust 1.94 ou supérieur (fixé dans `daemon/rust-toolchain.toml`), `protoc`, ainsi que les en-têtes de développement pour `libsodium`, `sqlcipher` et `libfido2`.
 
 ```bash
 # Daemon

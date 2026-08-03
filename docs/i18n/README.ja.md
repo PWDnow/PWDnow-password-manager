@@ -145,7 +145,7 @@ cd PWDnow
 
 ### ソースからのビルド
 
-必要要件:Node.js 20以降、Rust 1.94以降(`daemon/rust-toolchain.toml`で固定)、`protoc`、および`libsodium`、`sqlcipher`、`libfido2`の開発用ヘッダー。
+必要要件:Node.js 24以降、Rust 1.94以降(`daemon/rust-toolchain.toml`で固定)、`protoc`、および`libsodium`、`sqlcipher`、`libfido2`の開発用ヘッダー。
 
 ```bash
 # デーモン

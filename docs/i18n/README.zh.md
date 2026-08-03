@@ -145,7 +145,7 @@ cd PWDnow
 
 ### 从源码构建
 
-前置要求:Node.js 20 或更高版本,Rust 1.94 或更高版本(在 `daemon/rust-toolchain.toml` 中固定),`protoc`,以及 `libsodium`、`sqlcipher` 和 `libfido2` 的开发头文件。
+前置要求:Node.js 24 或更高版本,Rust 1.94 或更高版本(在 `daemon/rust-toolchain.toml` 中固定),`protoc`,以及 `libsodium`、`sqlcipher` 和 `libfido2` 的开发头文件。
 
 ```bash
 # 守护进程

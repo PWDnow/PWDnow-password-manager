@@ -145,7 +145,7 @@ cd PWDnow
 
 ### Сборка из исходного кода
 
-Требования: Node.js 20 или новее, Rust 1.94 или новее (зафиксировано в `daemon/rust-toolchain.toml`), `protoc`, а также заголовки для разработки `libsodium`, `sqlcipher` и `libfido2`.
+Требования: Node.js 24 или новее, Rust 1.94 или новее (зафиксировано в `daemon/rust-toolchain.toml`), `protoc`, а также заголовки для разработки `libsodium`, `sqlcipher` и `libfido2`.
 
 ```bash
 # Демон

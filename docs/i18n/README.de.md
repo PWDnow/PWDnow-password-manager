@@ -144,7 +144,7 @@ Der Installer erkennt Ihre Distribution, prüft auf fehlende Abhängigkeiten und
 
 ### Aus dem Quellcode kompilieren
 
-Voraussetzungen: Node.js 20 oder neuer, Rust 1.94 oder neuer (festgelegt in `daemon/rust-toolchain.toml`), `protoc`, sowie die Entwickler-Header für `libsodium`, `sqlcipher` und `libfido2`.
+Voraussetzungen: Node.js 24 oder neuer, Rust 1.94 oder neuer (festgelegt in `daemon/rust-toolchain.toml`), `protoc`, sowie die Entwickler-Header für `libsodium`, `sqlcipher` und `libfido2`.
 
 ```bash
 # Daemon

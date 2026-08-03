@@ -144,7 +144,7 @@ The installer detects your distribution, checks and offers to install missing de
 
 ### Building from Source
 
-Requirements: Node.js 20 or newer, Rust 1.94 or newer (pinned in `daemon/rust-toolchain.toml`), `protoc`, and the development headers for `libsodium`, `sqlcipher`, and `libfido2`.
+Requirements: Node.js 24 or newer, Rust 1.94 or newer (pinned in `daemon/rust-toolchain.toml`), `protoc`, and the development headers for `libsodium`, `sqlcipher`, and `libfido2`.
 
 ```bash
 # Daemon

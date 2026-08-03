@@ -144,7 +144,7 @@ cd PWDnow
 
 ### 소스에서 빌드하기
 
-요구 사항: Node.js 20 이상, Rust 1.94 이상(`daemon/rust-toolchain.toml`에 고정됨), `protoc`, 그리고 `libsodium`, `sqlcipher`, `libfido2`의 개발용 헤더.
+요구 사항: Node.js 24 이상, Rust 1.94 이상(`daemon/rust-toolchain.toml`에 고정됨), `protoc`, 그리고 `libsodium`, `sqlcipher`, `libfido2`의 개발용 헤더.
 
 ```bash
 # 데몬
