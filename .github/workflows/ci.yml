@@ -30,6 +30,7 @@ jobs:
         run: npm run test
 
   daemon-tests:
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +48,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            pkg-config libclang-dev \
+            pkg-config libclang-dev protobuf-compiler \
             libsodium-dev libfido2-dev libsqlcipher-dev
         shell: bash
 

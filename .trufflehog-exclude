@@ -1,0 +1,3 @@
+# TruffleHog path exclusions
+# Graphify AST cache contains minified JS bundles that trigger false positives.
+web/graphify-out/

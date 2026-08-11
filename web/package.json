@@ -96,6 +96,7 @@
     "vitest": "^4.1.3"
   },
   "overrides": {
-    "@xmldom/xmldom": "^0.8.13"
+    "@xmldom/xmldom": "^0.8.13",
+    "js-yaml": ">=4.3.1"
   }
 }

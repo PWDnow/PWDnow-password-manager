@@ -93,7 +93,7 @@ jobs:
       - name: TruffleHog Secret Scan
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified
+          extra_args: --only-verified --exclude-paths .trufflehog-exclude
 
   # ── License Compliance ─────────────────────────────────────────────────────
   license-check:

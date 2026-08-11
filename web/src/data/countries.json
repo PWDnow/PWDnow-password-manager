@@ -1,0 +1,1696 @@
+[
+  {
+    "name": "Afghanistan",
+    "code": "+93",
+    "iso": "AF",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Aland Islands",
+    "code": "+358",
+    "iso": "AX",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Albania",
+    "code": "+355",
+    "iso": "AL",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Algeria",
+    "code": "+213",
+    "iso": "DZ",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "American Samoa",
+    "code": "+1684",
+    "iso": "AS",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Andorra",
+    "code": "+376",
+    "iso": "AD",
+    "format": "XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Angola",
+    "code": "+244",
+    "iso": "AO",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Anguilla",
+    "code": "+1264",
+    "iso": "AI",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Antarctica",
+    "code": "+672",
+    "iso": "AQ",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Antigua and Barbuda",
+    "code": "+1268",
+    "iso": "AG",
+    "format": "(268) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Argentina",
+    "code": "+54",
+    "iso": "AR",
+    "format": "X XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Armenia",
+    "code": "+374",
+    "iso": "AM",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Aruba",
+    "code": "+297",
+    "iso": "AW",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Australia",
+    "code": "+61",
+    "iso": "AU",
+    "format": "X XXXX-XXXX",
+    "flag": "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='32' fill='#00008B'/><path d='M0 0l16 16M16 0L0 16' stroke='#fff' stroke-width='2'/><path d='M8 0v16M0 8h16' stroke='#fff' stroke-width='3'/><path d='M8 0v16M0 8h16' stroke='#FF0000' stroke-width='2'/><circle cx='24' cy='8' r='1' fill='#fff'/><circle cx='28' cy='14' r='1' fill='#fff'/><circle cx='24' cy='20' r='1' fill='#fff'/><circle cx='20' cy='14' r='1' fill='#fff'/><circle cx='24' cy='26' r='1' fill='#fff'/></svg>"
+  },
+  {
+    "name": "Austria",
+    "code": "+43",
+    "iso": "AT",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Azerbaijan",
+    "code": "+994",
+    "iso": "AZ",
+    "format": "XX-XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Bahamas",
+    "code": "+1242",
+    "iso": "BS",
+    "format": "(242) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Bahrain",
+    "code": "+973",
+    "iso": "BH",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Bangladesh",
+    "code": "+880",
+    "iso": "BD",
+    "format": "XXXX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Barbados",
+    "code": "+1246",
+    "iso": "BB",
+    "format": "(246) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Belarus",
+    "code": "+375",
+    "iso": "BY",
+    "format": "XX-XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Belgium",
+    "code": "+32",
+    "iso": "BE",
+    "format": "XXXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Belize",
+    "code": "+501",
+    "iso": "BZ",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Benin",
+    "code": "+229",
+    "iso": "BJ",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Bermuda",
+    "code": "+1441",
+    "iso": "BM",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Bhutan",
+    "code": "+975",
+    "iso": "BT",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Bolivia",
+    "code": "+591",
+    "iso": "BO",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Bosnia and Herzegovina",
+    "code": "+387",
+    "iso": "BA",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Botswana",
+    "code": "+267",
+    "iso": "BW",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Brazil",
+    "code": "+55",
+    "iso": "BR",
+    "format": "XX XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "British Indian Ocean Territory",
+    "code": "+246",
+    "iso": "IO",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Brunei Darussalam",
+    "code": "+673",
+    "iso": "BN",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Bulgaria",
+    "code": "+359",
+    "iso": "BG",
+    "format": "XXX-XX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Burkina Faso",
+    "code": "+226",
+    "iso": "BF",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Burundi",
+    "code": "+257",
+    "iso": "BI",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Cambodia",
+    "code": "+855",
+    "iso": "KH",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Cameroon",
+    "code": "+237",
+    "iso": "CM",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Canada",
+    "code": "+1",
+    "iso": "CA",
+    "format": "XXX-XXX-XXXX",
+    "flag": "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='32' fill='#fff'/><rect width='8' height='32' fill='#FF0000'/><rect x='24' width='8' height='32' fill='#FF0000'/><path d='M16 8l1 4h4l-3 3 1 4-3-2-3 2 1-4-3-3h4z' fill='#FF0000'/></svg>"
+  },
+  {
+    "name": "Cape Verde",
+    "code": "+238",
+    "iso": "CV",
+    "format": "XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Cayman Islands",
+    "code": "+345",
+    "iso": "KY",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Central African Republic",
+    "code": "+236",
+    "iso": "CF",
+    "format": "XX-XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Chad",
+    "code": "+235",
+    "iso": "TD",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Chile",
+    "code": "+56",
+    "iso": "CL",
+    "format": "X XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "China",
+    "code": "+86",
+    "iso": "CN",
+    "format": "XXXX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Christmas Island",
+    "code": "+61",
+    "iso": "CX",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Cocos (Keeling) Islands",
+    "code": "+61",
+    "iso": "CC",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Colombia",
+    "code": "+57",
+    "iso": "CO",
+    "format": "X XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Comoros",
+    "code": "+269",
+    "iso": "KM",
+    "format": "XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Congo",
+    "code": "+242",
+    "iso": "CG",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Congo",
+    "code": "+243",
+    "iso": "CD",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Cook Islands",
+    "code": "+682",
+    "iso": "CK",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Costa Rica",
+    "code": "+506",
+    "iso": "CR",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Cote d'Ivoire",
+    "code": "+225",
+    "iso": "CI",
+    "format": "XX-XX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Croatia",
+    "code": "+385",
+    "iso": "HR",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Cuba",
+    "code": "+53",
+    "iso": "CU",
+    "format": "X XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Cyprus",
+    "code": "+357",
+    "iso": "CY",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Czech Republic",
+    "code": "+420",
+    "iso": "CZ",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Denmark",
+    "code": "+45",
+    "iso": "DK",
+    "format": "XX-XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Djibouti",
+    "code": "+253",
+    "iso": "DJ",
+    "format": "XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Dominica",
+    "code": "+1767",
+    "iso": "DM",
+    "format": "(767) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Dominican Republic",
+    "code": "+1849",
+    "iso": "DO",
+    "format": "(809) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Ecuador",
+    "code": "+593",
+    "iso": "EC",
+    "format": "XX XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Egypt",
+    "code": "+20",
+    "iso": "EG",
+    "format": "XX-XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "El Salvador",
+    "code": "+503",
+    "iso": "SV",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Equatorial Guinea",
+    "code": "+240",
+    "iso": "GQ",
+    "format": "XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Eritrea",
+    "code": "+291",
+    "iso": "ER",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Estonia",
+    "code": "+372",
+    "iso": "EE",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Ethiopia",
+    "code": "+251",
+    "iso": "ET",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Falkland Islands (Malvinas)",
+    "code": "+500",
+    "iso": "FK",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Faroe Islands",
+    "code": "+298",
+    "iso": "FO",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Fiji",
+    "code": "+679",
+    "iso": "FJ",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Finland",
+    "code": "+358",
+    "iso": "FI",
+    "format": "XX XXXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "France",
+    "code": "+33",
+    "iso": "FR",
+    "format": "XX-XX-XX-XX",
+    "flag": "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><rect width='10.6' height='32' fill='#002395'/><rect x='10.6' width='10.8' height='32' fill='#fff'/><rect x='21.4' width='10.6' height='32' fill='#ED2939'/></svg>"
+  },
+  {
+    "name": "French Guiana",
+    "code": "+594",
+    "iso": "GF",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "French Polynesia",
+    "code": "+689",
+    "iso": "PF",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Gabon",
+    "code": "+241",
+    "iso": "GA",
+    "format": "XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Gambia",
+    "code": "+220",
+    "iso": "GM",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Georgia",
+    "code": "+995",
+    "iso": "GE",
+    "format": "(5X) XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Germany",
+    "code": "+49",
+    "iso": "DE",
+    "format": "XXXX-XXXXXXX",
+    "flag": "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='10.6' fill='#000'/><rect y='10.6' width='32' height='10.8' fill='#D00'/><rect y='21.4' width='32' height='10.6' fill='#FFCE00'/></svg>"
+  },
+  {
+    "name": "Ghana",
+    "code": "+233",
+    "iso": "GH",
+    "format": "XX XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Gibraltar",
+    "code": "+350",
+    "iso": "GI",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Greece",
+    "code": "+30",
+    "iso": "GR",
+    "format": "XXX XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Greenland",
+    "code": "+299",
+    "iso": "GL",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Grenada",
+    "code": "+1473",
+    "iso": "GD",
+    "format": "(473) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Guadeloupe",
+    "code": "+590",
+    "iso": "GP",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Guam",
+    "code": "+1671",
+    "iso": "GU",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Guatemala",
+    "code": "+502",
+    "iso": "GT",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Guernsey",
+    "code": "+44",
+    "iso": "GG",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Guinea",
+    "code": "+224",
+    "iso": "GN",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Guinea-Bissau",
+    "code": "+245",
+    "iso": "GW",
+    "format": "XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Guyana",
+    "code": "+595",
+    "iso": "GY",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Haiti",
+    "code": "+509",
+    "iso": "HT",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Honduras",
+    "code": "+504",
+    "iso": "HN",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Hong Kong",
+    "code": "+852",
+    "iso": "HK",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Hungary",
+    "code": "+36",
+    "iso": "HU",
+    "format": "(1) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Iceland",
+    "code": "+354",
+    "iso": "IS",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "India",
+    "code": "+91",
+    "iso": "IN",
+    "format": "XXXXX-XXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Indonesia",
+    "code": "+62",
+    "iso": "ID",
+    "format": "XXX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Iran",
+    "code": "+98",
+    "iso": "IR",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Iraq",
+    "code": "+964",
+    "iso": "IQ",
+    "format": "XXX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Ireland",
+    "code": "+353",
+    "iso": "IE",
+    "format": "XX XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Isle of Man",
+    "code": "+44",
+    "iso": "IM",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Israel",
+    "code": "+972",
+    "iso": "IL",
+    "format": "X-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Italy",
+    "code": "+39",
+    "iso": "IT",
+    "format": "XXX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Jamaica",
+    "code": "+1876",
+    "iso": "JM",
+    "format": "(876) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Japan",
+    "code": "+81",
+    "iso": "JP",
+    "format": "0X-XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Jersey",
+    "code": "+44",
+    "iso": "JE",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Jordan",
+    "code": "+962",
+    "iso": "JO",
+    "format": "XXX-XXXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Kazakhstan",
+    "code": "+77",
+    "iso": "KZ",
+    "format": "(7XX) XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Kenya",
+    "code": "+254",
+    "iso": "KE",
+    "format": "XXXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Kiribati",
+    "code": "+686",
+    "iso": "KI",
+    "format": "XXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Kuwait",
+    "code": "+965",
+    "iso": "KW",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Kyrgyzstan",
+    "code": "+996",
+    "iso": "KG",
+    "format": "XXX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Laos",
+    "code": "+856",
+    "iso": "LA",
+    "format": "XX XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Latvia",
+    "code": "+371",
+    "iso": "LV",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Lebanon",
+    "code": "+961",
+    "iso": "LB",
+    "format": "XX XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Lesotho",
+    "code": "+266",
+    "iso": "LS",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Liberia",
+    "code": "+231",
+    "iso": "LR",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Libyan Arab Jamahiriya",
+    "code": "+218",
+    "iso": "LY",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Liechtenstein",
+    "code": "+423",
+    "iso": "LI",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Lithuania",
+    "code": "+370",
+    "iso": "LT",
+    "format": "XXX-XX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Luxembourg",
+    "code": "+352",
+    "iso": "LU",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Macao",
+    "code": "+853",
+    "iso": "MO",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Macedonia",
+    "code": "+389",
+    "iso": "MK",
+    "format": "XXX-XXX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Madagascar",
+    "code": "+261",
+    "iso": "MG",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Malawi",
+    "code": "+265",
+    "iso": "MW",
+    "format": "X XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Malaysia",
+    "code": "+60",
+    "iso": "MY",
+    "format": "XX-XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Maldives",
+    "code": "+960",
+    "iso": "MV",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Mali",
+    "code": "+223",
+    "iso": "ML",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Malta",
+    "code": "+356",
+    "iso": "MT",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Marshall Islands",
+    "code": "+692",
+    "iso": "MH",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Martinique",
+    "code": "+596",
+    "iso": "MQ",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Mauritania",
+    "code": "+222",
+    "iso": "MR",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Mauritius",
+    "code": "+230",
+    "iso": "MU",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Mayotte",
+    "code": "+262",
+    "iso": "YT",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Mexico",
+    "code": "+52",
+    "iso": "MX",
+    "format": "XXXX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Micronesia",
+    "code": "+691",
+    "iso": "FM",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Moldova",
+    "code": "+373",
+    "iso": "MD",
+    "format": "(XX) XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Monaco",
+    "code": "+377",
+    "iso": "MC",
+    "format": "XX-XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Mongolia",
+    "code": "+976",
+    "iso": "MN",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Montenegro",
+    "code": "+382",
+    "iso": "ME",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Montserrat",
+    "code": "+1664",
+    "iso": "MS",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Morocco",
+    "code": "+212",
+    "iso": "MA",
+    "format": "(X) XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Mozambique",
+    "code": "+258",
+    "iso": "MZ",
+    "format": "XX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Myanmar (Burma)",
+    "code": "+95",
+    "iso": "MM",
+    "format": "X XX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Namibia",
+    "code": "+264",
+    "iso": "NA",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Nauru",
+    "code": "+674",
+    "iso": "NR",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Nepal",
+    "code": "+977",
+    "iso": "NP",
+    "format": "X-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Netherlands",
+    "code": "+31",
+    "iso": "NL",
+    "format": "XXXX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Netherlands Antilles",
+    "code": "+599",
+    "iso": "AN",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "New Caledonia",
+    "code": "+687",
+    "iso": "NC",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "New Zealand",
+    "code": "+64",
+    "iso": "NZ",
+    "format": "X XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Nicaragua",
+    "code": "+505",
+    "iso": "NI",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Niger",
+    "code": "+227",
+    "iso": "NE",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Nigeria",
+    "code": "+234",
+    "iso": "NG",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Niue",
+    "code": "+683",
+    "iso": "NU",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Norfolk Island",
+    "code": "+672",
+    "iso": "NF",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "North Korea",
+    "code": "+850",
+    "iso": "KP",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Northern Mariana Islands",
+    "code": "+1670",
+    "iso": "MP",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Norway",
+    "code": "+47",
+    "iso": "NO",
+    "format": "XXX XX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Oman",
+    "code": "+968",
+    "iso": "OM",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Pakistan",
+    "code": "+92",
+    "iso": "PK",
+    "format": "XXXX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Palau",
+    "code": "+680",
+    "iso": "PW",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Palestine",
+    "code": "+970",
+    "iso": "PS",
+    "format": "XXXX-XXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Panama",
+    "code": "+507",
+    "iso": "PA",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Papua New Guinea",
+    "code": "+675",
+    "iso": "PG",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Paraguay",
+    "code": "+595",
+    "iso": "PY",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Peru",
+    "code": "+51",
+    "iso": "PE",
+    "format": "XXXX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Philippines",
+    "code": "+63",
+    "iso": "PH",
+    "format": "XXX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Pitcairn",
+    "code": "+872",
+    "iso": "PN",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Poland",
+    "code": "+48",
+    "iso": "PL",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Portugal",
+    "code": "+351",
+    "iso": "PT",
+    "format": "XXX XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Puerto Rico",
+    "code": "+1939",
+    "iso": "PR",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Qatar",
+    "code": "+974",
+    "iso": "QA",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Reunion",
+    "code": "+262",
+    "iso": "RE",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Romania",
+    "code": "+40",
+    "iso": "RO",
+    "format": "XXXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Russia",
+    "code": "+7",
+    "iso": "RU",
+    "format": "(XXX) XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Rwanda",
+    "code": "+250",
+    "iso": "RW",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Saint Barthelemy",
+    "code": "+590",
+    "iso": "BL",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Saint Helena",
+    "code": "+290",
+    "iso": "SH",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Saint Kitts and Nevis",
+    "code": "+1869",
+    "iso": "KN",
+    "format": "(869) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Saint Lucia",
+    "code": "+1758",
+    "iso": "LC",
+    "format": "(758) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Saint Martin",
+    "code": "+590",
+    "iso": "MF",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Saint Pierre and Miquelon",
+    "code": "+508",
+    "iso": "PM",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Saint Vincent and the Grenadines",
+    "code": "+1784",
+    "iso": "VC",
+    "format": "(784) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Samoa",
+    "code": "+685",
+    "iso": "WS",
+    "format": "XXXX",
+    "flag": ""
+  },
+  {
+    "name": "San Marino",
+    "code": "+378",
+    "iso": "SM",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Sao Tome and Principe",
+    "code": "+239",
+    "iso": "ST",
+    "format": "XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Saudi Arabia",
+    "code": "+966",
+    "iso": "SA",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Senegal",
+    "code": "+221",
+    "iso": "SN",
+    "format": "XX-XX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Serbia",
+    "code": "+381",
+    "iso": "RS",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Seychelles",
+    "code": "+248",
+    "iso": "SC",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Sierra Leone",
+    "code": "+232",
+    "iso": "SL",
+    "format": "XX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Singapore",
+    "code": "+65",
+    "iso": "SG",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Slovakia",
+    "code": "+421",
+    "iso": "SK",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Slovenia",
+    "code": "+386",
+    "iso": "SI",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Solomon Islands",
+    "code": "+677",
+    "iso": "SB",
+    "format": "XXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Somalia",
+    "code": "+252",
+    "iso": "SO",
+    "format": "X XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "South Africa",
+    "code": "+27",
+    "iso": "ZA",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "South Georgia and the South Sandwich Islands",
+    "code": "+500",
+    "iso": "GS",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "South Korea",
+    "code": "+82",
+    "iso": "KR",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "South Sudan",
+    "code": "+211",
+    "iso": "SS",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Spain",
+    "code": "+34",
+    "iso": "ES",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Sri Lanka",
+    "code": "+94",
+    "iso": "LK",
+    "format": "X XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Sudan",
+    "code": "+249",
+    "iso": "SD",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Suriname",
+    "code": "+597",
+    "iso": "SR",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Svalbard and Jan Mayen",
+    "code": "+47",
+    "iso": "SJ",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Swaziland",
+    "code": "+268",
+    "iso": "SZ",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Sweden",
+    "code": "+46",
+    "iso": "SE",
+    "format": "XXX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Switzerland",
+    "code": "+41",
+    "iso": "CH",
+    "format": "XX-XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Syria",
+    "code": "+963",
+    "iso": "SY",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Taiwan",
+    "code": "+886",
+    "iso": "TW",
+    "format": "XXXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Tajikistan",
+    "code": "+992",
+    "iso": "TJ",
+    "format": "(XXX) XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Tanzania",
+    "code": "+255",
+    "iso": "TZ",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Thailand",
+    "code": "+66",
+    "iso": "TH",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Timor-Leste",
+    "code": "+670",
+    "iso": "TL",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Togo",
+    "code": "+228",
+    "iso": "TG",
+    "format": "XX-XX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Tokelau",
+    "code": "+690",
+    "iso": "TK",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Tonga",
+    "code": "+676",
+    "iso": "TO",
+    "format": "XXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Trinidad and Tobago",
+    "code": "+1868",
+    "iso": "TT",
+    "format": "(868) XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Tunisia",
+    "code": "+216",
+    "iso": "TN",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Turkey",
+    "code": "+90",
+    "iso": "TR",
+    "format": "XXXX-XXX-XX",
+    "flag": ""
+  },
+  {
+    "name": "Turkmenistan",
+    "code": "+993",
+    "iso": "TM",
+    "format": "XX-XXX-XXX",
+    "flag": ""
+  },
+  {
+    "name": "Turks and Caicos Islands",
+    "code": "+1649",
+    "iso": "TC",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Tuvalu",
+    "code": "+688",
+    "iso": "TV",
+    "format": "XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Uganda",
+    "code": "+256",
+    "iso": "UG",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Ukraine",
+    "code": "+380",
+    "iso": "UA",
+    "format": "XX-XXX-XX-XX",
+    "flag": ""
+  },
+  {
+    "name": "United Arab Emirates",
+    "code": "+971",
+    "iso": "AE",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "United Kingdom",
+    "code": "+44",
+    "iso": "GB",
+    "format": "XXXX XXXXXXX",
+    "flag": "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='32' fill='#00247D'/><path d='M0 0l32 32M32 0L0 32' stroke='#fff' stroke-width='4'/><path d='M0 0l32 32M32 0L0 32' stroke='#CF142B' stroke-width='2'/><path d='M16 0v32M0 16h32' stroke='#fff' stroke-width='6'/><path d='M16 0v32M0 16h32' stroke='#CF142B' stroke-width='4'/></svg>"
+  },
+  {
+    "name": "United States",
+    "code": "+1",
+    "iso": "US",
+    "format": "XXX-XXX-XXXX",
+    "flag": "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='32' fill='#B22234'/><path d='M0 2.46h32M0 7.38h32M0 12.3h32M0 17.23h32M0 22.15h32M0 27.07h32' stroke='#fff' stroke-width='2.46'/><rect width='13.1' height='9.8' fill='#3C3B6E'/></svg>"
+  },
+  {
+    "name": "Uruguay",
+    "code": "+598",
+    "iso": "UY",
+    "format": "XX XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Uzbekistan",
+    "code": "+998",
+    "iso": "UZ",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Vanuatu",
+    "code": "+678",
+    "iso": "VU",
+    "format": "XXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Vatican City",
+    "code": "+379",
+    "iso": "VA",
+    "format": "XXXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Venezuela",
+    "code": "+58",
+    "iso": "VE",
+    "format": "XXXX-XXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Vietnam",
+    "code": "+84",
+    "iso": "VN",
+    "format": "XXX-XXXXXXX",
+    "flag": ""
+  },
+  {
+    "name": "Virgin Islands",
+    "code": "+1284",
+    "iso": "VG",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Virgin Islands",
+    "code": "+1340",
+    "iso": "VI",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Wallis and Futuna",
+    "code": "+681",
+    "iso": "WF",
+    "format": "",
+    "flag": ""
+  },
+  {
+    "name": "Yemen",
+    "code": "+967",
+    "iso": "YE",
+    "format": "XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Zambia",
+    "code": "+260",
+    "iso": "ZM",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  },
+  {
+    "name": "Zimbabwe",
+    "code": "+263",
+    "iso": "ZW",
+    "format": "XX-XXX-XXXX",
+    "flag": ""
+  }
+]

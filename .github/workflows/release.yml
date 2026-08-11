@@ -59,11 +59,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            pkg-config libclang-dev \
+            pkg-config libclang-dev protobuf-compiler \
             libsodium-dev libfido2-dev libsqlcipher-dev
       - name: Install C dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install pkg-config libsodium sqlcipher libfido2 llvm
+        run: brew install pkg-config libsodium sqlcipher libfido2 protobuf llvm
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:

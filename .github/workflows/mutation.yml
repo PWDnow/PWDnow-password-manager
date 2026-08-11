@@ -22,7 +22,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            pkg-config libclang-dev libsodium-dev libfido2-dev libsqlcipher-dev
+            pkg-config libclang-dev protobuf-compiler \
+            libsodium-dev libfido2-dev libsqlcipher-dev
       - uses: taiki-e/install-action@v2
         with: { tool: cargo-mutants }
       - run: cargo mutants --no-shuffle --timeout 300 --output mutants.out --jobs 2 || true
