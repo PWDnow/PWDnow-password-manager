@@ -40,13 +40,18 @@ jobs:
         continue-on-error: true
 
       - name: Setup Pages
+        id: setup_pages
         uses: actions/configure-pages@v4
+        continue-on-error: true
 
       - name: Upload artifact
+        if: steps.setup_pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'web/graphify-out'
 
       - name: Deploy to GitHub Pages
+        if: steps.setup_pages.outcome == 'success'
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
