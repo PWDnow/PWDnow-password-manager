@@ -45,9 +45,6 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: vault-daemon-linux-amd64
-          - os: ubuntu-24.04-arm64
-            target: aarch64-unknown-linux-gnu
-            artifact: vault-daemon-linux-arm64
           - os: macos-14
             target: aarch64-apple-darwin
             artifact: vault-daemon-macos-arm64
@@ -109,7 +106,7 @@ jobs:
           mkdir -p release/pwdnow
           cp -r artifacts/web-dist/web/dist release/pwdnow/web-dist
           cp artifacts/web-dist/bom-npm.json release/pwdnow/ 2>/dev/null || true
-          for bin in vault-daemon-linux-amd64 vault-daemon-linux-arm64 vault-daemon-macos-arm64; do
+          for bin in vault-daemon-linux-amd64 vault-daemon-macos-arm64; do
             src="artifacts/$bin/$bin"
             [ -f "$src" ] && cp "$src" "release/pwdnow/$bin" || true
           done
@@ -118,7 +115,7 @@ jobs:
           cd release
           tar -czvf pwdnow-release.tar.gz pwdnow/
           cd pwdnow
-          sha256sum vault-daemon-linux-amd64 vault-daemon-linux-arm64 \
+          sha256sum vault-daemon-linux-amd64 \
             vault-daemon-macos-arm64 2>/dev/null > ../checksums.sha256 || true
           sha256sum ../pwdnow-release.tar.gz >> ../checksums.sha256
       - name: Generate SLSA Provenance
@@ -141,7 +138,6 @@ jobs:
             release/pwdnow-release.bundle
             release/checksums.sha256
             release/pwdnow/vault-daemon-linux-amd64
-            release/pwdnow/vault-daemon-linux-arm64
             release/pwdnow/vault-daemon-macos-arm64
             release/pwdnow/bom-npm.json
             release/pwdnow/bom-rust.json
