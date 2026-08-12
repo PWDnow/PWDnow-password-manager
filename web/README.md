@@ -2,7 +2,6 @@
 
 React 19 + Express frontend and IPC proxy for the PWDnow vault daemon.
 
-See the [project README](../README.md) for an overview, installation instructions, and supported platforms, and [`CLAUDE.md`](CLAUDE.md) in this directory for frontend architecture, conventions, and the cryptographic boundaries the frontend must never cross.
 
 ## Quick start
 

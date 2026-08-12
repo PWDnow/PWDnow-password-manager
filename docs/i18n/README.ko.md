@@ -205,7 +205,6 @@ PWDnow/
 └── hibp/       오프라인 HIBP Cuckoo 필터를 빌드하는 스크립트.
 ```
 
-기여자와 자동화 도구가 사용하는 전체 아키텍처 참조는 [`CLAUDE.md`](../../CLAUDE.md)를, localStorage 키 레지스트리, 새 데몬 엔드포인트를 추가할 때의 IPC 체크리스트, 프론트엔드가 절대 넘어서는 안 되는 암호화 경계를 포함한 프론트엔드 관련 규약은 [`web/CLAUDE.md`](../../web/CLAUDE.md)를 참고하세요.
 
 ## 테스트
 
@@ -246,7 +245,6 @@ PWDnow는 자격 증명을 다루기 때문에, 이곳에서의 취약점 보고
 - `make lint`(`cargo clippy -D warnings` 및 `tsc --noEmit`)와 `make test`를 실행하세요
 - 프론트엔드나 인증 관련 변경 사항이라면 Playwright 전체 회귀 스위트를 실행하세요
 - 암호화 관련 변경은 데몬 안에만 두세요. 웹 계층은 기능 변경의 부작용으로 키 자료에 접근할 수 있게 되어서는 절대 안 됩니다
-- `CLAUDE.md`와 `web/CLAUDE.md`에 설명된 규약을 따르세요
 
 ## 라이선스
 

@@ -205,7 +205,6 @@ PWDnow/
 └── hibp/       Skrip yang membangun filter Cuckoo HIBP offline.
 ```
 
-Lihat [`CLAUDE.md`](../../CLAUDE.md) untuk referensi arsitektur lengkap yang digunakan oleh kontributor dan perkakas otomatis, dan [`web/CLAUDE.md`](../../web/CLAUDE.md) untuk konvensi khusus frontend, termasuk registri kunci localStorage, daftar periksa IPC untuk menambahkan endpoint daemon baru, dan batas kriptografis yang tidak boleh pernah dilewati frontend.
 
 ## Pengujian
 
@@ -246,7 +245,6 @@ Tiket dan pull request sangat diterima. Sebelum mengirimkan perubahan:
 - Jalankan `make lint` (`cargo clippy -D warnings` dan `tsc --noEmit`) dan `make test`
 - Untuk perubahan frontend atau autentikasi, jalankan rangkaian regresi Playwright secara lengkap
 - Jaga agar perubahan kriptografis hanya berada di daemon; lapisan web tidak boleh pernah mendapatkan akses ke materi kunci sebagai efek samping dari perubahan fitur
-- Ikuti konvensi yang dijelaskan dalam `CLAUDE.md` dan `web/CLAUDE.md`
 
 ## Lisensi
 

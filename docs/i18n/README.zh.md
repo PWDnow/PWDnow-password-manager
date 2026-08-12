@@ -206,7 +206,6 @@ PWDnow/
 └── hibp/       用于构建离线 HIBP Cuckoo 过滤器的脚本。
 ```
 
-有关贡献者和自动化工具所使用的完整架构参考,请参阅 [`CLAUDE.md`](../../CLAUDE.md);有关前端特定的约定,包括 localStorage 键注册表、为守护进程新增端点时需要遵循的 IPC 检查清单,以及前端绝不能跨越的加密边界,请参阅 [`web/CLAUDE.md`](../../web/CLAUDE.md)。
 
 ## 测试
 
@@ -247,7 +246,6 @@ PWDnow 处理的是凭证数据,因此这里的漏洞报告比大多数项目更
 - 运行 `make lint`(`cargo clippy -D warnings` 与 `tsc --noEmit`)以及 `make test`
 - 对于前端或身份验证方面的更改,请运行完整的 Playwright 回归测试套件
 - 将加密相关的更改保留在守护进程内;Web 层绝不能因为功能更改而附带获得对密钥材料的访问权限
-- 遵循 `CLAUDE.md` 和 `web/CLAUDE.md` 中描述的约定
 
 ## 许可证
 

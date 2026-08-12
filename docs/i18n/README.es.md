@@ -206,7 +206,6 @@ PWDnow/
 └── hibp/       Script que construye el filtro de Cuckoo HIBP sin conexión.
 ```
 
-Consulta [`CLAUDE.md`](../../CLAUDE.md) para la referencia arquitectónica completa usada por colaboradores y herramientas automatizadas, y [`web/CLAUDE.md`](../../web/CLAUDE.md) para las convenciones específicas del frontend, incluido el registro de claves de localStorage, la lista de comprobación IPC para añadir un nuevo comando al daemon, y los límites criptográficos que el frontend nunca debe cruzar.
 
 ## Pruebas
 
@@ -247,7 +246,6 @@ Los tickets y las pull requests son bienvenidos. Antes de enviar un cambio:
 - Ejecuta `make lint` (`cargo clippy -D warnings` y `tsc --noEmit`) y `make test`
 - Para cambios de frontend o de autenticación, ejecuta la suite completa de regresión de Playwright
 - Mantén los cambios criptográficos únicamente en el daemon; la capa web nunca debe obtener acceso a material de claves como efecto secundario de un cambio de función
-- Sigue las convenciones descritas en `CLAUDE.md` y `web/CLAUDE.md`
 
 ## Licencia
 

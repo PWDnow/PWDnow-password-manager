@@ -13,7 +13,6 @@
 - Reference spec: `PWDnow/docs/superpowers/specs/2026-07-21-extension-ui-i18n-a11y-design.md`.
 - Design tokens are ported **verbatim** from `PWDnow/web/src/index.css` (exact hex values given in Task 1) — do not invent new colors.
 - 13 supported language codes, exactly: `en, fr, es, de, it, pt, ru, ar, hi, zh, ja, ko, id`. Arabic (`ar`) is the only RTL language.
-- Icons: `lucide-react` for in-UI icons (matches the web app's own convention, per its `web/CLAUDE.md`: "Icons: lucide-react") — not custom hand-drawn SVGs, not an icon font. The toolbar icon is the one exception: a hand-authored master SVG (`assets/icon.svg`), rasterized for the manifest.
 - i18n uses **statically bundled** locale resources (`resources: {...}` passed directly to `i18next.init()`), never `i18next-http-backend` — an extension has no server to fetch translations from at runtime.
 - Every one of the 13 locale JSON files must have identical key structure to `en.json` — verified by an automated completeness test, not manual review.
 - WCAG 2.2 AAA: every redesigned screen's test file gets an automated `axe(container)` check asserting zero violations, using whatever `vitest-axe` (or equivalent, verified at Task 4) actually provides.

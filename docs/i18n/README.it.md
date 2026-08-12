@@ -206,7 +206,6 @@ PWDnow/
 └── hibp/       Script che costruisce il filtro di Cuckoo HIBP offline.
 ```
 
-Consultate [`CLAUDE.md`](../../CLAUDE.md) per il riferimento architetturale completo usato dai collaboratori e dagli strumenti automatizzati, e [`web/CLAUDE.md`](../../web/CLAUDE.md) per le convenzioni specifiche del frontend, incluso il registro delle chiavi di localStorage, la checklist IPC per aggiungere un nuovo endpoint al daemon, e i confini crittografici che il frontend non deve mai oltrepassare.
 
 ## Test
 
@@ -247,7 +246,6 @@ Ticket e pull request sono benvenuti. Prima di inviare una modifica:
 - Eseguite `make lint` (`cargo clippy -D warnings` e `tsc --noEmit`) e `make test`
 - Per le modifiche al frontend o all'autenticazione, eseguite la suite di regressione Playwright completa
 - Mantenete le modifiche crittografiche solo nel daemon; il livello web non deve mai ottenere accesso al materiale chiave come effetto collaterale di una modifica a una funzionalità
-- Seguite le convenzioni descritte in `CLAUDE.md` e `web/CLAUDE.md`
 
 ## Licenza
 

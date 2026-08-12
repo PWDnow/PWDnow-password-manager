@@ -92,7 +92,6 @@ NONE 17                                                           99.99%
 | v1 claim | Reality on disk | Impact |
 |---|---|---|
 | "C-01 `mfaCfg` ReferenceError crashes every server-mode login" | Already fixed at `web/auth.js:1004` — `const mfaCfg = readUserBlob(u.id, 'mfa_config', {});`. flaws.md is stale. | +4 pts |
-| "AppArmor profile hardcoded to `aarch64-linux-gnu`" | Profile uses the `@{multiarch}` tunable (`deploy/apparmor.d/vault-daemon:18-21`), which the AppArmor parser resolves to the correct triple per host. **The CLAUDE.md note that says it's hardcoded is itself outdated.** | +1 pt |
 
 ### Corrections to *this* (v2) assessment (added 2026-07-28)
 
@@ -781,7 +780,6 @@ There is no single source of truth for the port. Audit + fix:
 | `web/server.js:23` | `process.env.PORT \|\| 3000` | → `\|\| 1234` |
 | `web/ecosystem.config.cjs:13,17` | `PORT: 1234` | OK |
 | `web/playwright.config.ts:8,31` | `http://localhost:1234`, `http://127.0.0.1:1234` | OK (correct already) |
-| `web/CLAUDE.md` "Vite dev server on :3000" | misleading wording | Clarify: dev server is `:5173` (per package.json), production is `:1234` |
 | `web/.env.example` | (unreadable here) | Add explicit `PORT=1234` with comment "must match nginx upstream and ecosystem.config.cjs" |
 | `deploy/nginx/vault.conf:135-139,153,158,164` | `127.0.0.1:1234` | OK |
 | `server.js:491-498` Allowed WS Origins | computed from `PORT` | OK only after fix #1 |

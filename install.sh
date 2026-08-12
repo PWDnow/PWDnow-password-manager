@@ -1040,7 +1040,6 @@ run_install() {
     # /opt/pwdnow. A production .env gets created from .env.example instead
     # (see the HTTPS step below).
     local rsync_excludes=(--exclude target --exclude node_modules --exclude .git
-        --exclude '*.db' --exclude '*.db.meta' --exclude grpc.token --exclude .claude-flow
         --exclude .env)
     if command -v rsync &>/dev/null; then
         sudo rsync -a --info=progress2 "${rsync_excludes[@]}" \
@@ -1061,7 +1060,6 @@ run_install() {
             step_progress "" "Copying ${sub}/..."
             sudo mkdir -p "$INSTALL_DIR/$sub"
             (cd "$SCRIPT_DIR/$sub" && sudo tar --exclude=target --exclude=node_modules --exclude=.git \
-                --exclude='*.db' --exclude='*.db.meta' --exclude=grpc.token --exclude=.claude-flow --exclude=.env \
                 -cf - .) | (cd "$INSTALL_DIR/$sub" && sudo tar -xf -)
         done
     fi
