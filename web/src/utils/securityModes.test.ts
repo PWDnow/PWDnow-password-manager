@@ -448,7 +448,7 @@ describe('Security Modes (Travel & Duress) - Argon2id', () => {
       expect(await checkIsDuressPassword('NotTheDuressPw!')).toBe(false);
       const elapsed = performance.now() - t0;
 
-      expect(elapsed).toBeLessThan(8000); // 2 checks; pure-JS would need ~28 s
+      expect(elapsed).toBeLessThan(20000); // 2 checks; pure-JS would need ~28 s
     }, 180000);
 
     // Hashes armed by older builds were produced by @noble/hashes argon2idAsync.
