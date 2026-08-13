@@ -86,7 +86,7 @@
     "chrome-launcher": "^1.2.1",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
-    "lighthouse": "^12.6.1",
+    "lighthouse": "^13.4.1",
     "node-pg-migrate": "^8.0.4",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.22.5",
