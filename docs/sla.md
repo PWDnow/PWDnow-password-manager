@@ -609,7 +609,7 @@ Non-negotiable. Until this is done, no SLA can be measured and the project can't
 
 ### Phase 3 — TWO HOSTS, ACTIVE-ACTIVE (6 weeks → ~ 92/100)
 1. **Shared storage** — Ceph or EFS for vault files; or shard per-user across hosts via consistent hashing on user UUID.
-2. **CRDT for shared mutable state** — lockout counters, challenge map. (The repo already has a `crdt-synchronizer` subagent in `.claude/`; presumably for this.)
+2. **CRDT for shared mutable state** — lockout counters, challenge map.
 3. **Sticky WS sessions** by `tab_nonce` hash → consistent host; or pub/sub for cross-host session messages (Redis Streams / NATS).
 4. **Blue-green deploys** with canary on 1 % of traffic for 10 min, watched against SLI burn rate.
 
